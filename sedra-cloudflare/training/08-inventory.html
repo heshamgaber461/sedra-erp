@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sedra — المخزون / Inventory</title>
+<link rel="stylesheet" href="deck.css">
+</head>
+<body>
+<div class="toolbar">
+  <button onclick="window.print()">🖨️ Print / Save as PDF</button>
+  <a class="ghost" href="index.html">⬅ كل الأقسام</a>
+  <span class="hint">قسم المخزون</span>
+</div>
+
+<div class="deck">
+
+  <section class="slide title">
+    <div class="brand"><span class="dot">S</span> Sedra Electric</div>
+    <h1>المخزون</h1>
+    <p class="sub">Inventory — أصناف + باركود + مخازن + مشتريات<span class="en">Items · Barcode · Warehouses · Purchasing</span></p>
+    <div class="tag">المخزون</div>
+  </section>
+
+  <section class="slide">
+    <h2>ليه القسم ده مهم؟ <span class="en">Why it matters</span></h2>
+    <ul class="points">
+      <li>تعرف <b>الكميات الحقيقية</b> وقيمتها لحظيًا.<span class="en">Real-time quantities & value.</span></li>
+      <li>تنبيهات <b>نقص المخزون</b> وإعادة طلب تلقائية.<span class="en">Low-stock alerts & auto reorder.</span></li>
+      <li><b>باركود وماسح كاميرا</b> يسرّعوا الجرد والبيع.<span class="en">Barcode + camera scanner.</span></li>
+    </ul>
+  </section>
+
+  <section class="slide">
+    <h2>تبويبات المخزون <span class="en">Inventory tabs</span></h2>
+    <div class="cards three">
+      <div class="card"><div class="ic">📦</div><h3>الأصناف</h3><p>إضافة صنف، باركود، حد إعادة الطلب.<span class="en">Items & barcode.</span></p></div>
+      <div class="card"><div class="ic">🔁</div><h3>حركة المخزون</h3><p>إدخال/إخراج وتحويل بين المخازن.<span class="en">Stock moves & transfer.</span></p></div>
+      <div class="card"><div class="ic">🔄</div><h3>إعادة الطلب</h3><p>أصناف تحت الحد + Draft PO تلقائي.<span class="en">Reorder + auto Draft PO.</span></p></div>
+      <div class="card"><div class="ic">🏷️</div><h3>الموردون</h3><p>بيانات الموردين.<span class="en">Suppliers.</span></p></div>
+      <div class="card"><div class="ic">🧾</div><h3>أوامر الشراء (PO)</h3><p>طلب وشراء واستلام.<span class="en">Purchase orders.</span></p></div>
+      <div class="card"><div class="ic">💲</div><h3>تقييم المخزون</h3><p>القيمة = كمية × تكلفة.<span class="en">Valuation.</span></p></div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <h2>إضافة صنف + باركود <span class="en">Add item + barcode</span></h2>
+    <ol class="steps">
+      <li>تبويب <b>الأصناف</b> → <b>«+ إضافة صنف»</b> (اسم، SKU، التصنيف، السعر، التكلفة، الكمية، حد إعادة الطلب).<span class="en">Add item with SKU, price, cost, reorder level.</span></li>
+      <li>كل صنف بيتولّدله <b>باركود Code 39</b> تقدر تطبعه كليبل.<span class="en">Each item gets a printable barcode.</span></li>
+      <li>استخدم <b>ماسح الكاميرا</b> للبحث/الجرد السريع.<span class="en">Use the camera scanner.</span></li>
+    </ol>
+  </section>
+
+  <section class="slide">
+    <h2>مخازن وتحويل + إعادة طلب <span class="en">Warehouses & reorder</span></h2>
+    <ul class="points">
+      <li>تعدد <b>مخازن</b> و<b>تحويل كميات</b> بينها (transfer).<span class="en">Multiple warehouses + transfer.</span></li>
+      <li>تبويب <b>إعادة الطلب</b> يعرض الأصناف تحت الحد.<span class="en">Reorder tab lists low items.</span></li>
+      <li>اضغط <b>«+ Draft PO»</b> فيتعمل أمر شراء مبدئي تلقائيًا — حدّد المورد وأرسله.<span class="en">Auto-create a Draft PO; set supplier & send.</span></li>
+    </ul>
+    <div class="note warn">حدّث الكميات بعد أي إدخال/إخراج عشان التقارير والقيمة تفضل دقيقة.</div>
+  </section>
+
+  <section class="slide">
+    <h2>أوامر الشراء (PO) <span class="en">Purchase orders</span></h2>
+    <ol class="steps">
+      <li>تبويب <b>أوامر الشراء</b> → <b>«+ أمر شراء جديد»</b> واختار المورد والبنود.<span class="en">New PO: supplier + items.</span></li>
+      <li>غيّر الحالة لـ <b>Ordered</b> بعد الإرسال.<span class="en">Mark Ordered.</span></li>
+      <li>عند الوصول اضغط <b>📥 استلام</b> — الكميات تتزوّد للمخزون.<span class="en">Receive → stock increases.</span></li>
+    </ol>
+  </section>
+
+  <section class="slide">
+    <h2>خلاصة <span class="en">Recap</span></h2>
+    <ul class="points">
+      <li>بيانات الأصناف والكميات لازم <b>تتحدّث فورًا</b>.<span class="en">Keep items & quantities current.</span></li>
+      <li>استخدم <b>إعادة الطلب التلقائية</b> عشان متخلّصش أصناف.<span class="en">Use auto reorder.</span></li>
+      <li>استلم أوامر الشراء على النظام عشان المخزون يزيد صح.<span class="en">Receive POs in the system.</span></li>
+    </ul>
+  </section>
+
+</div>
+</body>
+</html>

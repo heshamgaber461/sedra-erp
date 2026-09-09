@@ -1,0 +1,30 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "$collection": {
+      ".read": "auth != null && $collection != 'attachments' && $collection != 'attachmentAccess'",
+      ".write": "auth != null && $collection != 'attachments' && $collection != 'attachmentAccess'"
+    },
+    "attachments": {
+      ".indexOn": [
+        "rec",
+        "byEmail"
+      ],
+      ".read": "auth != null && auth.token.email != null && auth.token.email.toLowerCase() == 'heshamgaber461@gmail.com'",
+      "$attachmentId": {
+        ".read": "auth != null && auth.token.email != null && (auth.token.email.toLowerCase() == 'heshamgaber461@gmail.com' || data.child('byEmail').val() == auth.token.email.toLowerCase() || root.child('attachmentAccess').child(auth.token.email.toLowerCase().replace('.', '%2E')).child($attachmentId).exists())",
+        ".write": "auth != null && auth.token.email != null && ((!data.exists() && newData.child('byEmail').val() == auth.token.email.toLowerCase()) || (data.exists() && (data.child('byEmail').val() == auth.token.email.toLowerCase() || auth.token.email.toLowerCase() == 'heshamgaber461@gmail.com')))"
+      }
+    },
+    "attachmentAccess": {
+      "$emailKey": {
+        ".read": "auth != null && auth.token.email != null && ($emailKey == auth.token.email.toLowerCase().replace('.', '%2E') || auth.token.email.toLowerCase() == 'heshamgaber461@gmail.com')",
+        "$attachmentId": {
+          ".write": "auth != null && auth.token.email != null && (auth.token.email.toLowerCase() == 'heshamgaber461@gmail.com' || root.child('attachments').child($attachmentId).child('byEmail').val() == auth.token.email.toLowerCase())",
+          ".validate": "newData.val() == true || !newData.exists()"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sedra — الإدارة / Admin</title>
+<link rel="stylesheet" href="deck.css">
+</head>
+<body>
+<div class="toolbar">
+  <button onclick="window.print()">🖨️ Print / Save as PDF</button>
+  <a class="ghost" href="index.html">⬅ كل الأقسام</a>
+  <span class="hint">قسم الإدارة (أدمن)</span>
+</div>
+
+<div class="deck">
+
+  <section class="slide title">
+    <div class="brand"><span class="dot">S</span> Sedra Electric</div>
+    <h1>الإدارة</h1>
+    <p class="sub">Admin — المستخدمون · الصلاحيات · الاستيراد · النسخ<span class="en">Users · Access · Import · Backup</span></p>
+    <div class="tag">للأدمن</div>
+  </section>
+
+  <section class="slide">
+    <h2>ليه القسم ده مهم؟ <span class="en">Why it matters</span></h2>
+    <ul class="points">
+      <li>تتحكم في <b>مين يدخل ومين يشوف إيه</b>.<span class="en">Control who accesses what.</span></li>
+      <li>تستورد بيانات بسرعة وتعمل <b>نسخة احتياطية</b>.<span class="en">Import data & back up.</span></li>
+      <li>تتابع <b>سجل النشاط</b> لكل تغيير.<span class="en">Activity log of every change.</span></li>
+    </ul>
+  </section>
+
+  <section class="slide">
+    <h2>المستخدمون والصلاحيات <span class="en">Users & access</span></h2>
+    <ol class="steps">
+      <li>تبويب <b>المستخدمون</b> → <b>«+ إضافة موظف»</b> (اسم، إيميل، كلمة مؤقتة، قسم، صلاحية).<span class="en">Add member with temp password.</span></li>
+      <li>حدّد <b>الفروع</b> المسموح بيها + <b>صلاحيات إضافية (Extra section access)</b> لو محتاج.<span class="en">Set branches + extra section access.</span></li>
+      <li><b>تعديل</b> أو <b>🗑 حذف</b> الموظف، أو إرسال <b>دعوة</b> لإعادة تعيين كلمة المرور.<span class="en">Edit, delete, or invite.</span></li>
+    </ol>
+    <div class="note warn">الحذف يشيل بروفايل الموظف من النظام. حساب الدخول في Firebase يفضل — يتشال يدويًا لو محتاج.</div>
+  </section>
+
+  <section class="slide">
+    <h2>الصلاحيات الإضافية <span class="en">Extra access (accessModules)</span></h2>
+    <ul class="points">
+      <li>الموظف بيشوف <b>قسمه الأساسي</b> افتراضيًا.<span class="en">Member sees their own dept.</span></li>
+      <li>تقدر تديله <b>شاشات زيادة</b> (مثلاً مندوب Sales → Quotations + Marketing).<span class="en">Grant extra screens via chips.</span></li>
+      <li><b>Super Admin / Management</b> بيشوفوا كل حاجة.<span class="en">Admin/Management see everything.</span></li>
+    </ul>
+  </section>
+
+  <section class="slide">
+    <h2>الاستيراد والنسخ الاحتياطي <span class="en">Import & backup</span></h2>
+    <ul class="points">
+      <li><b>استيراد CSV:</b> ارفع ملف، عاين، ثم استورد.<span class="en">Import CSV: upload, preview, run.</span></li>
+      <li><b>نسخة احتياطية:</b> نزّل ملف كل البيانات (Download backup).<span class="en">Download a full backup.</span></li>
+      <li><b>استرجاع:</b> ارفع نسخة سابقة لاستعادتها (Restore).<span class="en">Restore from a backup.</span></li>
+    </ul>
+    <div class="note">اعمل نسخة احتياطية دورية — خصوصًا قبل أي استيراد كبير.</div>
+  </section>
+
+  <section class="slide">
+    <h2>خلاصة <span class="en">Recap</span></h2>
+    <ul class="points">
+      <li>امنح أقل صلاحية لازمة لكل موظف.<span class="en">Grant least access needed.</span></li>
+      <li>اعمل <b>Backup</b> بانتظام.<span class="en">Back up regularly.</span></li>
+      <li>راجع <b>سجل النشاط</b> عند أي مشكلة.<span class="en">Check the activity log.</span></li>
+    </ul>
+  </section>
+
+</div>
+</body>
+</html>

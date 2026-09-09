@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sedra Electric — تدريب الموظفين على النظام</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#143F63; --navy-d:#0E2F4B; --navy-l:#1d5380; --cyan:#36C5E0;
+    --mist:#E6EAEF; --line:#dfe6ee; --muted:#5A6B7B; --ink:#16242f; --bg:#eef2f7;
+    --soft:#f5f8fb;
+    --font:'IBM Plex Sans Arabic','Segoe UI','Cairo',Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--font);-webkit-font-smoothing:antialiased;direction:rtl}
+  .en{font-family:'Inter',var(--font)}
+  .wrap{max-width:1200px;margin:0 auto;padding:0 20px}
+
+  /* hero */
+  .hero{background:linear-gradient(150deg,var(--navy-l),var(--navy) 45%,var(--navy-d));
+    color:#fff;position:relative;overflow:hidden}
+  .hero .deco{position:absolute;background:rgba(54,197,224,.13);border-radius:34px;transform:skewX(-18deg);pointer-events:none}
+  .hero .deco.a{width:420px;height:190px;top:-60px;inset-inline-start:-80px}
+  .hero .deco.b{width:260px;height:150px;bottom:-50px;inset-inline-start:160px;background:rgba(255,255,255,.05)}
+  .hero .deco.c{width:160px;height:160px;border-radius:50%;top:30px;inset-inline-end:-40px;background:rgba(54,197,224,.10);transform:none}
+  .hero .inner{position:relative;z-index:1;padding:60px 20px 54px;max-width:1200px;margin:0 auto}
+  .eyebrow{display:inline-flex;align-items:center;gap:10px;color:var(--cyan);font-weight:700;font-size:14px;letter-spacing:.4px;margin-bottom:18px}
+  .eyebrow .dot{width:34px;height:34px;border-radius:10px;background:var(--cyan);color:var(--navy-d);
+    display:inline-flex;align-items:center;justify-content:center;font-size:18px;font-weight:800}
+  .hero h1{font-size:42px;line-height:1.12;letter-spacing:-.6px;margin-bottom:12px;max-width:820px}
+  .hero p{color:#cfe6f2;font-size:18px;font-weight:600;max-width:760px;line-height:1.55}
+
+  /* section groups */
+  .group{margin:38px auto 8px}
+  .group-head{display:flex;align-items:center;gap:12px;margin:30px 0 4px}
+  .group-head .bar{width:30px;height:5px;border-radius:5px;background:var(--cyan)}
+  .group-head h2{color:var(--navy);font-size:21px;letter-spacing:-.2px}
+  .group-head .sub{color:var(--muted);font-size:13.5px;font-weight:600}
+
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin:16px 0}
+  @media(max-width:980px){.grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:640px){.grid{grid-template-columns:1fr}}
+
+  .tile{display:flex;flex-direction:column;text-decoration:none;background:#fff;border:1px solid var(--line);
+    border-radius:16px;padding:22px 22px 18px;position:relative;overflow:hidden;
+    box-shadow:0 10px 30px rgba(14,47,75,.06);transition:.16s}
+  .tile::before{content:"";position:absolute;inset-inline-start:0;top:0;bottom:0;width:5px;
+    background:linear-gradient(180deg,var(--cyan),var(--navy));opacity:.0;transition:.16s}
+  .tile:hover{transform:translateY(-3px);border-color:var(--cyan);box-shadow:0 16px 38px rgba(14,47,75,.12)}
+  .tile:hover::before{opacity:1}
+  .tile .num{position:absolute;top:18px;inset-inline-end:20px;width:42px;height:42px;border-radius:12px;
+    background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;
+    font-weight:800;font-size:15px;font-family:'Inter',var(--font)}
+  .tile .ic{font-size:30px;margin-bottom:10px}
+  .tile h3{color:var(--navy);font-size:19px;margin-bottom:2px;padding-inline-end:48px}
+  .tile .role-en{color:var(--cyan);font-weight:700;font-size:13px;font-family:'Inter',var(--font);margin-bottom:8px}
+  .tile p{color:var(--muted);font-size:13.5px;line-height:1.55;flex:1}
+  .tile .aud{margin-top:13px;display:inline-flex;align-items:center;gap:6px;align-self:flex-start;
+    background:#eef4fa;border:1px solid var(--line);color:var(--navy);font-weight:700;font-size:12px;
+    padding:5px 12px;border-radius:20px}
+
+  /* footer note */
+  .foot{margin:34px auto 60px}
+  .note{background:#eafaff;border:1px solid #c3e9f3;border-inline-start:5px solid var(--cyan);
+    border-radius:12px;padding:16px 18px;color:var(--navy-d);font-size:14.5px;line-height:1.6}
+  .note b{color:var(--navy)}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <span class="deco a"></span><span class="deco b"></span><span class="deco c"></span>
+  <div class="inner">
+    <span class="eyebrow"><span class="dot">S</span> Sedra Electric — Company Management System</span>
+    <h1>تدريب الموظفين على النظام</h1>
+    <p>دليل عملي لكل قسم — إزاي تستخدمه خطوة بخطوة (عربي + إنجليزي). اختار قسمك، اقرأ الشرائح، ولو عايز PDF افتح العرض واعمل <b>Print → Save as PDF</b>.</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section class="group">
+    <div class="group-head"><span class="bar"></span><h2>ابدأ من هنا</h2><span class="sub">— لكل الموظفين</span></div>
+    <div class="grid">
+      <a class="tile" href="00-overview.html"><span class="num">00</span><div class="ic">🧭</div><h3>نظرة عامة على النظام</h3><div class="role-en">System Overview</div><p>الدخول، جولة في الواجهة، الفروع والعملات، اللغة، والصلاحيات.</p><span class="aud">👥 لكل الموظفين</span></a>
+      <a class="tile" href="15-collaboration.html"><span class="num">15</span><div class="ic">💬</div><h3>التعاون وأدواتك اليومية</h3><div class="role-en">Collaboration</div><p>الشات الداخلي، التقويم، المهام الشخصية، والإشعارات.</p><span class="aud">👥 لكل الموظفين</span></a>
+      <a class="tile" href="12-attendance.html"><span class="num">12</span><div class="ic">🕒</div><h3>الحضور</h3><div class="role-en">Attendance</div><p>تسجيل الحضور والانصراف بالـ GPS من الموبايل.</p><span class="aud">👥 لكل الموظفين</span></a>
+    </div>
+  </section>
+
+  <section class="group">
+    <div class="group-head"><span class="bar"></span><h2>ملفات الأقسام</h2><span class="sub">— كل قسم وفريقه</span></div>
+    <div class="grid">
+      <a class="tile" href="01-sales-crm.html"><span class="num">01</span><div class="ic">📈</div><h3>المبيعات / CRM</h3><div class="role-en">Sales / CRM</div><p>الـ Pipeline، إضافة Lead، المتابعات، التحويل لعرض، وتحليل الفوز والخسارة.</p><span class="aud">🎯 فريق المبيعات</span></a>
+      <a class="tile" href="02-customers.html"><span class="num">02</span><div class="ic">🤝</div><h3>العملاء</h3><div class="role-en">Customers</div><p>ملف العميل، كشف الحساب، الحد الائتماني، وواتساب.</p><span class="aud">🎯 المبيعات + الحسابات</span></a>
+      <a class="tile" href="03-marketing.html"><span class="num">03</span><div class="ic">📣</div><h3>التسويق</h3><div class="role-en">Marketing</div><p>الحملات، تقويم المحتوى، وربط الإيراد بالمصدر.</p><span class="aud">🎯 فريق التسويق</span></a>
+      <a class="tile" href="04-projects.html"><span class="num">04</span><div class="ic">🏗️</div><h3>المشاريع</h3><div class="role-en">Projects</div><p>إنشاء المشاريع، المراحل، المهام، ونسبة الإنجاز.</p><span class="aud">🛠️ العمليات والفنيين</span></a>
+      <a class="tile" href="05-operations.html"><span class="num">05</span><div class="ic">🛠️</div><h3>العمليات</h3><div class="role-en">Operations</div><p>لوحة المهام (Kanban) وسجل الساعات (Timesheets).</p><span class="aud">🛠️ العمليات والفنيين</span></a>
+      <a class="tile" href="07-quotations.html"><span class="num">07</span><div class="ic">📄</div><h3>عروض الأسعار</h3><div class="role-en">Quotations</div><p>إنشاء عرض، البنود، الضريبة، الطباعة، والتحويل لفاتورة.</p><span class="aud">🎯 المبيعات / العمليات</span></a>
+      <a class="tile" href="08-inventory.html"><span class="num">08</span><div class="ic">📦</div><h3>المخزون والمشتريات</h3><div class="role-en">Inventory</div><p>الأصناف، الباركود، المخازن، إعادة الطلب، وأوامر الشراء.</p><span class="aud">📦 المخازن والمشتريات</span></a>
+      <a class="tile" href="09-accounting.html"><span class="num">09</span><div class="ic">💰</div><h3>الحسابات والفواتير</h3><div class="role-en">Accounting</div><p>الفواتير، التحصيل، أعمار الديون، VAT، والمصروفات والعقود.</p><span class="aud">💰 فريق الحسابات</span></a>
+      <a class="tile" href="06-support-field.html"><span class="num">06</span><div class="ic">🎫</div><h3>الدعم والخدمة الميدانية</h3><div class="role-en">Support & Field</div><p>تذاكر الدعم وجدولة الزيارات الميدانية وتوثيق الفنيين.</p><span class="aud">🎫 الدعم والفنيون</span></a>
+      <a class="tile" href="11-hr.html"><span class="num">11</span><div class="ic">👔</div><h3>الموارد البشرية</h3><div class="role-en">HR</div><p>دليل الموظفين، طلبات الإجازات، وكشوف الرواتب.</p><span class="aud">👔 الموارد البشرية</span></a>
+      <a class="tile" href="10-reports.html"><span class="num">10</span><div class="ic">📊</div><h3>مركز التقارير</h3><div class="role-en">Reports & BI</div><p>بناء أي تقرير بالتجميع والقياس والتصدير.</p><span class="aud">📊 الإدارة + الأقسام</span></a>
+    </div>
+  </section>
+
+  <section class="group">
+    <div class="group-head"><span class="bar"></span><h2>للمسؤولين فقط</h2><span class="sub">— Super Admin والإدارة</span></div>
+    <div class="grid">
+      <a class="tile" href="14-admin.html"><span class="num">14</span><div class="ic">⚙️</div><h3>الإدارة والصلاحيات</h3><div class="role-en">Administration</div><p>المستخدمون والصلاحيات، حذف الموظفين، الاستيراد، والنسخ الاحتياطي.</p><span class="aud">🔒 الأدمن فقط</span></a>
+      <a class="tile" href="13-automation.html"><span class="num">13</span><div class="ic">⚡</div><h3>الأتمتة</h3><div class="role-en">Automation</div><p>قواعد «لو حصل كذا → اعمل كذا» تشتغل تلقائيًا.</p><span class="aud">🔒 الأدمن فقط</span></a>
+    </div>
+  </section>
+
+  <section class="foot">
+    <div class="note"><b>إزاي تطلّع PDF؟</b> افتح أي عرض → اضغط زرار <b>🖨️ Print / Save as PDF</b> فوق (أو Ctrl+P) → من «الوجهة / Destination» اختار <b>Save as PDF</b> → خلّي الاتجاه <b>Landscape</b> → Save. كل شريحة هتطلع في صفحة مستقلة.</div>
+  </section>
+
+</div>
+</body>
+</html>

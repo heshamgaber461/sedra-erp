@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sedra Electric — Internship Application</title>
+<meta name="description" content="Apply for the Sedra Electric internship program — for students and fresh graduates in smart systems & electrical engineering.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<style>
+:root{--navy:#143F63;--navy-d:#0d2c47;--navy-dd:#081c2e;--cyan:#1FA6C4;--cyan-l:#38d0ec;--ink:#0f1e29;--muted:#5A6B7B;--line:#e6edf3;--bg:#f4f8fb}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Manrope',system-ui,sans-serif;background:radial-gradient(900px 500px at 80% 0%,rgba(31,166,196,.18),transparent),linear-gradient(165deg,var(--navy-dd),var(--navy) 60%,var(--navy-d));min-height:100vh;color:var(--ink);padding:24px 16px}
+h1,h2,h3,.disp{font-family:'Outfit',sans-serif;letter-spacing:-.4px}
+.wrap{max-width:620px;margin:0 auto}
+.head{text-align:center;color:#fff;padding:14px 0 26px}
+.logo{display:inline-flex;align-items:center;gap:11px;font-family:'Outfit';font-weight:800;font-size:25px;color:#fff;margin-bottom:22px}
+.logo .mk{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--cyan),var(--cyan-l));display:grid;place-items:center;box-shadow:0 8px 20px rgba(31,166,196,.5)}
+.logo .mk svg{width:24px;height:24px}
+.logo small{display:block;font-family:'Manrope';font-size:9px;font-weight:400;letter-spacing:1.5px;color:var(--cyan-l);text-transform:uppercase}
+.pill{display:inline-flex;align-items:center;gap:8px;background:rgba(56,208,236,.16);border:1px solid rgba(56,208,236,.4);color:var(--cyan-l);font-family:'Outfit';font-weight:600;font-size:12.5px;letter-spacing:1px;padding:6px 14px;border-radius:50px;margin-bottom:16px;text-transform:uppercase}
+.head h1{font-size:clamp(24px,5vw,34px);font-weight:800;margin-bottom:10px}
+.head h1 span{color:var(--cyan-l)}
+.head p{color:rgba(255,255,255,.78);font-size:15px;max-width:470px;margin:0 auto}
+.card{background:#fff;border-radius:22px;padding:26px 22px;box-shadow:0 30px 70px rgba(0,0,0,.3)}
+.fld{margin-bottom:15px}
+.fld label{display:block;font-family:'Outfit';font-weight:600;font-size:13px;color:var(--navy);margin-bottom:7px}
+.fld label .req{color:#e0533b}
+.fld input,.fld select,.fld textarea{width:100%;background:var(--bg);border:1.5px solid var(--line);border-radius:12px;padding:13px 14px;font-family:'Manrope';font-size:15px;color:var(--ink);transition:.2s}
+.fld input:focus,.fld select:focus,.fld textarea:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 0 3px rgba(31,166,196,.14)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.seg{display:flex;gap:10px}
+.seg label{flex:1;position:relative;cursor:pointer}
+.seg input{position:absolute;opacity:0}
+.seg span{display:block;text-align:center;padding:12px;border:1.5px solid var(--line);border-radius:12px;font-family:'Outfit';font-weight:600;font-size:14px;color:var(--muted);transition:.2s}
+.seg input:checked+span{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn{width:100%;background:linear-gradient(135deg,var(--cyan),var(--cyan-l));color:#04222c;font-family:'Outfit';font-weight:800;font-size:17px;padding:16px;border-radius:14px;border:none;cursor:pointer;transition:.2s;margin-top:6px}
+.btn:hover{transform:translateY(-2px);box-shadow:0 14px 32px rgba(31,166,196,.45)}
+.btn:disabled{opacity:.6;cursor:default;transform:none}
+.note{text-align:center;font-size:12px;color:var(--muted);margin-top:14px}
+.err{background:#fdecea;color:#b8322a;border-radius:10px;padding:11px 14px;font-size:13.5px;margin-bottom:14px;display:none}
+.foot{text-align:center;color:rgba(255,255,255,.5);font-size:12px;margin-top:22px}
+.thanks{display:none;text-align:center;padding:34px 20px}
+.thanks .ok{width:82px;height:82px;border-radius:50%;background:linear-gradient(135deg,#1a7a4f,#2fbd7e);display:grid;place-items:center;margin:0 auto 20px;box-shadow:0 16px 40px rgba(47,189,126,.4)}
+.thanks .ok svg{width:42px;height:42px;stroke:#fff;stroke-width:2.4;fill:none}
+.thanks h2{color:var(--navy);font-size:26px;margin-bottom:10px}
+.thanks p{color:var(--muted);font-size:15px;max-width:380px;margin:0 auto 20px}
+.wa{display:inline-flex;align-items:center;gap:9px;background:#25D366;color:#fff;font-family:'Outfit';font-weight:700;padding:13px 22px;border-radius:12px;text-decoration:none;font-size:15px}
+.wa svg{width:20px;height:20px;fill:#fff}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div class="logo"><span class="mk"><svg viewBox="0 0 24 24"><path d="M13 2L4.5 13.5H11l-1 8.5L19.5 10H13l0-8z" fill="#fff"/></svg></span><span>SEDRA<small>Reach the nature energy</small></span></div>
+    <span class="pill">⚡ Internship Program</span>
+    <h1>Apply for the <span>Sedra Internship</span></h1>
+    <p>A hands-on internship for students &amp; fresh graduates in smart systems, security, networks and electrical engineering. Fill in your details and our team will reach out.</p>
+  </div>
+
+  <div class="card">
+    <div class="err" id="err"></div>
+    <form id="form" onsubmit="return submitForm(event)">
+      <div class="fld"><label>Full name <span class="req">*</span></label><input id="f_name" required placeholder="Your full name"></div>
+      <div class="row2">
+        <div class="fld"><label>Mobile number <span class="req">*</span></label><input id="f_phone" required inputmode="tel" placeholder="01xxxxxxxxx"></div>
+        <div class="fld"><label>Email</label><input id="f_email" type="email" placeholder="you@email.com"></div>
+      </div>
+      <div class="fld"><label>University</label><input id="f_uni" placeholder="Your university"></div>
+
+      <div class="fld"><label>Academic status <span class="req">*</span></label>
+        <div class="seg">
+          <label><input type="radio" name="status" value="Student" checked onchange="toggleYear()"><span>Student (still studying)</span></label>
+          <label><input type="radio" name="status" value="Graduate" onchange="toggleYear()"><span>Graduate</span></label>
+        </div>
+      </div>
+
+      <div class="row2">
+        <div class="fld" id="yearWrap"><label>Academic year</label>
+          <select id="f_year"><option value="">— select —</option><option>Preparatory</option><option>1st year</option><option>2nd year</option><option>3rd year</option><option>4th year</option><option>5th year</option></select>
+        </div>
+        <div class="fld"><label>Department / Major</label><input id="f_dept" placeholder="e.g. Electrical / Computer Eng."></div>
+      </div>
+
+      <div class="row2">
+        <div class="fld"><label>Governorate <span class="req">*</span></label>
+          <select id="f_gov" required>
+            <option value="">— select governorate —</option>
+            <option>Cairo</option><option>Giza</option><option>Alexandria</option><option>Qalyubia</option><option>Sharqia</option>
+            <option>Dakahlia</option><option>Beheira</option><option>Gharbia</option><option>Monufia</option><option>Kafr El Sheikh</option>
+            <option>Damietta</option><option>Port Said</option><option>Ismailia</option><option>Suez</option><option>North Sinai</option>
+            <option>South Sinai</option><option>Faiyum</option><option>Beni Suef</option><option>Minya</option><option>Asyut</option>
+            <option>Sohag</option><option>Qena</option><option>Luxor</option><option>Aswan</option><option>Red Sea</option>
+            <option>New Valley</option><option>Matrouh</option>
+          </select>
+        </div>
+        <div class="fld"><label>Best time to contact</label>
+          <select id="f_time"><option value="">— select —</option><option>Morning (9 – 12)</option><option>Noon (12 – 3)</option><option>Afternoon (3 – 6)</option><option>Evening (6 – 9)</option><option>Anytime</option></select>
+        </div>
+      </div>
+
+      <div class="fld"><label>Notes (optional)</label><textarea id="f_notes" rows="2" placeholder="Anything you'd like to add"></textarea></div>
+
+      <button class="btn" id="submitBtn" type="submit">Submit Application</button>
+      <div class="note">Your data is kept private and used only to contact you about the internship.</div>
+    </form>
+
+    <div class="thanks" id="thanks">
+      <div class="ok"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></div>
+      <h2>Application received ✔</h2>
+      <p>Thank you for applying to the Sedra Electric internship. Our team will review your details and get in touch soon.</p>
+    </div>
+  </div>
+
+  <div class="foot">© <span id="yr"></span> Sedra Electric — Internship Program</div>
+</div>
+
+<script>
+var firebaseConfig={apiKey:"AIzaSyBAz-utB_Wbu6J7CQ8hy7mBCMlJvYjsUw4",authDomain:"sedra-crm.firebaseapp.com",projectId:"sedra-crm",storageBucket:"sedra-crm.firebasestorage.app",messagingSenderId:"501278440253",appId:"1:501278440253:web:fd2f5783242afb2d15a354"};
+try{ firebase.initializeApp(firebaseConfig); }catch(e){}
+document.getElementById('yr').textContent=new Date().getFullYear();
+var WA="201125441197";
+function toggleYear(){ var st=document.querySelector('input[name=status]:checked').value; document.getElementById('yearWrap').style.opacity=(st==='Graduate')?'.45':'1'; }
+function gv(id){ var e=document.getElementById(id); return e?e.value.trim():''; }
+function showErr(m){ var e=document.getElementById('err'); e.textContent=m; e.style.display='block'; }
+async function submitForm(ev){
+  ev.preventDefault();
+  document.getElementById('err').style.display='none';
+  var name=gv('f_name'), phone=gv('f_phone'), gov=gv('f_gov');
+  if(!name||!phone||!gov){ showErr('Please complete: full name, mobile number, and governorate.'); return false; }
+  var data={
+    name:name, phone:phone, email:gv('f_email'), university:gv('f_uni'),
+    status:document.querySelector('input[name=status]:checked').value,
+    year:gv('f_year'), department:gv('f_dept'), governorate:gov,
+    bestTime:gv('f_time'), notes:gv('f_notes'),
+    programType:'Internship', source:'internship-landing', stage:'New',
+    created:new Date().toISOString()
+  };
+  var btn=document.getElementById('submitBtn'); btn.disabled=true; btn.textContent='Submitting…';
+  try{
+    var cred=await firebase.auth().signInAnonymously();
+    var token=await cred.user.getIdToken();
+    var res=await fetch('/db',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:token,method:'POST',path:'/applicants.json',body:data})});
+    if(!res.ok) throw new Error(await res.text());
+    document.getElementById('form').style.display='none';
+    document.getElementById('thanks').style.display='block';
+  }catch(e){
+    var msg='*Internship Application — Sedra*%0A'+'Name: '+name+'%0A'+'Mobile: '+phone+'%0A'+'Email: '+(data.email||'-')+'%0A'+'University: '+(data.university||'-')+'%0A'+'Status: '+data.status+'%0A'+'Year: '+(data.year||'-')+'%0A'+'Department: '+(data.department||'-')+'%0A'+'Governorate: '+gov+'%0A'+'Best time: '+(data.bestTime||'-');
+    var t=document.getElementById('thanks');
+    t.innerHTML='<div class="ok" style="background:linear-gradient(135deg,#127a94,#1FA6C4)"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></div><h2>Almost done</h2><p>Tap the button to send your application via WhatsApp and we\'ll get back to you.</p><a class="wa" href="https://wa.me/'+WA+'?text='+msg+'"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-8.6 15l-1.3 4.7L7 20.4A10 10 0 1012 2z"/></svg>Send via WhatsApp</a>';
+    document.getElementById('form').style.display='none';
+    t.style.display='block';
+  }
+  return false;
+}
+</script>
+</body>
+</html>
