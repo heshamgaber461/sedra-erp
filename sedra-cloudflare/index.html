@@ -2076,7 +2076,7 @@ function tvPage(key,p){ if(!TV[key])return; TV[key].state.page=p; tvSave(key); c
 function tvSort(key,si){ if(!TV[key])return; TV[key].state.s=si; TV[key].state.page=1; tvSave(key); const b=g('tvb_'+key); if(b)b.innerHTML=tvBody(key); tvCount(key); }
 
 /* ===================== SALES / CRM ===================== */
-const STAGES=['New','Contacted','Qualified','Site Survey','BOQ / Design','Quotation Sent','Negotiation','Won','Lost'];
+const STAGES=['New','Contacted','Qualified','Site Survey','BOQ / Design','Quotation Sent','Negotiation','Won','Lost','Qualification','Pending Quotation','Quotation Ready','Quote Sent','Closed Won','Closed Lost'];
 const SEGMENTS=['B2C Homeowner','Developer','Contractor','Hotel / Hospitality','Commercial','Industrial','Government','Consultant','Other'];
 const SOLUTIONS=['Solar PV','Home Automation','BMS','EV Charger','MEP','Lighting','Solar Water Heating','Energy Audit','Maintenance','Other'];
 const BUDGET_RANGES=['<100k','100k–500k','500k–1M','>1M'];
@@ -2093,7 +2093,7 @@ function managePositions(){ if(!isAdmin()){ alert(lang==='ar'?'Super Admin فق�
 function addPosition(){ var el=g('pos_new'); if(!el||!el.value.trim())return; var nm=el.value.trim();
   apiAdd('positions',{name:nm,by:(me&&me.name)||'',created:new Date().toISOString()}).then(function(id){ positions.push({id:id,name:nm}); logAudit('create','positions',id||'',nm); managePositions(); if(appReady)refreshAll(); }); }
 function delPosition(id){ positions=positions.filter(function(p){return p.id!==id;}); apiDelete('positions',id); managePositions(); }
-const STAGE_COL={New:'#5A6B7B',Contacted:'#2C77B0',Qualified:'#36C5E0','Site Survey':'#8e44ad','BOQ / Design':'#5b6bd6','Quotation Sent':'#e0a93b',Negotiation:'#d3742a',Won:'#1a7a4f',Lost:'#c0392b'};
+const STAGE_COL={New:'#5A6B7B',Contacted:'#2C77B0',Qualified:'#36C5E0','Site Survey':'#8e44ad','BOQ / Design':'#5b6bd6','Quotation Sent':'#e0a93b',Negotiation:'#d3742a',Won:'#1a7a4f',Lost:'#c0392b',Qualification:'#0aa2c0','Pending Quotation':'#d4a017','Quotation Ready':'#6f42c1','Quote Sent':'#e0722a','Closed Won':'#157347','Closed Lost':'#a02722'};
 const LEAD_SOURCES=['Meta Ads','Google Ads','LinkedIn','Organic / SEO','Website','Referral','WhatsApp','Event / Expo','Designer/Architect','Contractor','Walk-in','Instagram','Facebook','Direct','Yasir BD List','Other'];
 const WONLOST_REASONS=['Price','Product fit','Competitor','Timing / not now','No budget','Trust / referral','Service quality','Location','Specs / scope','Other'];
 const STAGE_SCORE={New:10,Contacted:25,Qualified:45,Proposal:65,Negotiation:85,Won:100,Lost:0};
