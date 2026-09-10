@@ -3111,6 +3111,9 @@ function printQuote(id){
   const base=location.origin+'/quotation-covers/';
   const covmap={'Home Automation':'cover-home-automation.jpg','Smart Home':'cover-smart-home.jpg','Home Cinema':'cover-home-cinema.jpg','Indoor Sound System':'cover-indoor-sound.jpg','Outdoor Sound System':'cover-outdoor-sound.jpg','Security Camera':'cover-security-camera.jpg','Intrusion System':'cover-intrusion.jpg','Safety System':'cover-safety-system.jpg','Intercom System':'cover-intercom.jpg','Structured Cabling System':'cover-structured-cabling.jpg','MATV Satellite System':'cover-matv-satellite.jpg','Solar Energy':'cover-solar-energy.jpg','Smart Gates':'cover-smart-gates.jpg'};
   const coverURL=base+(covmap[q.service]||'cover-home-automation.jpg');
+  const GENERAL_COVER=base+'cover-general.jpg';
+  const SYS_COVER={'knx':'cover-knx.jpg','wireless':'cover-wireless.jpg','light current':'cover-light-current.jpg','cctv':'cover-cctv.jpg','fire':'cover-safety-system.jpg','fire system':'cover-safety-system.jpg','safety system':'cover-safety-system.jpg','sound system':'','sound':''};
+  function sysCoverURL(title){ var k=String(title||'').trim().toLowerCase(); if(SYS_COVER.hasOwnProperty(k)) return SYS_COVER[k]?base+SYS_COVER[k]:''; if(covmap[title]) return base+covmap[title]; return ''; }
   const partnersURL=base+'partners-logos.png';
   const MARK='<svg viewBox="22 30 132 140" fill="#0e2c49" style="height:58px"><path d="M70 34 L150 34 L128 70 L48 70 Z"/><path d="M48 82 L128 82 L106 118 L26 118 Z"/><rect x="116" y="82" width="30" height="30" rx="5"/><path d="M88 130 L150 130 L128 166 L66 166 Z"/><rect x="40" y="130" width="30" height="30" rx="5"/></svg>';
   const secs=t.secs;
@@ -3130,10 +3133,14 @@ function printQuote(id){
   const featHTML=(function(){var fl=lines(q.featuresList);return fl.length?`<div class="stitle" style="font-size:15px;margin-top:10px">✨ Features list</div><div class="sec" style="page-break-inside:avoid;border-color:#37c0dc"><ul style="padding:14px 30px;margin:0;line-height:1.9;font-size:12.5px;color:#1c2b3a;columns:2;-webkit-columns:2;column-gap:30px">${fl.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')}</ul></div>`:'';})();
   const payHTML=pay.length?`<div class="stitle" style="font-size:15px;margin-top:6px">Payment terms</div><div class="pay">${pay.map(pp=>`<div class="pc"><div class="k">${esc(pp[0].toUpperCase())}</div><div class="v">${num(pp[1])}%</div></div>`).join('')}</div>`:'';
   const WMARK=MARK.split('#0e2c49').join('#ffffff').replace('height:58px','height:82px');
-  const sedraCover=`<div class="sheet A4 scover pad"><span class="mk">${WMARK}</span><div class="wm">SEDRA</div><div class="tl">Electric</div><div class="rule"></div><div style="font-size:18px;font-weight:800;letter-spacing:2px;margin-bottom:18px">Integrated Systems Proposal</div><div class="syslist">${secs.map(sc=>`<div class="syschip">${esc(sc.title||'System')}</div>`).join('')}</div>${ccardHTML}</div>`;
-  const serviceCover=`<div class="sheet A4 cover"><img src="${coverURL}">${ccardHTML}</div>`;
-  const coverHTML=multi?sedraCover:serviceCover;
-  const sysPages=secs.map((sc,i)=>`<div class="sheet pad">${theadHTML}<div class="sysbig"><span class="ix">System ${i+1}</span>${esc(sc.title||('System '+(i+1)))}</div><div class="sysrule"></div>${SYS_IMG[sc.title]?`<div class="sysbanner"><img src="${esc(SYS_IMG[sc.title])}"></div>`:''}${metaHTML}<div class="sec">${rowsTbl(sc)}<div class="sect"><span>Total &mdash; ${esc((sc.title||('System '+(i+1))).toUpperCase())}</span><span>${M(t.secTotals[i])}</span></div></div>${ftHTML}</div>`).join('');
+  const frontURL=multi?GENERAL_COVER:(sysCoverURL((secs[0]&&secs[0].title))||GENERAL_COVER);
+  const coverHTML=`<div class="sheet A4 cover"><img src="${frontURL}">${ccardHTML}</div>`;
+  const sysPages=secs.map((sc,i)=>{
+    const sc_url=sysCoverURL(sc.title);
+    const scover=sc_url?`<div class="sheet A4 cover syscover"><img src="${sc_url}"></div>`:'';
+    const spage=`<div class="sheet pad">${theadHTML}<div class="sysbig"><span class="ix">System ${i+1}</span>${esc(sc.title||('System '+(i+1)))}</div><div class="sysrule"></div>${SYS_IMG[sc.title]?`<div class="sysbanner"><img src="${esc(SYS_IMG[sc.title])}"></div>`:''}${metaHTML}<div class="sec">${rowsTbl(sc)}<div class="sect"><span>Total &mdash; ${esc((sc.title||('System '+(i+1))).toUpperCase())}</span><span>${M(t.secTotals[i])}</span></div></div>${ftHTML}</div>`;
+    return scover+spage;
+  }).join('');
   const summaryPage=`<div class="sheet pad">${theadHTML}<div class="stitle">Financial Summary</div>${metaHTML}<div class="sec"><table class="sumtbl"><thead><tr><th>System</th><th class="r">Total</th></tr></thead><tbody>${secs.map((sc,i)=>`<tr><td class="pn">${esc(sc.title||('System '+(i+1)))}</td><td class="r"><b>${M(t.secTotals[i])}</b></td></tr>`).join('')}</tbody></table></div>${finHTML}${featHTML}${payHTML}${ftHTML}</div>`;
   const singlePage=`<div class="sheet pad">${theadHTML}<div class="stitle">${esc((secs[0]&&secs[0].title)||q.service||'Quotation')} &mdash; Quotation</div>${metaHTML}${secs.map((sc,i)=>secTable(sc,i)).join('')}${finHTML}${featHTML}${payHTML}${ftHTML}</div>`;
   const termsPage=`<div class="sheet pad"><div class="stitle">Terms &amp; Conditions</div><div class="tc">${(function(){ var ls=terms.length?terms:lines(defQTerms()); return ls.map(function(x){ var s=x.replace(/\t/g,'    '); var tt=s.trim(); if(/^[-•]\s/.test(tt)){ return '<div class="tc-h">'+esc(tt.replace(/^[-•]\s*/,''))+'</div>'; } if(/^·/.test(tt)||/^\s{2,}·/.test(s)){ return '<div class="tc-b">'+esc(tt.replace(/^·\s*/,''))+'</div>'; } return '<div class="tc-p">'+esc(tt)+'</div>'; }).join(''); })()}</div>${excl.length?`<div class="stitle" style="font-size:15px;margin-top:12px">Offer excludes</div><ul style="padding-inline-start:18px;line-height:1.9;font-size:12.5px;color:#3a4a5a">${excl.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}<div class="tc" style="margin-top:12px"><div class="tc-b">This offer is valid for ${num(q.validity)||30} days (until ${esc(validTill||'')}).</div>${q.notes?`<div class="tc-b">${esc(q.notes)}</div>`:''}</div><div class="sign"><div class="s">Prepared by &mdash; ${esc(q.preparedBy||'-')}</div><div class="s">Client approval &mdash; signature &amp; date</div></div>${ftHTML}</div>`;
@@ -3150,6 +3157,9 @@ function printQuote(id){
   .A4{height:1123px}.pad{padding:40px 46px}
   .cover{background:#0e2c49;position:relative}
   .cover img{width:100%;height:100%;object-fit:cover;object-position:center;display:block}
+  .syscover .scov-cap{position:absolute;left:0;right:0;bottom:0;z-index:3;padding:28px 40px 34px;background:linear-gradient(to top,rgba(8,22,38,.82) 0,rgba(8,22,38,.55) 55%,rgba(8,22,38,0) 100%);color:#fff;display:flex;flex-direction:column;gap:6px}
+  .syscover .scov-cap .ix{font-size:12px;font-weight:800;letter-spacing:2px;color:#8fd0e6;text-transform:uppercase}
+  .syscover .scov-cap .nm{font-size:38px;font-weight:800;letter-spacing:1px;line-height:1}
   .imgpage{padding:0;background:#fff}
   .imgpage img{width:100%;height:100%;object-fit:cover;display:block}
   .ccard{position:absolute;right:30px;bottom:30px;z-index:3;background:rgba(8,22,38,.74);border:1px solid rgba(255,255,255,.16);border-radius:14px;padding:14px 20px;color:#fff;min-width:250px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
