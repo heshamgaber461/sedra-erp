@@ -845,7 +845,9 @@ function dupGuard(kind,d,id){
   const existing=dup.rec.name||dup.rec.client||'(record)';
   if(seesAll()||isMine(dup.rec))
     return confirm('⚠️ '+(lang==='ar'?'تكرار محتمل':'Possible duplicate')+' ('+dup.by+'):\n\n"'+existing+'" '+(lang==='ar'?'موجود بالفعل في':'already exists in')+' '+dup.label+' — '+(lang==='ar'?'المالك':'owner')+': '+dup.owner+'.\n\n'+(lang==='ar'?'تحفظ برضه؟':'Save anyway?'));
-  alert('🚫 '+(lang==='ar'?'الرقم/الاسم ده مسجّل بالفعل في النظام. مينفعش تسجّل مكرر — لو محتاج تعرف مين اللي شغّال عليه، نسّق مع الأدمن.':'This number/name is already registered in the system. You cannot register a duplicate — to find who owns it, please coordinate with the admin.'));
+  alert('🚫 '+(lang==='ar'
+    ? ('الرقم/الاسم "'+existing+'" مسجّل بالفعل في '+dup.label+' (المطابقة: '+dup.by+') — المالك: '+dup.owner+'.\n\nمينفعش تسجّل مكرر. نسّق مع '+dup.owner+' أو الأدمن.')
+    : ('"'+existing+'" is already registered in '+dup.label+' (matched by '+dup.by+') — owner: '+dup.owner+'.\n\nYou cannot register a duplicate. Please coordinate with '+dup.owner+' or the admin.')));
   return false;
 }
 /* Duplicate lookup box — anyone can check exists/available with NO details revealed */
@@ -5330,15 +5332,17 @@ function globalSearch(q){ clearTimeout(_gsT); _gsT=setTimeout(function(){ _globa
 function _globalSearchRun(q){ const box=g('searchResults'); if(!box)return; q=(q||'').trim().toLowerCase();
   if(q.length<2){ box.classList.add('hide'); box.innerHTML=''; return; }
   const hit=s=>(s||'').toString().toLowerCase().indexOf(q)>=0; let html=''; const cap=6;
+  const _pkq=_pk(q); const phit=p=>{ if(!_pkq)return false; var pk=_pk(p); return !!pk && (pk===_pkq || pk.indexOf(_pkq)>=0 || _pkq.indexOf(pk)>=0); };
   const add=(label,items)=>{ if(!items.length)return; html+=`<div class="gh2">${label}</div>`+items.slice(0,cap).map(it=>`<button class="res" onclick="${it.act}">${it.html}</button>`).join(''); };
-  if(cvAllowed('sales')) add('Leads', leads.filter(inBranch).filter(r=>canSeeLead(r)).filter(x=>hit(x.name)||hit(x.phone)||hit(x.owner)).map(x=>({html:`<b>${esc(x.name)}</b> <small>${esc(x.stage||'')} · ${esc(x.branch||'')}</small>`,act:`curView='sales';salesTab='leads';closeSearch();render()`})));
+  if(cvAllowed('sales')) add('Leads', leads.filter(inBranch).filter(r=>canSeeLead(r)).filter(x=>hit(x.name)||hit(x.phone)||phit(x.phone)||hit(x.owner)).map(x=>({html:`<b>${esc(x.name)}</b> <small>${esc(x.stage||'')} · ${esc(x.branch||'')}${x.phone?' · '+esc(x.phone):''}</small>`,act:`curView='sales';salesTab='leads';closeSearch();render()`})));
   if(cvAllowed('projects')) add('Projects', projects.filter(inBranch).filter(x=>hit(x.name)||hit(x.client)).map(x=>({html:`<b>${esc(x.name)}</b> <small>${esc(x.client||'')}</small>`,act:`openProjectId='${x.id}';curView='projects';closeSearch();render()`})));
   if(cvAllowed('accounting')) add('Invoices', invoices.filter(inBranch).filter(x=>hit(x.number)||hit(x.client)).map(x=>({html:`<b>${esc(x.number||'')}</b> <small>${esc(x.client||'')}</small>`,act:`curView='accounting';accTab='invoices';closeSearch();render()`})));
   if(cvAllowed('inventory')) add('Inventory', inventory.filter(inBranch).filter(x=>hit(x.name)||hit(x.sku)).map(x=>({html:`<b>${esc(x.name)}</b> <small>${esc(x.sku||'')} · qty ${num(x.qty)}</small>`,act:`curView='inventory';invTab='items';closeSearch();render()`})));
   if(cvAllowed('hr')) add('Employees', employees.filter(x=>hit(x.name)||hit(x.email)||hit(x.dept)).map(x=>({html:`<b>${esc(x.name)}</b> <small>${esc(x.dept||'')} · ${esc(x.role||'')}</small>`,act:`curView='hr';hrTab='directory';closeSearch();render()`})));
   if(cvAllowed('quotes')) add('Quotations', quotes.filter(inBranch).filter(x=>hit(x.number)||hit(x.client)).map(x=>({html:`<b>${esc(x.number||'')}</b> <small>${esc(x.client||'')}</small>`,act:`curView='quotes';closeSearch();render()`})));
   add('Sections', MODULES.filter(canSee).filter(m=>hit(m.label)||hit(m.id)).map(m=>({html:`<b>${m.icon} ${esc(m.label)}</b> <small>section</small>`,act:`go('${m.id}');closeSearch()`})));
-  if(cvAllowed('cust360')) add('Customers', customers.filter(inBranch).filter(x=>hit(x.name)||hit(x.phone)).map(x=>({html:`<b>${esc(x.name)}</b> <small>${esc(x.ctype||'')}</small>`,act:`cust360Id='${x.id}';curView='cust360';closeSearch();render()`})));
+  if(cvAllowed('cust360')||cvAllowed('customers')) add('Customers', customers.filter(inBranch).filter(x=>hit(x.name)||hit(x.phone)||phit(x.phone)).map(x=>({html:`<b>${esc(x.name)}</b> <small>${esc(x.ctype||'')}${x.phone?' · '+esc(x.phone):''}${x.owner?' · '+esc(x.owner):''}</small>`,act:`${cvAllowed('cust360')?"cust360Id='"+x.id+"';curView='cust360'":"curView='customers'"};closeSearch();render()`})));
+  if(cvAllowed('contacts')||cvAllowed('customers')) add('Contacts', (typeof contacts!=='undefined'?contacts:[]).filter(inBranch).filter(x=>hit(x.name)||hit(x.phone)||phit(x.phone)||hit(x.company)).map(x=>({html:`<b>${esc(x.name||'')}</b> <small>${esc(x.company||'')}${x.phone?' · '+esc(x.phone):''}</small>`,act:`curView='contacts';closeSearch();render()`})));
   if(cvAllowed('agreements')) add('Contracts', agreements.filter(inBranch).filter(x=>hit(x.title)||hit(x.party)).map(x=>({html:`<b>${esc(x.title||'')}</b> <small>${esc(x.party||'')}</small>`,act:`go('agreements');closeSearch()`})));
   if(cvAllowed('workorders')) add('Work Orders', workorders.filter(inBranch).filter(x=>hit(x.number)||hit(x.project)||hit(x.assignee)).map(x=>({html:`<b>${esc(x.number||'')}</b> <small>${esc(x.project||'')}</small>`,act:`go('workorders');closeSearch()`})));
   if(cvAllowed('inventory')) add('Suppliers', (suppliers||[]).filter(inBranch).filter(x=>hit(x.name)).map(x=>({html:`<b>${esc(x.name)}</b> <small>supplier</small>`,act:`go('suppscore');closeSearch()`})));
