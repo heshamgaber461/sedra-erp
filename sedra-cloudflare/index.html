@@ -1905,6 +1905,29 @@ function dashAttention(){
   var rows=items.map(function(it){ return '<div class="fi" onclick="'+it.act+'"><div class="fic" style="background:'+it.bg+'18;color:'+it.bg+'">'+it.ic+'</div><div class="ft">'+it.t+'</div>'+(it.m?'<div class="fm">'+it.m+'</div>':'')+'</div>'; }).join('');
   return '<div class="dpanel">'+head+'<div class="dfeed">'+rows+'</div></div>';
 }
+function dashCheckinCard(){
+  try{
+    var offices=attOffices(); if(!offices.length) return '';
+    var rec=myAttToday(); var ar=(lang==='ar');
+    if(rec){
+      var out = rec.outTime ? ('🏁 '+(ar?'انصراف':'out')+' '+esc(rec.outTime)) : ('<button class="btn" onclick="checkOut(\''+rec.id+'\',\''+esc(rec.branch||'')+'\')">🚪 '+(ar?'تسجيل انصراف':'Check Out')+'</button>');
+      return '<div class="card" id="dashAttCard" style="background:linear-gradient(135deg,#e8f5ee,#d6efe0);border-color:#1a7a4f44;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0"><div><b style="color:#1a7a4f;font-size:15px">✅ '+(ar?'مسجّل حضور النهاردة':'Checked in today')+'</b> — '+(FLAG[rec.branch]||'')+' '+esc(rec.branch||'')+' '+esc(rec.inTime||'')+(rec.inDist!=null?' ('+Math.round(rec.inDist)+'m)':'')+'<div id="dashAttMsg" class="mini" style="margin-top:2px"></div></div><div>'+out+'</div></div>';
+    }
+    return '<div class="card" id="dashAttCard" style="background:linear-gradient(135deg,#eaf4fb,#dcecf8);border-color:#157f9644;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0"><div><b style="color:#0e2c49;font-size:15px">📍 '+(ar?'سجّل حضورك النهاردة':'Check in for today')+'</b><div class="mini" id="dashAttMsg" style="margin-top:2px">'+(ar?'من أي مقر: ':'From any office: ')+offices.map(function(o){return (FLAG[o.branch]||'')+' '+o.branch;}).join(' · ')+'</div></div><button class="btn cy" style="font-size:15px;padding:10px 20px" onclick="dashCheckIn()">📍 '+(ar?'تسجيل حضور':'Check In')+'</button></div>';
+  }catch(e){ return ''; }
+}
+function dashCheckIn(){
+  var offices=attOffices(); if(!offices.length) return;
+  var msg=g('dashAttMsg'); if(msg) msg.textContent=(lang==='ar'?'بنجيب موقعك…':'Getting your location…');
+  if(!navigator.geolocation){ if(msg)msg.textContent=(lang==='ar'?'الجهاز مش بيدعم تحديد الموقع.':'Geolocation not supported.'); return; }
+  navigator.geolocation.getCurrentPosition(function(p){
+    var lat=p.coords.latitude,lng=p.coords.longitude,best=null;
+    offices.forEach(function(o){ var d=dist(lat,lng,o.lat,o.lng); if(best===null||d<best.d)best={o:o,d:d}; });
+    if(best && best.d<=best.o.radius){ var o=best.o; var id=(me.email||'').toLowerCase().replace(/[^a-z0-9]/g,'_')+'_'+today();
+      apiMerge('attendance',id,{email:(me.email||'').toLowerCase(),name:me.name,branch:o.branch,date:today(),inTime:nowT(),inLat:lat,inLng:lng,inDist:best.d}).then(function(){ synced(); if(g('dashAttMsg'))g('dashAttMsg').innerHTML='<span style="color:var(--ok)">'+(lang==='ar'?'تم تسجيل الحضور ✔':'Checked in ✔')+'</span>'; render(); });
+    } else if(best){ if(msg)msg.innerHTML='<span style="color:var(--bad)">'+(lang==='ar'?'إنت على بُعد ':'You are ')+Math.round(best.d)+'m '+(lang==='ar'?'من أقرب مقر':'from the nearest office')+' ('+(FLAG[best.o.branch]||'')+' '+best.o.branch+') — '+(lang==='ar'?'لازم تكون في حدود ':'must be within ')+best.o.radius+'m.</span>'; }
+  }, function(e){ if(msg)msg.textContent=(lang==='ar'?'مقدرناش نجيب موقعك: ':'Could not get location: ')+e.message+' ('+(lang==='ar'?'اسمح بالوصول للموقع':'allow location access')+').'; }, {enableHighAccuracy:true,timeout:12000});
+}
 function vDashboard(){
   const b=curBranch;
   const fl = arr=>arr.filter(inBranch);
@@ -1928,6 +1951,7 @@ function vDashboard(){
       <div class="hp"><b>${openProj}</b><span>${lang==='ar'?'مشاريع مفتوحة':'open projects'}</span></div>
       <div class="hp"><b>${myLeads.length}</b><span>Leads</span></div>
     </div></div>`;
+  h+=dashCheckinCard();
   h+=dashQuickActions();
   const chip=(cls,txt)=>`<span class="dl ${cls}">${txt}</span>`;
   const stat=(ic,bg,val,lbl,chipHtml)=>`<div class="dstat" style="background:linear-gradient(135deg,${bg},${_shade(bg)})"><div class="top"><div class="ic">${ic}</div>${chipHtml||''}</div><div><div class="val">${val}</div><div class="lbl">${lbl}</div></div></div>`;
