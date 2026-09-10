@@ -2939,13 +2939,13 @@ function qBlankItem(){ return {item:'',desc:'',brand:'',qty:1,price:0}; }
 function defQExcluding(){ return ['Lights supply','Sockets & switches supply','Sanitary supply','MEP Work (Conduits, Pulling Cables)'].join(NL); }
 function defQTerms(){ return ['- Prices don’t include VAT unless mentioned.','','- Offer Includes:','    · Supervision on the Contractor team in the cabling phase','    · Full Design for all systems','    · Full Installation','    Installation prices include works within Cairo or Giza.','    For any other location, additional charges will apply.','','- Offer Excludes:','    · Any piping or wiring works unless mentioned otherwise','    · Any pipes or cables unless mentioned otherwise','    · Any protection circuit breakers unless mentioned otherwise','','- Payment Terms:','    · Advance Payment: 80% of the total price','    · After Delivery: 10% of the total price','    · After system installation: 10% of the total price','','- Warranty:','    · Warranty against manufacturing defects is 12 Months','','- Delivery:','    · 2-8 Weeks'].join(NL); }
 function qReadDOM(){ _qsec.forEach((s,si)=>{ const t=g('qsT'+si); if(t)s.title=t.value; (s.items||[]).forEach((it,ii)=>{ const gv=f=>{const e=g('q_'+si+'_'+ii+'_'+f);return e?e.value:it[f];}; it.item=gv('item'); it.desc=gv('desc'); it.brand=gv('brand'); it.qty=num(gv('qty')); it.price=num(gv('price')); }); }); }
-function qSecAdd(){ qReadDOM(); _qsec.push({title:'New service',items:[qBlankItem()]}); qSecRender(); }
+function qSecAdd(){ qReadDOM(); _qsec.push({title:'',items:[qBlankItem()]}); qSecRender(); }
 function qSecDel(si){ qReadDOM(); _qsec.splice(si,1); if(!_qsec.length)_qsec=[{title:'Section',items:[qBlankItem()]}]; qSecRender(); }
 function qItemAdd(si){ qReadDOM(); _qsec[si].items.push(qBlankItem()); qSecRender(); }
 function qItemDel(si,ii){ qReadDOM(); _qsec[si].items.splice(ii,1); if(!_qsec[si].items.length)_qsec[si].items.push(qBlankItem()); qSecRender(); }
 function qPickProduct(si,ii,name){ const p=inventory.find(x=>(x.name||'')===name); qReadDOM(); const it=_qsec[si].items[ii]; if(p){ if(!it.item)it.item=p.name||p.category||''; it.desc=p.desc||p.name; if(p.brand)it.brand=p.brand; const pr=num(p.price)||num(p.cost); if(pr)it.price=pr; if(p.image)it.image=p.image; if(p.sku&&!it.item)it.item=p.sku; } qSecRender(); }
 function qSecRender(){ const el=g('qSec'); if(!el)return;
-  const dl=`<datalist id="prod_dl">${inventory.filter(inBranch).map(p=>`<option value="${esc(p.name)}">`).join('')}</datalist>`;
+  const dl=`<datalist id="prod_dl">${inventory.filter(inBranch).map(p=>`<option value="${esc(p.name)}">`).join('')}</datalist><datalist id="sys_dl">${QSYSTEMS.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>`;
   el.innerHTML=dl+_qsec.map((s,si)=>{
     const rows=(s.items||[]).map((it,ii)=>`<tr>
       <td><input id="q_${si}_${ii}_item" value="${esc(it.item||'')}" placeholder="Item" style="width:84px"></td>
@@ -2955,10 +2955,10 @@ function qSecRender(){ const el=g('qSec'); if(!el)return;
       <td><input id="q_${si}_${ii}_price" type="number" value="${num(it.price)||0}" style="width:74px" oninput="qRecalc()"></td>
       <td class="mini" id="q_${si}_${ii}_sub" style="white-space:nowrap">0</td>
       <td><button class="btn dn sm" onclick="qItemDel(${si},${ii})">✕</button></td></tr>`).join('');
-    return `<div class="card" style="margin-bottom:10px;padding:10px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><input id="qsT${si}" value="${esc(s.title||'')}" placeholder="Service name (e.g. Smart Home / Cameras) — printed at the top" style="font-weight:700;flex:1"><button class="btn gh sm" onclick="qSecDel(${si})">🗑 Service</button></div>
+    return `<div class="card" style="margin-bottom:10px;padding:10px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><span class="mini" style="color:#157f96;font-weight:800">System ${si+1}</span><input id="qsT${si}" list="sys_dl" value="${esc(s.title||'')}" placeholder="Choose a system — KNX / Wireless / Light Current / Sound System / CCTV" style="font-weight:700;flex:1"><button class="btn gh sm" onclick="qSecDel(${si})">🗑 Remove system</button></div>
       <div style="overflow-x:auto"><table class="items"><thead><tr><th>Item</th><th>Description</th><th>Brand</th><th>Qty</th><th>Unit</th><th>Sub</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
       <button class="btn gh sm" style="margin-top:6px" onclick="qItemAdd(${si})">+ Add line</button></div>`;
-  }).join('')+`<button class="btn cy" onclick="qSecAdd()">➕ Add service</button>`;
+  }).join('')+`<button class="btn cy" onclick="qSecAdd()">➕ Add another system</button><div class="mini" style="color:var(--muted);margin-top:4px">Pick one system for a simple quote, or add more — each system prints on its own page with its own title, under one Sedra cover.</div>`;
   qRecalc();
 }
 function qCurRate(){ var cur=(g('q_cur')&&val('q_cur'))||'EGP'; if(cur==='EGP') return 1; var man=g('q_fxman')&&g('q_fxman').checked; if(man){ var r=num(val('q_fx')); return r>0?r:fxRateFor(cur); } return fxRateFor(cur); }
@@ -2969,6 +2969,9 @@ function qRecalc(){ qReadDOM(); const cur=(g('q_cur')&&val('q_cur'))||'EGP'; con
   if(tot)tot.innerHTML=`<div style="display:flex;justify-content:space-between"><span>Subtotal (excl. VAT)</span><b>${f(sub)} ${cur}</b></div><div style="display:flex;justify-content:space-between"><span>VAT (${vat}%)</span><b>${f(v)} ${cur}</b></div><div style="display:flex;justify-content:space-between;font-size:16px;color:var(--navy)"><span>Grand total</span><b>${f(sub+v)} ${cur}</b></div>`+baseNote;
 }
 const QSERVICES=['Home Automation','Smart Home','Home Cinema','Indoor Sound System','Outdoor Sound System','Security Camera','Intrusion System','Safety System','Intercom System','Structured Cabling System','MATV Satellite System','Solar Energy','Smart Gates'];
+/* Systems that can each become a page inside one quotation (Hesham: choose one or more, each system prints on its own page with its own title). Images per system are wired via SYS_IMG when supplied. */
+const QSYSTEMS=['KNX','Wireless','Light Current','Sound System','CCTV'];
+const SYS_IMG={}; /* system name -> banner image URL/dataURL, added when Hesham sends the system images */
 function svcAbbr(k){ return ({'home-automation':'HA','smart-home':'SH','home-cinema':'HC','indoor-sound':'ISS','outdoor-sound':'OSS','security-camera':'SC','intrusion':'INT','safety-system':'SF','intercom':'IC','structured-cabling':'SCS','matv-satellite':'MATV','solar-energy':'SOL','smart-gates':'SG'})[k]||'GEN'; }
 function svcKey(name){ return ({'Home Automation':'home-automation','Smart Home':'smart-home','Home Cinema':'home-cinema','Indoor Sound System':'indoor-sound','Outdoor Sound System':'outdoor-sound','Security Camera':'security-camera','Intrusion System':'intrusion','Safety System':'safety-system','Intercom System':'intercom','Structured Cabling System':'structured-cabling','MATV Satellite System':'matv-satellite','Solar Energy':'solar-energy','Smart Gates':'smart-gates'})[name]||'home-automation'; }
 function genQuoteNo(k){ var d=new Date(); var ymd=(''+d.getFullYear()).slice(2)+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2); var n=quotes.filter(function(q){return (q.number||'').indexOf('SDR-')===0;}).length+1; return 'SDR-'+svcAbbr(k)+'-'+ymd+'-'+('00'+n).slice(-3); }
@@ -3062,6 +3065,24 @@ function printQuote(id){
     </tbody></table><div class="sect"><span>Total &mdash; ${esc((sc.title||'').toUpperCase())}</span><span>${M(t.secTotals[i])}</span></div></div>`;
   const pay=[['Advance',q.payAdvance],['Before delivery',q.payBefore],['After delivery',q.payAfter],['Testing & commissioning',q.payTest]].filter(pp=>num(pp[1]));
   const excl=lines(q.excluding), terms=lines(q.terms);
+  const multi=secs.length>1;
+  const ccardHTML=`<div class="ccard"><div class="cc-row"><span class="k">Quote Subject</span><span class="v">${esc(q.subject||q.projectName||q.client||'-')}</span></div><div class="cc-row"><span class="k">Quote Num.</span><span class="v">${esc(q.number||'')}</span></div><div class="cc-row"><span class="k">Valid Till</span><span class="v">${esc(validTill||'')}</span></div><div class="cc-row"><span class="k">Presales Name</span><span class="v">${esc(q.presalesName||q.preparedBy||'-')}</span></div></div>`;
+  const theadHTML=`<div class="thead"><div><div class="nm">SEDRA ELECTRIC</div><div class="sub">SMART &amp; LOW-CURRENT SYSTEMS &mdash; CAIRO, EGYPT</div></div><div style="text-align:right"><div class="qid">${esc(q.number||'')}</div><div class="sub" style="margin-top:4px">${esc(q.date||'')}</div></div></div>`;
+  const metaHTML=`<div class="metabox"><span>Client: <b>${esc(q.client||'-')}</b></span><span>Location: <b>${esc(q.location||'-')}</b></span><span>Prepared by: <b>${esc(q.preparedBy||'-')}</b></span></div>`;
+  const ftHTML=`<div class="ft"><span>info@sedra-electric.com</span><span>www.sedra-electric.com</span><span>Tel: 0226783906</span></div>`;
+  const rowsTbl=sc=>`<table><thead><tr><th class="c">Image</th><th>Item</th><th>Description</th><th>Brand</th><th class="c">Qty</th><th class="r">Unit Price</th><th class="r">Total</th></tr></thead><tbody>${(sc.items||[]).map(it=>`<tr><td class="c">${it.image?`<img src="${esc(it.image)}" style="width:46px;height:46px;object-fit:cover;border-radius:6px;border:1px solid #d7dee6">`:''}</td><td class="pn">${esc(it.item||'')}</td><td>${esc(it.desc||'')}</td><td class="br">${esc(it.brand||'-')}</td><td class="c">${num(it.qty)}</td><td class="r">${M(it.price)}</td><td class="r"><b>${M(num(it.qty)*num(it.price))}</b></td></tr>`).join('')}</tbody></table>`;
+  const finHTML=`<div class="fin"><div class="r2"><span>Subtotal (excl. VAT)</span><b>${M(t.sub)}</b></div><div class="r2"><span>VAT (${num(q.vat)}%)</span><b>${M(t.vat)}</b></div><div class="g"><span>Grand Total</span><span>${M(t.total)}</span></div></div>`;
+  const featHTML=(function(){var fl=lines(q.featuresList);return fl.length?`<div class="stitle" style="font-size:15px;margin-top:10px">✨ Features list</div><div class="sec" style="page-break-inside:avoid;border-color:#37c0dc"><ul style="padding:14px 30px;margin:0;line-height:1.9;font-size:12.5px;color:#1c2b3a;columns:2;-webkit-columns:2;column-gap:30px">${fl.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')}</ul></div>`:'';})();
+  const payHTML=pay.length?`<div class="stitle" style="font-size:15px;margin-top:6px">Payment terms</div><div class="pay">${pay.map(pp=>`<div class="pc"><div class="k">${esc(pp[0].toUpperCase())}</div><div class="v">${num(pp[1])}%</div></div>`).join('')}</div>`:'';
+  const WMARK=MARK.split('#0e2c49').join('#ffffff').replace('height:58px','height:82px');
+  const sedraCover=`<div class="sheet A4 scover pad"><span class="mk">${WMARK}</span><div class="wm">SEDRA</div><div class="tl">Electric</div><div class="rule"></div><div style="font-size:18px;font-weight:800;letter-spacing:2px;margin-bottom:18px">Integrated Systems Proposal</div><div class="syslist">${secs.map(sc=>`<div class="syschip">${esc(sc.title||'System')}</div>`).join('')}</div>${ccardHTML}</div>`;
+  const serviceCover=`<div class="sheet A4 cover"><img src="${coverURL}">${ccardHTML}</div>`;
+  const coverHTML=multi?sedraCover:serviceCover;
+  const sysPages=secs.map((sc,i)=>`<div class="sheet pad">${theadHTML}<div class="sysbig"><span class="ix">System ${i+1}</span>${esc(sc.title||('System '+(i+1)))}</div><div class="sysrule"></div>${SYS_IMG[sc.title]?`<div class="sysbanner"><img src="${esc(SYS_IMG[sc.title])}"></div>`:''}${metaHTML}<div class="sec">${rowsTbl(sc)}<div class="sect"><span>Total &mdash; ${esc((sc.title||('System '+(i+1))).toUpperCase())}</span><span>${M(t.secTotals[i])}</span></div></div>${ftHTML}</div>`).join('');
+  const summaryPage=`<div class="sheet pad">${theadHTML}<div class="stitle">Financial Summary</div>${metaHTML}<div class="sec"><table class="sumtbl"><thead><tr><th>System</th><th class="r">Total</th></tr></thead><tbody>${secs.map((sc,i)=>`<tr><td class="pn">${esc(sc.title||('System '+(i+1)))}</td><td class="r"><b>${M(t.secTotals[i])}</b></td></tr>`).join('')}</tbody></table></div>${finHTML}${featHTML}${payHTML}${ftHTML}</div>`;
+  const singlePage=`<div class="sheet pad">${theadHTML}<div class="stitle">${esc((secs[0]&&secs[0].title)||q.service||'Quotation')} &mdash; Quotation</div>${metaHTML}${secs.map((sc,i)=>secTable(sc,i)).join('')}${finHTML}${featHTML}${payHTML}${ftHTML}</div>`;
+  const termsPage=`<div class="sheet pad"><div class="stitle">Terms &amp; Conditions</div><div class="tc">${(function(){ var ls=terms.length?terms:lines(defQTerms()); return ls.map(function(x){ var s=x.replace(/\t/g,'    '); var tt=s.trim(); if(/^[-•]\s/.test(tt)){ return '<div class="tc-h">'+esc(tt.replace(/^[-•]\s*/,''))+'</div>'; } if(/^·/.test(tt)||/^\s{2,}·/.test(s)){ return '<div class="tc-b">'+esc(tt.replace(/^·\s*/,''))+'</div>'; } return '<div class="tc-p">'+esc(tt)+'</div>'; }).join(''); })()}</div>${excl.length?`<div class="stitle" style="font-size:15px;margin-top:12px">Offer excludes</div><ul style="padding-inline-start:18px;line-height:1.9;font-size:12.5px;color:#3a4a5a">${excl.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}<div class="tc" style="margin-top:12px"><div class="tc-b">This offer is valid for ${num(q.validity)||30} days (until ${esc(validTill||'')}).</div>${q.notes?`<div class="tc-b">${esc(q.notes)}</div>`:''}</div><div class="sign"><div class="s">Prepared by &mdash; ${esc(q.preparedBy||'-')}</div><div class="s">Client approval &mdash; signature &amp; date</div></div>${ftHTML}</div>`;
+  const bodyHTML=coverHTML+`<div class="sheet A4 imgpage"><img src="${base}page-about.jpg"></div><div class="sheet A4 imgpage"><img src="${base}page-partners.jpg"></div>`+(multi?(sysPages+summaryPage):singlePage)+termsPage;
   w.document.write(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=822, initial-scale=1"><title>${esc(q.number||'Quotation')} &mdash; Sedra</title>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,600;0,700;0,800;1,800&display=swap" rel="stylesheet">
   <style>
@@ -3085,6 +3106,19 @@ function printQuote(id){
   .center h1{color:#123a5f;font-size:30px;margin:16px 0 14px}.center p{max-width:600px;font-size:14px;line-height:1.9;color:#3a4a5a}
   .ptitle{color:#123a5f;letter-spacing:3px;font-size:19px;margin:8px 0 4px}.pline{width:140px;height:2px;background:#0e2c49;opacity:.5;margin:12px auto 20px}
   .center img.pimg{max-width:640px;width:100%}
+  .scover{background:radial-gradient(120% 100% at 50% 0,#16405f 0,#0e2c49 55%,#081826 100%);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+  .scover .mk{height:82px;margin-bottom:8px}
+  .scover .wm{font-size:52px;font-weight:800;letter-spacing:10px;margin:6px 0 2px}
+  .scover .tl{font-size:16px;letter-spacing:5px;color:#8fd0e6;text-transform:uppercase;margin-bottom:26px}
+  .scover .rule{width:120px;height:3px;background:#37c0dc;margin:0 0 26px}
+  .scover .syslist{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:560px;margin-bottom:8px}
+  .scover .syschip{border:1px solid rgba(143,208,230,.5);border-radius:30px;padding:8px 20px;font-weight:800;font-size:14px;letter-spacing:1px}
+  .sysbig{font-size:30px;font-weight:800;color:#0e2c49;letter-spacing:1px;margin:2px 0 4px;display:flex;align-items:center;gap:14px}
+  .sysbig .ix{background:#37c0dc;color:#0e2c49;font-size:15px;border-radius:8px;padding:4px 12px}
+  .sysrule{width:100%;height:3px;background:linear-gradient(90deg,#0e2c49,#37c0dc 60%,transparent);margin:0 0 16px}
+  .sysbanner{width:100%;height:150px;border-radius:12px;overflow:hidden;margin-bottom:14px;border:1px solid #d7dee6}
+  .sysbanner img{width:100%;height:100%;object-fit:cover;display:block}
+  .sumtbl td.r,.sumtbl th.r{text-align:right}
   .thead{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #0e2c49;padding-bottom:12px;margin-bottom:16px}
   .thead .nm{font-size:16px;font-weight:800;color:#0e2c49}.thead .sub{font-size:10px;color:#6c7c8c;letter-spacing:.5px}
   .thead .qid{background:#0e2c49;color:#fff;padding:5px 12px;border-radius:6px;font-weight:800;font-size:13px}
@@ -3110,34 +3144,7 @@ function printQuote(id){
   @media screen and (max-width:840px){ .sheet{width:100%} }
   </style></head><body>
   <div class="bar"><b>Sedra Quotation &mdash; ${esc(q.number||'')}</b><button onclick="window.print()">Print / Save PDF</button></div>
-  <div class="doc">
-    <div class="sheet A4 cover"><img src="${coverURL}"><div class="ccard">
-      <div class="cc-row"><span class="k">Quote Subject</span><span class="v">${esc(q.subject||q.projectName||q.client||'-')}</span></div>
-      <div class="cc-row"><span class="k">Quote Num.</span><span class="v">${esc(q.number||'')}</span></div>
-      <div class="cc-row"><span class="k">Valid Till</span><span class="v">${esc(validTill||'')}</span></div>
-      <div class="cc-row"><span class="k">Presales Name</span><span class="v">${esc(q.presalesName||q.preparedBy||'-')}</span></div>
-    </div></div>
-    <div class="sheet A4 imgpage"><img src="${base}page-about.jpg"></div>
-    <div class="sheet A4 imgpage"><img src="${base}page-partners.jpg"></div>
-    <div class="sheet pad">
-      <div class="thead"><div><div class="nm">SEDRA ELECTRIC</div><div class="sub">SMART &amp; LOW-CURRENT SYSTEMS &mdash; CAIRO, EGYPT</div></div><div style="text-align:right"><div class="qid">${esc(q.number||'')}</div><div class="sub" style="margin-top:4px">${esc(q.service||'')} &middot; ${esc(q.date||'')}</div></div></div>
-      <div class="stitle">${esc(q.service||'Quotation')} &mdash; Quotation</div>
-      <div class="metabox"><span>Client: <b>${esc(q.client||'-')}</b></span><span>Location: <b>${esc(q.location||'-')}</b></span><span>Prepared by: <b>${esc(q.preparedBy||'-')}</b></span></div>
-      ${secs.map((sc,i)=>secTable(sc,i)).join('')}
-      <div class="fin"><div class="r2"><span>Subtotal (excl. VAT)</span><b>${M(t.sub)}</b></div><div class="r2"><span>VAT (${num(q.vat)}%)</span><b>${M(t.vat)}</b></div><div class="g"><span>Grand Total</span><span>${M(t.total)}</span></div></div>
-      ${(function(){var fl=lines(q.featuresList);return fl.length?`<div class="stitle" style="font-size:15px;margin-top:10px">✨ Features list</div><div class="sec" style="page-break-inside:avoid;border-color:#37c0dc"><ul style="padding:14px 30px;margin:0;line-height:1.9;font-size:12.5px;color:#1c2b3a;columns:2;-webkit-columns:2;column-gap:30px">${fl.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')}</ul></div>`:'';})()}
-      ${pay.length?`<div class="stitle" style="font-size:15px;margin-top:6px">Payment terms</div><div class="pay">${pay.map(pp=>`<div class="pc"><div class="k">${esc(pp[0].toUpperCase())}</div><div class="v">${num(pp[1])}%</div></div>`).join('')}</div>`:''}
-      <div class="ft"><span>info@sedra-electric.com</span><span>www.sedra-electric.com</span><span>Tel: 0226783906</span></div>
-    </div>
-    <div class="sheet pad">
-      <div class="stitle">Terms &amp; Conditions</div>
-      <div class="tc">${(function(){ var ls=terms.length?terms:lines(defQTerms()); return ls.map(function(x){ var s=x.replace(/\t/g,'    '); var t=s.trim(); if(/^[-•]\s/.test(t)){ return '<div class="tc-h">'+esc(t.replace(/^[-•]\s*/,''))+'</div>'; } if(/^·/.test(t)||/^\s{2,}·/.test(s)){ return '<div class="tc-b">'+esc(t.replace(/^·\s*/,''))+'</div>'; } return '<div class="tc-p">'+esc(t)+'</div>'; }).join(''); })()}</div>
-      ${excl.length?`<div class="stitle" style="font-size:15px;margin-top:12px">Offer excludes</div><ul style="padding-inline-start:18px;line-height:1.9;font-size:12.5px;color:#3a4a5a">${excl.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}
-      <div class="tc" style="margin-top:12px"><div class="tc-b">This offer is valid for ${num(q.validity)||30} days (until ${esc(validTill||'')}).</div>${q.notes?`<div class="tc-b">${esc(q.notes)}</div>`:''}</div>
-      <div class="sign"><div class="s">Prepared by &mdash; ${esc(q.preparedBy||'-')}</div><div class="s">Client approval &mdash; signature &amp; date</div></div>
-      <div class="ft"><span>info@sedra-electric.com</span><span>www.sedra-electric.com</span><span>Tel: 0226783906</span></div>
-    </div>
-  </div></body></html>`);
+  <div class="doc">${bodyHTML}</div></body></html>`);
   w.document.close();
 }
 function createProjectFromQuote(id){
