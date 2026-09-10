@@ -2967,9 +2967,13 @@ function qSecAdd(){ qReadDOM(); _qsec.push({title:'',items:[qBlankItem()]}); qSe
 function qSecDel(si){ qReadDOM(); _qsec.splice(si,1); if(!_qsec.length)_qsec=[{title:'Section',items:[qBlankItem()]}]; qSecRender(); }
 function qItemAdd(si){ qReadDOM(); _qsec[si].items.push(qBlankItem()); qSecRender(); }
 function qItemDel(si,ii){ qReadDOM(); _qsec[si].items.splice(ii,1); if(!_qsec[si].items.length)_qsec[si].items.push(qBlankItem()); qSecRender(); }
-function qPickProduct(si,ii,name){ const p=inventory.find(x=>(x.name||'')===name); qReadDOM(); const it=_qsec[si].items[ii]; if(p){ if(!it.item)it.item=p.name||p.category||''; it.desc=p.desc||p.name; if(p.brand)it.brand=p.brand; const pr=num(p.price)||num(p.cost); if(pr)it.price=pr; if(p.image)it.image=p.image; if(p.sku&&!it.item)it.item=p.sku; } qSecRender(); }
+function qPickProduct(si,ii,val){ var v=String(val||'').trim(); var lv=v.toLowerCase();
+  const p=inventory.find(x=>((x.sku?x.sku+' — ':'')+(x.name||''))===v) || inventory.find(x=>(x.name||'')===v) || inventory.find(x=>(x.sku||'')===v) || inventory.find(x=>String(x.sku||'').toLowerCase()===lv || String(x.name||'').toLowerCase()===lv);
+  qReadDOM(); const it=_qsec[si].items[ii];
+  if(p){ it.item=p.sku||p.code||it.item||''; it.desc=p.name||p.desc||it.desc||''; if(p.brand)it.brand=p.brand; const pr=num(p.price)||num(p.cost); if(pr)it.price=pr; if(p.image)it.image=p.image; }
+  qSecRender(); }
 function qSecRender(){ const el=g('qSec'); if(!el)return;
-  const dl=`<datalist id="prod_dl">${inventory.filter(inBranch).map(p=>`<option value="${esc(p.name)}">`).join('')}</datalist><datalist id="sys_dl">${QSYSTEMS.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>`;
+  const dl=`<datalist id="prod_dl">${inventory.filter(inBranch).map(p=>`<option value="${esc((p.sku?p.sku+' — ':'')+(p.name||''))}">`).join('')}</datalist><datalist id="sys_dl">${QSYSTEMS.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>`;
   el.innerHTML=dl+_qsec.map((s,si)=>{
     const rows=(s.items||[]).map((it,ii)=>`<tr>
       <td><input id="q_${si}_${ii}_item" value="${esc(it.item||'')}" placeholder="Item" style="width:84px"></td>
