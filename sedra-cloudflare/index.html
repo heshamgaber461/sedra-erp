@@ -789,6 +789,14 @@ const CURRENCIES=['EGP','AED','SAR','USD','EUR','GBP','KWD','QAR','TRY'];
 function money2(cur,n){ return (num(n)).toLocaleString(undefined,{maximumFractionDigits:0})+' '+(cur||''); }
 function docCur(v){ return v.currency || CUR[v.branch] || ''; }
 function fxOf(v){ return num(v.fxRate)||1; }
+/* ===== Live FX: rates are units of <currency> per 1 EGP (base). Prices in quotes are stored in EGP and converted for display. ===== */
+const FX_FALLBACK={EGP:1,USD:0.0203,EUR:0.0188,GBP:0.0159,AED:0.0745,SAR:0.0761,KWD:0.0062,QAR:0.0739,TRY:0.83};
+function fxTable(){ var t=(settings&&settings.fxRates)||{}; return Object.assign({},FX_FALLBACK,t); }
+function fxRateFor(cur){ if(!cur||cur==='EGP') return 1; var t=fxTable(); return num(t[cur])||FX_FALLBACK[cur]||1; }
+function fxDate(){ return (settings&&settings.fxDate)||''; }
+function quoteRate(q){ var cur=docCur(q); if(!cur||cur==='EGP') return 1; if(q.fxManual&&num(q.fxRate)>0) return num(q.fxRate); return fxRateFor(cur); }
+function refreshFX(force){ try{ var td=today(); if(!force && settings && settings.fxDate===td && settings.fxRates) return Promise.resolve(false);
+  return fetch('https://open.er-api.com/v6/latest/EGP').then(function(r){return r.json();}).then(function(j){ if(!j||!j.rates) throw 0; var keep={}; CURRENCIES.forEach(function(c){ if(j.rates[c]!=null) keep[c]=j.rates[c]; }); keep.EGP=1; settings.fxRates=keep; settings.fxDate=td; return apiMerge('meta','settings',{fxRates:keep,fxDate:td}).then(function(){ return true; }); }).catch(function(){ return false; }); }catch(e){ return Promise.resolve(false); } }
 function baseAmt(v){ return num(v.amount)*fxOf(v); }
 function basePaid(v){ return num(v.paid)*fxOf(v); }
 function baseOut(v){ return (num(v.amount)-num(v.paid))*fxOf(v); }
@@ -1026,6 +1034,7 @@ function afterData(){
   if(!appReady){ resolveMe(); return; }
   try{ checkChatNotifications(); updateBadges(); }catch(e){}
   try{ runAutomations(); }catch(e){}
+  try{ if(!window.__fxChecked){ window.__fxChecked=true; refreshFX(false).then(function(ok){ if(ok && !g('modal').classList.contains('show')) render(); }); } }catch(e){}
   var sig=[employees,leads,campaigns,projects,quotes,inventory,stockMoves,attendance,invoices,expenses,leaves,posts,tasks,suppliers,pos,messages,groups,events,todos,customers,contracts,audit,tickets,jobs,timelogs,payments,rules].map(a=>a.length).join('|')+'|'+JSON.stringify(settings).length;
   if(sig!==lastSig){ lastSig=sig; if(!g('modal').classList.contains('show')){ render(); if(g('bellPanel'))g('bellPanel').classList.add('hide'); } }
 }
@@ -2902,13 +2911,21 @@ function printVariation(id){
 function quoteSections(q){ if(q.sections&&q.sections.length)return q.sections; if(q.items&&q.items.length)return [{title:'Items',items:q.items.map(i=>({item:i.item||'',desc:i.desc||'',brand:i.brand||'',qty:num(i.qty),price:num(i.price),image:i.image||''}))}]; return []; }
 function quoteTotal(q){ const secs=quoteSections(q); let sub=0; const secTotals=secs.map(s=>{ const t=(s.items||[]).reduce((a,i)=>a+num(i.qty)*num(i.price),0); sub+=t; return t; }); const vat=sub*num(q.vat)/100; return {sub,vat,total:sub+vat,secTotals,secs}; }
 function vQuotes(){
-  const rows=quotes.filter(inBranch).filter(q=>me.role==='Super Admin'||me.dept==='Management'||!q.dept||q.dept===me.dept||(me.accessModules||[]).includes('quotes'));
+  const meName=(me&&me.name)||'';
+  const techAssignees=Object.keys(TECH_ROUTING).map(function(k){return TECH_ROUTING[k].name;});
+  const isTechAssignee = techAssignees.indexOf(meName)>=0 || (me.dept==='Technical');
+  const seesAllQuotes = me.role==='Super Admin'||me.dept==='Management'||isMgr();
+  const rows=quotes.filter(inBranch).filter(function(q){
+    if(seesAllQuotes) return true;
+    if(isTechAssignee){ return (q.assignedTo||'')===meName || nameEq(q.preparedBy,meName) || nameEq(q.requestedBy,meName); }
+    return !q.dept||q.dept===me.dept||nameEq(q.requestedBy,meName)||nameEq(q.preparedBy,meName)||(me.accessModules||[]).includes('quotes');
+  });
   let h=`<div class="sect"><h2>Quotations & Proposals</h2><div class="sp"></div><button class="btn cy" onclick="newQuoteChoice()">+ New quotation</button></div>`;
   h+=tableView('quotes', rows,
     `<th>#</th><th>Type</th><th>Client</th><th>Branch</th><th>Dept</th><th>Total</th><th>Status</th><th></th>`,
     q=>{const t=quoteTotal(q);return `<tr>
     <td><b>${esc(q.number||q.id.slice(-5))}</b><div class="mini">${esc(q.date||'')}</div></td><td>${esc(q.type||'Quotation')}</td><td>${esc(q.client||'')}</td>
-    <td>${FLAG[q.branch]||''} ${esc(q.branch||'')}</td><td>${esc(q.dept||'')}</td><td>${money2(docCur(q),t.total)}</td>
+    <td>${FLAG[q.branch]||''} ${esc(q.branch||'')}</td><td>${esc(q.dept||'')}</td><td>${money2(docCur(q),t.total*quoteRate(q))}</td>
     <td><span class="tag" style="background:${QSTAT_COL[q.status]||'#eee'}22;color:${QSTAT_COL[q.status]||'#333'}">${esc(q.status||'Draft')}</span></td>
     <td style="white-space:nowrap">${q.invoiced?'<span class="tag" style="background:#1a7a4f22;color:#1a7a4f">Invoiced</span> ':`<button class="btn cy sm" onclick="quoteToInvoice('${q.id}')">→ Invoice</button> `}${q.projectId?'<span class="tag" style="background:#1a7a4f22;color:#1a7a4f">Project ✓</span> ':`<button class="btn gh sm" onclick="createProjectFromQuote('${q.id}')">🏗️ Project</button> `}<button class="btn gh sm" onclick="printQuote('${q.id}')">Print</button> <button class="btn gh sm" title="Send on WhatsApp" onclick="waQuote('${q.id}')">💬</button> ${(isMgr()||me.dept==='Management')?`<button class="btn gh sm" title="Generate payment schedule" onclick="genPaySchedule('${q.id}')">💳</button> `:''}<button class="btn gh sm" title="Open record" onclick="recOpen('${q.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${q.id}')">📎</button> <button class="btn gh sm" onclick="editQuote('${q.id}')">Edit</button> ${isMgr()?`<button class="btn dn sm" onclick="delDoc('quotes','${q.id}')">✕</button>`:''}</td></tr>`},
     {empty:'No quotations yet.', placeholder:'🔍 Search quotations…',
@@ -2920,9 +2937,9 @@ let _qsec=[];
 const NL=String.fromCharCode(10);
 function qBlankItem(){ return {item:'',desc:'',brand:'',qty:1,price:0}; }
 function defQExcluding(){ return ['Lights supply','Sockets & switches supply','Sanitary supply','MEP Work (Conduits, Pulling Cables)'].join(NL); }
-function defQTerms(){ return ['1. Work commences upon receipt of signed acceptance and advance payment as per the agreed payment terms.','2. All works are subject to site conditions and material availability at the time of execution.','3. Any additional works not specified in this quotation will be subject to a separate variation order.','4. Sedra Electric reserves the right to adjust timelines based on site access and third-party coordination.','5. Prices are subject to change after expiry of the quotation validity period.'].join(NL); }
+function defQTerms(){ return ['- Prices don’t include VAT unless mentioned.','','- Offer Includes:','    · Supervision on the Contractor team in the cabling phase','    · Full Design for all systems','    · Full Installation','    Installation prices include works within Cairo or Giza.','    For any other location, additional charges will apply.','','- Offer Excludes:','    · Any piping or wiring works unless mentioned otherwise','    · Any pipes or cables unless mentioned otherwise','    · Any protection circuit breakers unless mentioned otherwise','','- Payment Terms:','    · Advance Payment: 80% of the total price','    · After Delivery: 10% of the total price','    · After system installation: 10% of the total price','','- Warranty:','    · Warranty against manufacturing defects is 12 Months','','- Delivery:','    · 2-8 Weeks'].join(NL); }
 function qReadDOM(){ _qsec.forEach((s,si)=>{ const t=g('qsT'+si); if(t)s.title=t.value; (s.items||[]).forEach((it,ii)=>{ const gv=f=>{const e=g('q_'+si+'_'+ii+'_'+f);return e?e.value:it[f];}; it.item=gv('item'); it.desc=gv('desc'); it.brand=gv('brand'); it.qty=num(gv('qty')); it.price=num(gv('price')); }); }); }
-function qSecAdd(){ qReadDOM(); _qsec.push({title:'New section',items:[qBlankItem()]}); qSecRender(); }
+function qSecAdd(){ qReadDOM(); _qsec.push({title:'New service',items:[qBlankItem()]}); qSecRender(); }
 function qSecDel(si){ qReadDOM(); _qsec.splice(si,1); if(!_qsec.length)_qsec=[{title:'Section',items:[qBlankItem()]}]; qSecRender(); }
 function qItemAdd(si){ qReadDOM(); _qsec[si].items.push(qBlankItem()); qSecRender(); }
 function qItemDel(si,ii){ qReadDOM(); _qsec[si].items.splice(ii,1); if(!_qsec[si].items.length)_qsec[si].items.push(qBlankItem()); qSecRender(); }
@@ -2938,15 +2955,18 @@ function qSecRender(){ const el=g('qSec'); if(!el)return;
       <td><input id="q_${si}_${ii}_price" type="number" value="${num(it.price)||0}" style="width:74px" oninput="qRecalc()"></td>
       <td class="mini" id="q_${si}_${ii}_sub" style="white-space:nowrap">0</td>
       <td><button class="btn dn sm" onclick="qItemDel(${si},${ii})">✕</button></td></tr>`).join('');
-    return `<div class="card" style="margin-bottom:10px;padding:10px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><input id="qsT${si}" value="${esc(s.title||'')}" placeholder="Section title (e.g. Smart Home System)" style="font-weight:700;flex:1"><button class="btn gh sm" onclick="qSecDel(${si})">🗑 Section</button></div>
+    return `<div class="card" style="margin-bottom:10px;padding:10px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><input id="qsT${si}" value="${esc(s.title||'')}" placeholder="Service name (e.g. Smart Home / Cameras) — printed at the top" style="font-weight:700;flex:1"><button class="btn gh sm" onclick="qSecDel(${si})">🗑 Service</button></div>
       <div style="overflow-x:auto"><table class="items"><thead><tr><th>Item</th><th>Description</th><th>Brand</th><th>Qty</th><th>Unit</th><th>Sub</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
       <button class="btn gh sm" style="margin-top:6px" onclick="qItemAdd(${si})">+ Add line</button></div>`;
-  }).join('')+`<button class="btn cy" onclick="qSecAdd()">+ Add section</button>`;
+  }).join('')+`<button class="btn cy" onclick="qSecAdd()">➕ Add service</button>`;
   qRecalc();
 }
-function qRecalc(){ qReadDOM(); const cur=(g('q_cur')&&val('q_cur'))||''; const vat=num(val('q_vat')); let sub=0;
-  _qsec.forEach((s,si)=>{ (s.items||[]).forEach((it,ii)=>{ const t=num(it.qty)*num(it.price); sub+=t; const c=g('q_'+si+'_'+ii+'_sub'); if(c)c.textContent=t.toLocaleString()+' '+cur; }); });
-  const v=sub*vat/100; const tot=g('qTotals'); if(tot)tot.innerHTML=`<div style="display:flex;justify-content:space-between"><span>Subtotal (excl. VAT)</span><b>${sub.toLocaleString()} ${cur}</b></div><div style="display:flex;justify-content:space-between"><span>VAT (${vat}%)</span><b>${Math.round(v).toLocaleString()} ${cur}</b></div><div style="display:flex;justify-content:space-between;font-size:16px;color:var(--navy)"><span>Grand total</span><b>${Math.round(sub+v).toLocaleString()} ${cur}</b></div>`;
+function qCurRate(){ var cur=(g('q_cur')&&val('q_cur'))||'EGP'; if(cur==='EGP') return 1; var man=g('q_fxman')&&g('q_fxman').checked; if(man){ var r=num(val('q_fx')); return r>0?r:fxRateFor(cur); } return fxRateFor(cur); }
+function qCurChange(){ var cur=(g('q_cur')&&val('q_cur'))||'EGP'; var man=g('q_fxman')&&g('q_fxman').checked; var fx=g('q_fx'); if(fx){ fx.disabled=!man; if(!man) fx.value=(cur==='EGP'?'':fxRateFor(cur)); else if(!num(fx.value)) fx.value=fxRateFor(cur); } var info=g('q_fxinfo'); if(info){ info.textContent = cur==='EGP'?(lang==='ar'?'العملة الأساسية':'base currency'):((fxDate()?('auto '+fxDate()+' — '):'')+'1 EGP = '+fxRateFor(cur)+' '+cur); } qRecalc(); }
+function qRecalc(){ qReadDOM(); const cur=(g('q_cur')&&val('q_cur'))||'EGP'; const vat=num(val('q_vat')); const rate=qCurRate(); const f=n=>(n*rate).toLocaleString(undefined,{maximumFractionDigits:2}); let sub=0;
+  _qsec.forEach((s,si)=>{ (s.items||[]).forEach((it,ii)=>{ const t=num(it.qty)*num(it.price); sub+=t; const c=g('q_'+si+'_'+ii+'_sub'); if(c)c.textContent=f(t)+' '+cur; }); });
+  const v=sub*vat/100; const tot=g('qTotals'); const baseNote=cur!=='EGP'?`<div class="mini" style="text-align:right;color:var(--muted)">base: ${Math.round(sub+v).toLocaleString()} EGP</div>`:'';
+  if(tot)tot.innerHTML=`<div style="display:flex;justify-content:space-between"><span>Subtotal (excl. VAT)</span><b>${f(sub)} ${cur}</b></div><div style="display:flex;justify-content:space-between"><span>VAT (${vat}%)</span><b>${f(v)} ${cur}</b></div><div style="display:flex;justify-content:space-between;font-size:16px;color:var(--navy)"><span>Grand total</span><b>${f(sub+v)} ${cur}</b></div>`+baseNote;
 }
 const QSERVICES=['Home Automation','Smart Home','Home Cinema','Indoor Sound System','Outdoor Sound System','Security Camera','Intrusion System','Safety System','Intercom System','Structured Cabling System','MATV Satellite System','Solar Energy','Smart Gates'];
 function svcAbbr(k){ return ({'home-automation':'HA','smart-home':'SH','home-cinema':'HC','indoor-sound':'ISS','outdoor-sound':'OSS','security-camera':'SC','intrusion':'INT','safety-system':'SF','intercom':'IC','structured-cabling':'SCS','matv-satellite':'MATV','solar-energy':'SOL','smart-gates':'SG'})[k]||'GEN'; }
@@ -2956,8 +2976,11 @@ function newQuoteChoice(){ openModal('New quotation','<div class="mini" style="m
 const RFQ_PTYPES=['Apartment','Villa','Duplex','Penthouse','Twin house','Townhouse','Administrative','Commercial','Clinic','Retail','Other'];
 const RFQ_DESIGN=['Plan','Qty by sales'];
 const RFQ_CATS=['Low budget','Mid-range','High-end','Premium'];
+const TECH_ROUTING={Residential:{name:'Nada',email:'nada.farouk4884@gmail.com'},Commercial:{name:'Mohamed Shawky',email:'shwkymohamed74@gmail.com'}};
+function tqRouteHint(){ var v=(g('tq_route')&&g('tq_route').value)||'Residential'; var a=TECH_ROUTING[v]||{}; var el=g('tq_routeHint'); if(el) el.innerHTML=(lang==='ar'?'\u0647\u064a\u0648\u0635\u0644 \u0644\u0640: ':'Goes to: ')+'<b>'+esc(a.name||'')+'</b>'; }
 function quoteToTech(){ openModal('Request quotation from Technical Office',
     '<div class="card mini" style="background:#eef6ff;border-color:#bcd6ee;margin-bottom:10px">'+(lang==='ar'?'\u0627\u0645\u0644\u0623 \u0645\u062a\u0637\u0644\u0628\u0627\u062a \u0627\u0644\u0645\u0634\u0631\u0648\u0639 \u2014 \u062f\u064a \u0647\u062a\u0648\u0635\u0644 \u0644\u0644\u0623\u0648\u0641\u064a\u0633 \u0627\u0644\u0641\u0646\u064a \u0648\u062a\u0638\u0647\u0631\u0644\u0647\u0645 \u0648\u0647\u0645\u0627 \u0628\u064a\u062c\u0647\u0651\u0632\u0648\u0627 \u0627\u0644\u0643\u0648\u062a\u064a\u0634\u0646.':'Fill the project requirements \u2014 these reach the Technical Office and show while they build the quotation.')+'</div>'+
+    '<div class="fld" style="background:#fff7ed;border:1px solid #f0c98a;border-radius:8px;padding:10px"><label>\ud83c\udfe2 '+(lang==='ar'?'\u0646\u0648\u0639 \u0627\u0644\u0645\u0634\u0631\u0648\u0639 (\u0628\u064a\u062d\u062f\u0651\u062f \u0645\u064a\u0646 \u064a\u0633\u062a\u0644\u0645 \u0627\u0644\u0637\u0644\u0628)':'Project category (decides who receives it)')+'</label><select id="tq_route" onchange="tqRouteHint()"><option value="Residential">'+(lang==='ar'?'\u0633\u0643\u0646\u064a Residential':'Residential')+'</option><option value="Commercial">'+(lang==='ar'?'\u062a\u062c\u0627\u0631\u064a Commercial':'Commercial')+'</option></select><div id="tq_routeHint" class="mini" style="margin-top:4px;color:#157f96"></div></div>'+
     '<div class="row2">'+fEl('Project name','tq_project','')+'<div class="fld"><label>Client name</label><input id="tq_client" list="cust_dl" value="">'+custDatalist()+'</div></div>'+
     '<div class="row2">'+fEl('Project location','tq_loc','')+selEl('Project type','tq_ptype',RFQ_PTYPES,'Apartment')+'</div>'+
     '<div class="row2">'+selEl('Scope of work (service \u2014 sets the cover)','tq_service',QSERVICES,'Home Automation')+selEl('Category','tq_cat',RFQ_CATS,'Mid-range')+'</div>'+
@@ -2969,13 +2992,15 @@ function quoteToTech(){ openModal('Request quotation from Technical Office',
     fTa('Notes','tq_notes','')+
     fTa('Revisions','tq_rev',''),
   ()=>{ if(!val('tq_client')){alert('Client name required');return false;}
+    var route=val('tq_route')||'Residential'; var asg=TECH_ROUTING[route]||{};
     var d={number:genQuoteNo(svcKey(val('tq_service'))),service:val('tq_service'),
       projectName:val('tq_project'),client:val('tq_client'),location:val('tq_loc'),buildingType:val('tq_ptype'),projectType:val('tq_ptype'),
-      category:val('tq_cat'),designBasedOn:val('tq_design'),deadline:val('tq_deadline'),salesPerson:val('tq_sales'),quotationCode:val('tq_code'),
+      category:val('tq_cat'),techCategory:route,assignedTo:asg.name||'',assignedEmail:(asg.email||'').toLowerCase(),
+      designBasedOn:val('tq_design'),deadline:val('tq_deadline'),salesPerson:val('tq_sales'),quotationCode:val('tq_code'),
       reqKNX:val('tq_knx'),reqLC:val('tq_lc'),reqNetwork:val('tq_net'),notes:val('tq_notes'),revisions:val('tq_rev'),
       type:'Quotation',status:'Tech Office \u2014 Pending',dept:'Technical',branch:defBranch(),
       requestedBy:(me&&me.name)||'',requestedByDept:(me&&me.dept)||'',date:today(),created:new Date().toISOString(),isRFQ:true};
-    apiAdd('quotes',d).then(function(){ synced(); alert('\u2714 '+(lang==='ar'?'\u0627\u062a\u0628\u0639\u062a \u0644\u0644\u0623\u0648\u0641\u064a\u0633 \u0627\u0644\u0641\u0646\u064a \u0628\u0643\u0644 \u0627\u0644\u0645\u062a\u0637\u0644\u0628\u0627\u062a.':'Sent to the Technical Office with the full requirements.')); }).catch(function(e){ alert('Error: '+(e.message||e)); }); return true; }); }
+    apiAdd('quotes',d).then(function(){ synced(); alert('\u2714 '+(lang==='ar'?'\u0627\u062a\u0628\u0639\u062a \u0644\u0640 ':'Sent to ')+(asg.name||'Technical Office')+(lang==='ar'?' \u0628\u0643\u0644 \u0627\u0644\u0645\u062a\u0637\u0644\u0628\u0627\u062a.':' with the full requirements.')); }).catch(function(e){ alert('Error: '+(e.message||e)); }); return true; }); tqRouteHint(); }
 function rfqSummaryHTML(r){
   if(!r||!(r.isRFQ||r.projectName||r.reqKNX||r.reqLC||r.reqNetwork||r.designBasedOn||r.deadline||r.revisions)) return '';
   var ar=(typeof lang!=='undefined'&&lang==='ar');
@@ -2990,15 +3015,18 @@ function rfqSummaryHTML(r){
     '</div>';
 }
 function editQuote(id){
-  const r=id?quotes.find(x=>x.id===id):{branch:defBranch(),type:'Proposal',status:'Draft',vat:5,dept:(me.dept==='Management'?'Operations':me.dept),date:today(),service:'Home Automation',number:genQuoteNo('home-automation'),preparedBy:(me&&me.name)||''};
+  const r=id?quotes.find(x=>x.id===id):{branch:defBranch(),type:'Quotation',status:'Draft',vat:5,dept:(me.dept==='Management'?'Operations':me.dept),date:today(),service:'Home Automation',number:genQuoteNo('home-automation'),preparedBy:(me&&me.name)||'',presalesName:(me&&me.name)||'',validity:30};
   _qsec=JSON.parse(JSON.stringify(quoteSections(r))); if(!_qsec.length)_qsec=[{title:'Smart Home System',items:[qBlankItem()]}];
   openModal(id?'Edit quotation':'New quotation',
     rfqSummaryHTML(r)+
-    `<div class="row2">${fEl('Quotation No.','q_number',r.number)}${selEl('Type','q_type',['Proposal','Quotation'],r.type||'Proposal')}</div>`+selEl('Service (auto-selects the cover page)','q_service',QSERVICES,r.service||'Home Automation')+
+    `<div class="row2">${fEl('Quotation No.','q_number',r.number)}${selEl('Type','q_type',['Quotation'],'Quotation')}</div>`+
+    `<div class="row2">${fEl('Quote Subject (cover)','q_subject',r.subject||r.projectName||'')}${fEl('Presales Name (cover)','q_presales',r.presalesName||r.preparedBy||'')}</div>`+
+    selEl('Service (auto-selects the cover page)','q_service',QSERVICES,r.service||'Home Automation')+
     `<div class="row2"><div class="fld"><label>Client name</label><input id="q_client" list="cust_dl" value="${esc(r.client||'')}">${custDatalist()}</div>${fEl('Date','q_date',r.date,'date')}</div>`+
     `<div class="row2">${fEl('Building type','q_btype',r.buildingType)}${fEl('Location','q_loc',r.location)}</div>`+
     `<div class="row2">${fEl('Consultant','q_consultant',r.consultant)}${fEl('Prepared by','q_prep',r.preparedBy||(me&&me.name)||'')}</div>`+
-    `<div class="row2">${selEl('Branch','q_branch',branchOpts(),r.branch)}${selEl('Currency','q_cur',CURRENCIES,r.currency||CUR[r.branch||defBranch()]||'')}</div>`+
+    `<div class="row2">${selEl('Branch','q_branch',branchOpts(),r.branch)}<div class="fld"><label>Currency</label><select id="q_cur" onchange="qCurChange()">${CURRENCIES.map(function(c){return '<option '+((r.currency||CUR[r.branch||defBranch()]||'EGP')===c?'selected':'')+'>'+c+'</option>';}).join('')}</select></div></div>`+
+    `<div class="card" id="q_fxbox" style="background:#f6f9fc;padding:10px;margin-bottom:8px"><div class="mini" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span>💱 ${lang==='ar'?'سعر الصرف (1 جنيه =)':'Exchange rate (1 EGP =)'}</span><label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="q_fxman" ${r.fxManual?'checked':''} onchange="qCurChange()"> ${lang==='ar'?'أحدّده يدويًا':'set manually'}</label><input id="q_fx" type="number" step="0.0001" value="${num(r.fxRate)||''}" style="width:110px" oninput="qRecalc()" ${r.fxManual?'':'disabled'}><span id="q_fxinfo" class="mini" style="color:#157f96"></span></div></div>`+
     `<div class="fld"><label>Sections & line items (pick products from inventory in the Description field)</label><div id="qSec"></div></div>`+
     `<div class="row2">${selEl('Status','q_status',QSTAT,r.status||'Draft')}${fEl('VAT %','q_vat',r.vat!=null?r.vat:5,'number','qRecalc()')}</div>`+
     `<div class="card" id="qTotals" style="background:#f6f9fc"></div>`+
@@ -3006,20 +3034,21 @@ function editQuote(id){
     fTa('Features list (one per line — shown as a highlighted section in the quotation)','q_features',r.featuresList||'')+
     `<div class="row2">${fEl('Advance %','q_pa',r.payAdvance!=null?r.payAdvance:60,'number')}${fEl('Before delivery %','q_pb',r.payBefore!=null?r.payBefore:10,'number')}</div>`+
     `<div class="row2">${fEl('After delivery %','q_pc',r.payAfter!=null?r.payAfter:15,'number')}${fEl('Testing & commissioning %','q_pd',r.payTest!=null?r.payTest:15,'number')}</div>`+
-    `<div class="row2">${fEl('Validity (days)','q_valid',r.validity!=null?r.validity:30,'number')}${fEl('FX rate (1 = same)','q_fx',r.fxRate||1,'number')}</div>`+
+    `<div class="row2">${fEl('Validity (days)','q_valid',r.validity!=null?r.validity:30,'number')}${fEl('Due date (finish by)','q_due',r.dueDate||r.deadline||'','date')}</div>`+
     fTa('Terms & conditions (one per line)','q_terms',r.terms||defQTerms())+
     fTa('Notes','q_notes',r.notes),
     ()=>{ qReadDOM(); const secs=_qsec.map(s=>({title:s.title||'Section',items:(s.items||[]).filter(i=>(i.desc||i.item)).map(i=>({item:i.item||'',desc:i.desc||'',brand:i.brand||'',qty:num(i.qty),price:num(i.price),image:i.image||''}))})).filter(s=>s.items.length);
-      const d={number:val('q_number'),type:val('q_type'),client:val('q_client'),date:val('q_date'),buildingType:val('q_btype'),location:val('q_loc'),consultant:val('q_consultant'),preparedBy:val('q_prep'),service:val('q_service'),branch:val('q_branch'),dept:r.dept||'Operations',currency:val('q_cur'),fxRate:num(val('q_fx'))||1,status:val('q_status'),vat:num(val('q_vat')),sections:secs,excluding:val('q_excl'),featuresList:val('q_features'),payAdvance:num(val('q_pa')),payBefore:num(val('q_pb')),payAfter:num(val('q_pc')),payTest:num(val('q_pd')),validity:num(val('q_valid')),terms:val('q_terms'),notes:val('q_notes')};
+      const d={number:val('q_number'),type:val('q_type'),subject:val('q_subject'),presalesName:val('q_presales'),client:val('q_client'),date:val('q_date'),dueDate:val('q_due'),buildingType:val('q_btype'),location:val('q_loc'),consultant:val('q_consultant'),preparedBy:val('q_prep'),service:val('q_service'),branch:val('q_branch'),dept:r.dept||'Operations',currency:val('q_cur'),fxManual:!!(g('q_fxman')&&g('q_fxman').checked),fxRate:num(val('q_fx'))||1,status:val('q_status'),vat:num(val('q_vat')),sections:secs,excluding:val('q_excl'),featuresList:val('q_features'),payAdvance:num(val('q_pa')),payBefore:num(val('q_pb')),payAfter:num(val('q_pc')),payTest:num(val('q_pd')),validity:num(val('q_valid')),terms:val('q_terms'),notes:val('q_notes')};
       if(!d.client){alert('Client name required');return false;} if(!secs.length){alert('Add at least one line item with a description.');return false;} if(!id){d.created=new Date().toISOString(); d.number=genQuoteNo(svcKey(d.service));} saveDoc('quotes',d,id); });
-  qSecRender();
+  qSecRender(); try{ qCurChange(); }catch(e){}
 }
 function printQuote(id){
   const q=quotes.find(x=>x.id===id); if(!q)return;
-  const t=quoteTotal(q); const cur=docCur(q)||'EGP';
+  const t=quoteTotal(q); const cur=docCur(q)||'EGP'; const rate=quoteRate(q);
   const w=window.open('','_blank'); if(!w){ alert('Allow pop-ups to print/PDF the quotation.'); return; }
   const NL=String.fromCharCode(10), CR=String.fromCharCode(13);
-  const M=n=>Number(num(n)).toLocaleString('en-US')+' '+cur;
+  const M=n=>Number(num(n)*rate).toLocaleString('en-US',{maximumFractionDigits:2})+' '+cur;
+  const validTill=(function(){ try{ var d=new Date(q.date||today()); d.setDate(d.getDate()+(num(q.validity)||30)); return d.toISOString().slice(0,10); }catch(e){ return ''; } })();
   const lines=z=>(z||'').split(NL).map(x=>x.split(CR).join('').trim()).filter(Boolean);
   const base=location.origin+'/quotation-covers/';
   const covmap={'Home Automation':'cover-home-automation.jpg','Smart Home':'cover-smart-home.jpg','Home Cinema':'cover-home-cinema.jpg','Indoor Sound System':'cover-indoor-sound.jpg','Outdoor Sound System':'cover-outdoor-sound.jpg','Security Camera':'cover-security-camera.jpg','Intrusion System':'cover-intrusion.jpg','Safety System':'cover-safety-system.jpg','Intercom System':'cover-intercom.jpg','Structured Cabling System':'cover-structured-cabling.jpg','MATV Satellite System':'cover-matv-satellite.jpg','Solar Energy':'cover-solar-energy.jpg','Smart Gates':'cover-smart-gates.jpg'};
@@ -3072,6 +3101,7 @@ function printQuote(id){
   .fin .g{background:#0e2c49;color:#fff;display:flex;justify-content:space-between;padding:13px 16px;font-size:17px;font-weight:800}
   .cols{display:flex;gap:16px;flex-wrap:wrap;margin-top:6px}.col{flex:1;min-width:230px;border:1px solid #d7dee6;border-radius:8px;padding:14px;page-break-inside:avoid}
   .col h3{margin:0 0 8px;color:#0e2c49;font-size:13px}.col ul{margin:0;padding-inline-start:16px;line-height:1.8;font-size:12px}
+  .tc{font-size:12.5px;color:#263646;line-height:1.7}.tc-h{font-weight:800;color:#0e2c49;margin:10px 0 3px}.tc-b{padding-inline-start:18px;position:relative}.tc-b:before{content:"·";position:absolute;inset-inline-start:6px;color:#37c0dc;font-weight:800}.tc-p{padding-inline-start:2px}
   .pay{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}.pc{flex:1;min-width:120px;background:#eef3f8;border-radius:9px;padding:12px;text-align:center}
   .pc .k{font-size:10px;color:#6c7c8c;font-weight:700}.pc .v{font-size:20px;font-weight:800;color:#0e2c49}
   .sign{display:flex;gap:40px;margin-top:26px}.sign .s{flex:1;border-top:2px solid #0e2c49;padding-top:8px;font-size:12px;color:#6c7c8c;font-weight:700}
@@ -3082,10 +3112,10 @@ function printQuote(id){
   <div class="bar"><b>Sedra Quotation &mdash; ${esc(q.number||'')}</b><button onclick="window.print()">Print / Save PDF</button></div>
   <div class="doc">
     <div class="sheet A4 cover"><img src="${coverURL}"><div class="ccard">
-      <div class="cc-row"><span class="k">Prepared for</span><span class="v">${esc(q.client||'-')}</span></div>
-      <div class="cc-row"><span class="k">Prepared by</span><span class="v">${esc(q.preparedBy||'-')}</span></div>
-      <div class="cc-row"><span class="k">Date</span><span class="v">${esc(q.date||'')}</span></div>
-      <div class="cc-row"><span class="k">Quote No.</span><span class="v">${esc(q.number||'')}</span></div>
+      <div class="cc-row"><span class="k">Quote Subject</span><span class="v">${esc(q.subject||q.projectName||q.client||'-')}</span></div>
+      <div class="cc-row"><span class="k">Quote Num.</span><span class="v">${esc(q.number||'')}</span></div>
+      <div class="cc-row"><span class="k">Valid Till</span><span class="v">${esc(validTill||'')}</span></div>
+      <div class="cc-row"><span class="k">Presales Name</span><span class="v">${esc(q.presalesName||q.preparedBy||'-')}</span></div>
     </div></div>
     <div class="sheet A4 imgpage"><img src="${base}page-about.jpg"></div>
     <div class="sheet A4 imgpage"><img src="${base}page-partners.jpg"></div>
@@ -3101,12 +3131,9 @@ function printQuote(id){
     </div>
     <div class="sheet pad">
       <div class="stitle">Terms &amp; Conditions</div>
-      <div class="cols">
-        <div class="col"><h3>Scope &amp; terms</h3><ul>${(terms.length?terms:['Offer is based on the referenced BOQ.','Prices are subject to change after the validity period.','All works are subject to site conditions at time of execution.']).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
-        <div class="col"><h3>Offer excludes</h3><ul>${(excl.length?excl:['Any piping or wiring works unless mentioned otherwise.','Any pipes or cables unless mentioned otherwise.']).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
-      </div>
-      <div class="stitle" style="font-size:15px;margin-top:16px">Validity &amp; warranty</div>
-      <ul style="padding-inline-start:18px;line-height:1.9;font-size:12.5px;color:#3a4a5a"><li>Warranty against manufacturing defects: 1 year.</li><li>This offer is valid for ${num(q.validity)||30} days.</li>${q.notes?`<li>${esc(q.notes)}</li>`:''}</ul>
+      <div class="tc">${(function(){ var ls=terms.length?terms:lines(defQTerms()); return ls.map(function(x){ var s=x.replace(/\t/g,'    '); var t=s.trim(); if(/^[-•]\s/.test(t)){ return '<div class="tc-h">'+esc(t.replace(/^[-•]\s*/,''))+'</div>'; } if(/^·/.test(t)||/^\s{2,}·/.test(s)){ return '<div class="tc-b">'+esc(t.replace(/^·\s*/,''))+'</div>'; } return '<div class="tc-p">'+esc(t)+'</div>'; }).join(''); })()}</div>
+      ${excl.length?`<div class="stitle" style="font-size:15px;margin-top:12px">Offer excludes</div><ul style="padding-inline-start:18px;line-height:1.9;font-size:12.5px;color:#3a4a5a">${excl.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}
+      <div class="tc" style="margin-top:12px"><div class="tc-b">This offer is valid for ${num(q.validity)||30} days (until ${esc(validTill||'')}).</div>${q.notes?`<div class="tc-b">${esc(q.notes)}</div>`:''}</div>
       <div class="sign"><div class="s">Prepared by &mdash; ${esc(q.preparedBy||'-')}</div><div class="s">Client approval &mdash; signature &amp; date</div></div>
       <div class="ft"><span>info@sedra-electric.com</span><span>www.sedra-electric.com</span><span>Tel: 0226783906</span></div>
     </div>
