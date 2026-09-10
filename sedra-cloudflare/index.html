@@ -2338,10 +2338,11 @@ const BP_DEFAULT={
   }
 };
 const BP_FIELDS={
-  phone:{label:(lang==='ar'?'رقم التليفون':'Phone'),type:'text',get:function(l){return l.phone;},key:'phone'},
-  next:{label:(lang==='ar'?'تاريخ المتابعة القادمة':'Next follow-up date'),type:'date',get:function(l){return l.next;},key:'next'},
-  value:{label:(lang==='ar'?'قيمة الصفقة':'Deal value'),type:'number',get:function(l){return l.value;},key:'value'}
+  phone:{en:'Phone',ar:'رقم التليفون',type:'text',get:function(l){return l.phone;},key:'phone'},
+  next:{en:'Next follow-up date',ar:'تاريخ المتابعة القادمة',type:'date',get:function(l){return l.next;},key:'next'},
+  value:{en:'Deal value',ar:'قيمة الصفقة',type:'number',get:function(l){return l.value;},key:'value'}
 };
+function bpFieldLabel(f){ var fd=BP_FIELDS[f]; if(!fd)return f; return ((typeof lang!=='undefined'&&lang==='ar')?fd.ar:fd.en); }
 function bpCfg(){ try{ var c=(settings&&settings.blueprint)?settings.blueprint:null; if(c&&c.rules)return c; }catch(e){} return BP_DEFAULT; }
 function bpOn(){ try{ var c=bpCfg(); return !!(c&&c.on!==false); }catch(e){ return false; } }
 function bpRule(stage){ var c=bpCfg(); return (c.rules&&c.rules[stage])||null; }
@@ -2365,7 +2366,7 @@ function bpTransition(id,to){
 }
 function bpPrompt(l,to,missing,needReason,needNote){
   var body='<div class="card" style="background:#f6f9fc;margin-bottom:8px"><div class="mini">'+(lang==='ar'?'الانتقال إلى مرحلة':'Moving to stage')+'</div><div style="font-weight:800;color:var(--navy);font-size:16px">'+esc(l.stage||'New')+' → '+esc(to)+'</div><div class="mini" style="margin-top:4px">'+(lang==='ar'?'محتاج تكمّل البيانات دي عشان تكمّل العملية:':'The process requires these before you can continue:')+'</div></div>';
-  (missing||[]).forEach(function(f){ var fd=BP_FIELDS[f]; if(!fd)return; body+='<div class="fld"><label>'+esc(fd.label)+' *</label><input id="bp_'+f+'" type="'+(fd.type||'text')+'" value="'+esc(fd.get(l)||'')+'"></div>'; });
+  (missing||[]).forEach(function(f){ var fd=BP_FIELDS[f]; if(!fd)return; body+='<div class="fld"><label>'+esc(bpFieldLabel(f))+' *</label><input id="bp_'+f+'" type="'+(fd.type||'text')+'" value="'+esc(fd.get(l)||'')+'"></div>'; });
   if(needReason){ body+='<div class="fld"><label>'+(lang==='ar'?'السبب (فوز/خسارة)':'Win / Loss reason')+' *</label><select id="bp_reason">'+['—'].concat(typeof WONLOST_REASONS!=='undefined'?WONLOST_REASONS:[]).map(function(x){return '<option '+((l.reason||'—')===x?'selected':'')+'>'+esc(x)+'</option>';}).join('')+'</select></div>'; body+='<div class="fld"><label>'+(lang==='ar'?'ملاحظة على السبب':'Reason note')+'</label><input id="bp_reasonNote" value="'+esc(l.reasonNote||'')+'"></div>'; }
   if(needNote){ body+='<div class="fld"><label>'+(lang==='ar'?'ملاحظة على الانتقال (مطلوبة)':'Transition note (required)')+' *</label><textarea id="bp_note" rows="2" placeholder="'+(lang==='ar'?'اكتب اللي حصل...':'What happened / next step...')+'"></textarea></div>'; }
   openModal((lang==='ar'?'خطوة العملية — ':'Process step — ')+esc(to), body, function(){
@@ -2403,7 +2404,7 @@ function vBlueprint(){
   h+='<div class="card" style="margin-bottom:10px"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:700"><input type="checkbox" id="bp_on" '+(on?'checked':'')+' onchange="bpToggle(this.checked)" style="width:18px;height:18px"> '+(lang==='ar'?'تفعيل الـBlueprint (إجبار الفريق يمشي على المراحل بالترتيب)':'Enforce the Blueprint (force the team to follow the stage process)')+'</label><div class="mini" style="margin-top:6px">'+(lang==='ar'?'لما يكون مفعّل، السيلز مش هيقدر يقفز مرحلة أو يقفل صفقة من غير ما يكمّل البيانات المطلوبة.':'When on, reps cannot skip a stage or close a deal without filling the required data.')+'</div></div>';
   h+='<div class="card"><div class="mini" style="font-weight:700;margin-bottom:8px">'+(lang==='ar'?'المراحل والانتقالات المسموح بها والحقول المطلوبة':'Stages, allowed transitions & required fields')+'</div>';
   h+='<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:'+(lang==='ar'?'right':'left')+';border-bottom:2px solid #e3e9ef"><th style="padding:6px">'+(lang==='ar'?'المرحلة':'Stage')+'</th><th style="padding:6px">'+(lang==='ar'?'ينتقل إلى':'Can move to')+'</th><th style="padding:6px">'+(lang==='ar'?'حقول مطلوبة':'Required')+'</th></tr></thead><tbody>';
-  (cfg.stages||[]).forEach(function(st){ var r=cfg.rules&&cfg.rules[st]||{}; var col=STAGE_COL[st]||'#5A6B7B'; h+='<tr style="border-bottom:1px solid #eef2f6"><td style="padding:7px 6px"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:'+col+';margin-'+(lang==='ar'?'left':'right')+':6px"></span><b>'+esc(st)+'</b></td><td style="padding:7px 6px;color:#5A6B7B">'+((r.to||[]).join(' · ')||'—')+'</td><td style="padding:7px 6px;color:#5A6B7B">'+((r.require||[]).map(function(f){return (BP_FIELDS[f]&&BP_FIELDS[f].label)||f;}).concat(r.note?[(lang==='ar'?'ملاحظة':'note')]:[]).concat(r.reason?[(lang==='ar'?'السبب':'reason')]:[]).join(' · ')||'—')+'</td></tr>'; });
+  (cfg.stages||[]).forEach(function(st){ var r=cfg.rules&&cfg.rules[st]||{}; var col=STAGE_COL[st]||'#5A6B7B'; h+='<tr style="border-bottom:1px solid #eef2f6"><td style="padding:7px 6px"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:'+col+';margin-'+(lang==='ar'?'left':'right')+':6px"></span><b>'+esc(st)+'</b></td><td style="padding:7px 6px;color:#5A6B7B">'+((r.to||[]).join(' · ')||'—')+'</td><td style="padding:7px 6px;color:#5A6B7B">'+((r.require||[]).map(function(f){return bpFieldLabel(f);}).concat(r.note?[(lang==='ar'?'ملاحظة':'note')]:[]).concat(r.reason?[(lang==='ar'?'السبب':'reason')]:[]).join(' · ')||'—')+'</td></tr>'; });
   h+='</tbody></table><div class="mini" style="margin-top:8px">'+(lang==='ar'?'الإعداد الافتراضي مناسب لأغلب الحالات. لو عايز تعدّل الانتقالات أو الحقول قولّي وأنا أظبطهالك.':'The default suits most cases. Tell me if you want different transitions or required fields and I will adjust them.')+'</div></div>';
   return h;
 }
