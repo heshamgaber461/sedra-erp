@@ -934,7 +934,18 @@ async function apiDelete(coll,id){ return apiCall('DELETE','/'+coll+'/'+id+'.jso
 let appReady=false, lastSig='', polling=false, lastRefresh=0;
 var _lastRawSig='';
 function _modalOpen(){ var m=document.getElementById('modal'); return m&&m.classList.contains('show'); }
-function startData(){ if(started)return; started=true; refreshAll();
+function startData(){ if(started)return; started=true;
+  // Resilient first load: if the initial full read hiccups, keep retrying so the app never gets
+  // stuck forever on "Loading your workspace…". Retries stop once the team list has loaded.
+  (function boot(n){
+    try{
+      Promise.resolve(refreshAll()).then(function(){
+        if(!employeesLoaded && n<20){ setTimeout(function(){ boot(n+1); }, Math.min(2000+n*500, 6000)); }
+      }).catch(function(){
+        if(n<20){ setTimeout(function(){ boot(n+1); }, Math.min(2000+n*500, 6000)); }
+      });
+    }catch(e){ if(n<20){ setTimeout(function(){ boot(n+1); }, 3000); } }
+  })(0);
   setInterval(function(){ if(document.visibilityState!=='hidden' && !_modalOpen()) refreshLight(); }, 120000);
   setInterval(function(){ if(document.visibilityState!=='hidden' && curView==='chat' && !_modalOpen()) refreshLight(); }, 6000);
   document.addEventListener('visibilitychange', function(){ if(document.visibilityState!=='hidden' && appReady && Date.now()-lastRefresh>15000) refreshAll(); });
