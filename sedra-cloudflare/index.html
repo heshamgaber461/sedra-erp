@@ -4969,7 +4969,7 @@ function adminUsers(){
     <td><b>${esc(u.name||'')}</b></td><td>${esc(u.email||'')}</td><td>${esc(u.dept||'')}</td><td>${esc(u.role||'')}</td>
     <td>${(u.role==='Super Admin')?'All':((u.branches||[]).map(b=>FLAG[b]).join(' ')||'—')}</td>
     <td>${u.active===false?'<span class="tag" style="background:#c0392b22;color:#c0392b">Inactive</span>':'<span class="tag" style="background:#1a7a4f22;color:#1a7a4f">Active</span>'}</td>
-    <td style="white-space:nowrap">${u.email!==SUPER_ADMIN_EMAIL?`<button class="btn cy sm" onclick="inviteUser('${esc(u.email)}')">✉ Invite</button> <button class="btn gh sm" title="Send password-reset link" onclick="resetUserPass('${esc(u.email)}')">🔑 Reset pass</button> <button class="btn gh sm" title="Open record" onclick="recOpen('${u.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${u.id}')">📎</button> <button class="btn gh sm" onclick="editUser('${u.id}')">Edit</button> <button class="btn dn sm" onclick="delEmployee('${u.id}','${esc(u.email)}')">🗑 Delete</button>`:'<span class="mini">owner</span>'}</td></tr>`).join('')+`</tbody></table>`;
+    <td style="white-space:nowrap">${u.email!==SUPER_ADMIN_EMAIL?`<button class="btn cy sm" title="Create a sign-in account for this member (no duplicate)" onclick="grantLogin('${u.id}')">🔑 Grant login</button> <button class="btn gh sm" onclick="inviteUser('${esc(u.email)}')">✉ Invite</button> <button class="btn gh sm" title="Send password-reset link" onclick="resetUserPass('${esc(u.email)}')">🔑 Reset pass</button> <button class="btn gh sm" title="Open record" onclick="recOpen('${u.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${u.id}')">📎</button> <button class="btn gh sm" onclick="editUser('${u.id}')">Edit</button> <button class="btn dn sm" onclick="delEmployee('${u.id}','${esc(u.email)}')">🗑 Delete</button>`:'<span class="mini">owner</span>'}</td></tr>`).join('')+`</tbody></table>`;
   return h;
 }
 function addUser(){
@@ -5013,6 +5013,28 @@ function inviteUser(email){
 function resetUserPass(email){
   if(!confirm('Reset password for '+email+'?\n\nA link will be emailed to the member to set a NEW password of their choice.\n(For security, passwords can only be set by the member via the secure reset link — not typed by an admin.)'))return;
   auth.sendPasswordResetEmail(email).then(function(){ try{logAudit('reset-password','employees','',email||'');}catch(_){} alert('✔ Password-reset link sent to '+email); }).catch(function(e){ alert('Could not send: '+(e.message||e)); });
+}
+function grantLogin(id){
+  var u=employees.find(function(e){return e.id===id;}); if(!u){alert('Employee not found.');return;}
+  // Known emails recovered from Zoho for the imported users (used only as a default; admin confirms).
+  var HINTS={'ahmed ebead':'a.ebead@sedraelectric.online','reem sabry':'reem.sabry@sedra-electric.com','ibrahim sabry':'ibrahim.sabry@sedra-electric.com','aya emad el-den':'aya.emadelden@sedra-electric.com','rana alm-elden':'rana.alamelden@sedra-electric.com','amir mahfouz':'amir.mahfouz@sedra-electric.com','hossam selem':'hossam.selem@sedra-electric.com'};
+  var pre=(u.email||'').trim().toLowerCase() || (HINTS[(u.name||'').trim().toLowerCase()]||'');
+  var email=(prompt('Create a sign-in login for '+(u.name||'this member')+'.\nConfirm their email:', pre)||'').trim().toLowerCase();
+  if(!email || email.indexOf('@')<1){ return; }
+  if(!confirm('Create sign-in account for:\n'+(u.name||'')+'  <'+email+'>\n\nAn invite link will be emailed so THEY set their own password.\n(No duplicate profile is created — this uses the existing employee record.)')) return;
+  if(!secondary){ try{ secondary=firebase.initializeApp(firebaseConfig,'sec'); }catch(e){ secondary=firebase.app('sec'); } }
+  var tempPass='Sedra#'+Math.random().toString(36).slice(2,9)+'A9';
+  var finish=function(){
+    apiMerge('employees',u.id,{email:email,mustChangePass:true,active:true}).then(function(){ u.email=email; }).catch(function(){});
+    auth.sendPasswordResetEmail(email).then(function(){}).catch(function(){});
+    try{logAudit('grant-login','employees',u.id,email);}catch(_){}
+    try{synced();}catch(_){}
+    alert('✔ Login created for '+(u.name||'')+'.\nAn invite (set-password) link was emailed to '+email+'.');
+    if(typeof render==='function'){ try{render();}catch(_){} }
+  };
+  secondary.auth().createUserWithEmailAndPassword(email,tempPass)
+    .then(function(){ try{secondary.auth().signOut();}catch(_){} finish(); })
+    .catch(function(e){ if(e && e.code==='auth/email-already-in-use'){ finish(); } else { alert('Could not create account: '+((e&&e.message)||e)); } });
 }
 function delEmployee(id,email){
   if(!confirm('Delete this employee?\n\nThis removes their profile and access from the system.\nNote: their sign-in account stays in Firebase, so you can re-add the same email later. To fully remove the login, also delete the user from Firebase → Authentication.'))return;
