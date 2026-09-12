@@ -781,10 +781,10 @@ let stockcounts=[];
 
 /* ===================== HELPERS ===================== */
 const g=id=>document.getElementById(id);
-const esc=s=>(s||'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const today=()=>new Date().toISOString().slice(0,10);
+const esc=s=>(s||'').toString().replace(/[&<>"'`]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[c]));
+const today=()=>{ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const nowT=()=>new Date().toTimeString().slice(0,5);
-const num=v=>parseFloat(v)||0;
+const num=v=>{ if(typeof v==='number') return isFinite(v)?v:0; if(v==null) return 0; const n=parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isFinite(n)?n:0; };
 function money(branch,n){const c=CUR[branch]||'';return (num(n)).toLocaleString(undefined,{maximumFractionDigits:0})+' '+c;}
 /* ----- multi-currency: a document can be billed in any currency with an FX rate to the branch base currency ----- */
 const CURRENCIES=['EGP','AED','SAR','USD','EUR','GBP','KWD','QAR','TRY'];
@@ -807,7 +807,8 @@ function allowedBranches(){ if(!me)return[]; return (roleRank(me.role)>=ROLE_RAN
 function inBranch(item){ const a=allowedBranches(); if(curBranch!=='All'&&item.branch!==curBranch)return false; return a.includes(item.branch); }
 var LOCK_PERSONAL=['hub','dashboard','profile','myhr','todo','calendar','sitecheck','announcements','leavecal','birthdays','suggestions','chat','training'];
 var DEPT_HOME={Sales:'sales',Marketing:'marketing',Operations:'projects',Technical:'projects',Accounting:'accounting',Inventory:'inventory',HR:'hr',Management:'dashboard'};
-function canSee(m){ if(!me)return false; if(m&&m.id!=='admin'&&settings&&settings.hiddenModules&&settings.hiddenModules[m.id])return false; if(me.role==='Super Admin')return true; if(me.role==='Viewer')return true; if(m.adminOnly)return false; if(LOCK_PERSONAL.indexOf(m.id)>=0)return true; if((me.accessModules||[]).indexOf(m.id)>=0)return true; var ess=(typeof ROLE_ESSENTIALS!=='undefined'&&(ROLE_ESSENTIALS[me.dept]||ROLE_ESSENTIALS._default))||[]; return ess.indexOf(m.id)>=0; }
+var SENSITIVE_MODS=['hr','accounting','finance','payroll','payslips','loans'];
+function canSee(m){ if(!me)return false; if(m&&m.id!=='admin'&&settings&&settings.hiddenModules&&settings.hiddenModules[m.id])return false; if(me.role==='Super Admin')return true; if(m.adminOnly)return false; if(me.role==='Viewer'){ return SENSITIVE_MODS.indexOf(m.id)<0; } if(SENSITIVE_MODS.indexOf(m.id)>=0){ if((me.accessModules||[]).indexOf(m.id)>=0)return true; var essS=(typeof ROLE_ESSENTIALS!=='undefined'&&(ROLE_ESSENTIALS[me.dept]||ROLE_ESSENTIALS._default))||[]; return essS.indexOf(m.id)>=0; } if(LOCK_PERSONAL.indexOf(m.id)>=0)return true; if((me.accessModules||[]).indexOf(m.id)>=0)return true; var ess=(typeof ROLE_ESSENTIALS!=='undefined'&&(ROLE_ESSENTIALS[me.dept]||ROLE_ESSENTIALS._default))||[]; return ess.indexOf(m.id)>=0; }
 function canEdit(){ if(me&&me.role==='Viewer')return false; return me && me.role!=='Member' ? true : (me&&me.role==='Member'); }
 function isViewer(){ return !!(me&&me.role==='Viewer'); }
 function canWrite(){ return !(me&&me.role==='Viewer'); }
@@ -815,7 +816,7 @@ var _vbT=0;
 function viewerBlock(){ var n=Date.now(); if(n-_vbT<1500)return; _vbT=n; try{ var d=document.getElementById('viewerToast'); if(!d){ d=document.createElement('div'); d.id='viewerToast'; d.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#143F63;color:#fff;padding:10px 16px;border-radius:8px;z-index:99999;box-shadow:0 6px 18px rgba(0,0,0,.3);font-size:14px;transition:opacity .4s'; document.body.appendChild(d); } d.textContent=(typeof lang!=='undefined'&&lang==='ar')?'\u{1F441}\uFE0F \u0648\u0636\u0639 \u0627\u0644\u0645\u0634\u0627\u0647\u062F\u0629 (Viewer) \u2014 \u0644\u0644\u0642\u0631\u0627\u0621\u0629 \u0641\u0642\u0637':'\u{1F441}\uFE0F Viewer mode \u2014 read only'; d.style.opacity='1'; clearTimeout(d._t); d._t=setTimeout(function(){d.style.opacity='0';},2200); }catch(e){} }
 function isAdmin(){ return me&&me.role==='Super Admin'; }
 /* ---- Ownership & duplicate-prevention helpers (Phase 1) ---- */
-function myScope(){ if(!me)return 'own'; if(me.scope)return me.scope; if(me.role==='Team Leader')return 'team'; if(me.role==='Viewer'||me.dept==='Management'||roleRank(me.role)>=ROLE_RANK['Manager'])return 'all'; return 'own'; }
+function myScope(){ if(!me)return 'own'; if(me.scope)return me.scope; if(me.role==='Viewer')return 'own'; if(me.role==='Team Leader')return 'team'; if(me.dept==='Management'||roleRank(me.role)>=ROLE_RANK['Manager'])return 'all'; return 'own'; }
 function teamEmails(){ if(!me)return []; return employees.filter(e=>e.dept===me.dept).map(e=>(e.email||'').toLowerCase()); }
 function teamNames(){ if(!me)return []; return employees.filter(e=>e.dept===me.dept).map(e=>e.name||''); }
 function seesAll(){ return myScope()==='all'; }
@@ -1961,6 +1962,8 @@ function dashCheckIn(){
     var lat=p.coords.latitude,lng=p.coords.longitude,best=null;
     offices.forEach(function(o){ var d=dist(lat,lng,o.lat,o.lng); if(best===null||d<best.d)best={o:o,d:d}; });
     if(best && best.d<=best.o.radius){ var o=best.o; var id=(me.email||'').toLowerCase().replace(/[^a-z0-9]/g,'_')+'_'+today();
+      var _ex=(attendance||[]).find(function(a){return a.id===id;});
+      if(_ex && _ex.inTime){ if(g('dashAttMsg'))g('dashAttMsg').innerHTML='<span style="color:var(--muted)">'+(lang==='ar'?('مسجّل حضور بالفعل النهاردة ('+_ex.inTime+')'):('Already checked in today ('+_ex.inTime+')'))+'</span>'; return; }
       apiMerge('attendance',id,{email:(me.email||'').toLowerCase(),name:me.name,branch:o.branch,date:today(),inTime:nowT(),inLat:lat,inLng:lng,inDist:best.d}).then(function(){ synced(); if(g('dashAttMsg'))g('dashAttMsg').innerHTML='<span style="color:var(--ok)">'+(lang==='ar'?'تم تسجيل الحضور ✔':'Checked in ✔')+'</span>'; render(); });
     } else if(best){ if(msg)msg.innerHTML='<span style="color:var(--bad)">'+(lang==='ar'?'إنت على بُعد ':'You are ')+Math.round(best.d)+'m '+(lang==='ar'?'من أقرب مقر':'from the nearest office')+' ('+(FLAG[best.o.branch]||'')+' '+best.o.branch+') — '+(lang==='ar'?'لازم تكون في حدود ':'must be within ')+best.o.radius+'m.</span>'; }
   }, function(e){ if(msg)msg.textContent=(lang==='ar'?'مقدرناش نجيب موقعك: ':'Could not get location: ')+e.message+' ('+(lang==='ar'?'اسمح بالوصول للموقع':'allow location access')+').'; }, {enableHighAccuracy:true,timeout:12000});
@@ -2163,7 +2166,7 @@ function managePositions(){ if(!isAdmin()){ alert(lang==='ar'?'Super Admin فق�
 }
 function addPosition(){ var el=g('pos_new'); if(!el||!el.value.trim())return; var nm=el.value.trim();
   apiAdd('positions',{name:nm,by:(me&&me.name)||'',created:new Date().toISOString()}).then(function(id){ positions.push({id:id,name:nm}); logAudit('create','positions',id||'',nm); managePositions(); if(appReady)refreshAll(); }); }
-function delPosition(id){ positions=positions.filter(function(p){return p.id!==id;}); apiDelete('positions',id); managePositions(); }
+function delPosition(id){ if(!confirm(lang==='ar'?'حذف هذه الوظيفة؟':'Delete this job position?'))return; positions=positions.filter(function(p){return p.id!==id;}); apiDelete('positions',id); managePositions(); }
 const STAGE_COL={New:'#5A6B7B',Contacted:'#2C77B0',Qualified:'#36C5E0','Site Survey':'#8e44ad','BOQ / Design':'#5b6bd6','Quotation Sent':'#e0a93b',Negotiation:'#d3742a',Won:'#1a7a4f',Lost:'#c0392b',Qualification:'#0aa2c0','Pending Quotation':'#d4a017','Quotation Ready':'#6f42c1','Quote Sent':'#e0722a','Closed Won':'#157347','Closed Lost':'#a02722'};
 const LEAD_SOURCES=['Meta Ads','Google Ads','LinkedIn','Organic / SEO','Website','Referral','WhatsApp','Event / Expo','Designer/Architect','Contractor','Walk-in','Instagram','Facebook','Direct','Yasir BD List','Other'];
 const WONLOST_REASONS=['Price','Product fit','Competitor','Timing / not now','No budget','Trust / referral','Service quality','Location','Specs / scope','Other'];
@@ -2533,7 +2536,7 @@ function leadToQuote(id){
   const l=leads.find(x=>x.id===id); if(!l)return;
   if(l.quoteId && quotes.find(q=>q.id===l.quoteId)){ if(!confirm('A quotation already exists for this lead. Create another?'))return; }
   const items=[{desc:l.service||l.name||'Service',qty:1,price:num(l.value)}];
-  const q={number:'Q-'+Date.now().toString().slice(-6),type:'Quotation',client:l.name,date:today(),branch:l.branch||defBranch(),dept:'Operations',status:'Draft',vat:14,items:items,notes:'From lead: '+(l.name||''),fromLead:l.id,created:new Date().toISOString()};
+  const q={number:'Q-'+Date.now().toString().slice(-6),type:'Quotation',client:l.name,date:today(),branch:l.branch||defBranch(),dept:'Operations',status:'Draft',vat:vatForBranch(l.branch||defBranch()),items:items,notes:'From lead: '+(l.name||''),fromLead:l.id,created:new Date().toISOString()};
   apiAdd('quotes',q).then(function(qid){ apiMerge('leads',id,{quoteId:qid}); logAudit('create','quotes',qid||'',l.name||''); synced(); curView='quotes'; alert('Quotation created from lead ✔ — opening Quotations.'); render(); }).catch(e=>alert('Error: '+(e.message||e)));
 }
 function salesTeam(){ return (employees||[]).filter(function(e){ return (e.dept==='Sales') && e.active!==false && e.name; }).map(function(e){return e.name;}).sort(); }
@@ -2708,7 +2711,7 @@ function editLead(id){
     fEl('Company name','l_company',r.company)+fEl('Lead / client name','l_name',r.name)+fEl('Phone','l_phone',r.phone)+
     `<div class="fld"><label>🏡 ${lang==='ar'?'مالك الفيلا / العقار (العميل النهائي)':'Villa / property owner (end client)'}</label><input id="l_villaOwner" value="${esc(r.villaOwner||'')}" placeholder="${lang==='ar'?'اسم صاحب الفيلا — غير اسم الشركة':'owner name — not the company'}"></div>`+
     `<div class="fld"><label>Position / job title (contact)${isAdmin()?' · <a onclick="managePositions()" style="cursor:pointer;color:#157f96;font-size:11px">⚙ '+(lang==='ar'?'إدارة الوظائف':'manage')+'</a>':''}</label><select id="l_position">${posOptions(r.position||'')}</select></div>`+
-    `<div class="row2">${selEl('Branch','l_branch',branchOpts(),r.branch)}${selEl('Stage','l_stage',STAGES,r.stage||'New')}</div>`+
+    `<div class="row2">${selEl('Branch','l_branch',branchOpts(),r.branch)}${(bpOn()&&id)?('<div class="fld"><label>Stage</label><input value="'+esc(r.stage||'New')+'" disabled title="'+(lang==='ar'?'المرحلة تتغيّر من أزرار العملية بالأعلى':'Stage changes via the process buttons above')+'"></div>'):selEl('Stage','l_stage',STAGES,r.stage||'New')}</div>`+
     `<div class="row2">${fEl('Sales rep (owner)','l_owner',r.owner)}${selEl('Source','l_source',LEAD_SOURCES,r.source||'Direct')}</div>`+
     `<div class="fld"><label>Campaign (marketing source)</label><select id="l_campaign">${['<option value="">— none —</option>'].concat(campaigns.filter(inBranch).map(c=>`<option value="${c.id}" ${c.id===r.campaignId?'selected':''}>${esc(c.name)}</option>`)).join('')}</select></div>`+
     `<div class="row2">${selEl('Customer type','l_ctype',CUSTOMER_TYPES,r.ctype||'Company')}${selEl('Business / industry','l_btype',BUSINESS_TYPES,r.btype||'Other')}</div>`+
@@ -2727,7 +2730,7 @@ function editLead(id){
     `<div class="row2">${selEl('Win/Loss reason (if Won/Lost)','l_reason',['—'].concat(WONLOST_REASONS),r.reason||'—')}${fEl('Reason note','l_reasonNote',r.reasonNote)}</div>`+
     fileField('l_file','Attach a file (drawing / BOQ / quotation / photo)',r.file)+
     fTa('Notes','l_notes',r.notes),
-    ()=>{ const reason=val('l_reason'); const d={company:val('l_company'),name:val('l_name'),villaOwner:val('l_villaOwner'),phone:val('l_phone'),position:val('l_position'),email:val('l_email'),segment:val('l_segment'),budgetRange:(val('l_budget')==='—'?'':val('l_budget')),solutionInterest:val('l_solution'),currentBill:num(val('l_bill')),lifecycle:(val('l_lifecycle')==='Auto'?'':val('l_lifecycle')),funnel:(val('l_funnel')==='—'?'':val('l_funnel')),bantB:val('l_bantb'),bantA:val('l_banta'),bantN:val('l_bantn'),bantT:val('l_bantt'),branch:val('l_branch'),stage:val('l_stage'),owner:val('l_owner'),source:val('l_source'),campaignId:val('l_campaign'),ctype:val('l_ctype'),btype:val('l_btype'),ptype:val('l_ptype'),service:val('l_service'),area:val('l_area'),address:val('l_address'),location:val('l_location'),projects:val('l_projects'),lastUpdate:val('l_lastUpdate'),updateDate:val('l_updateDate'),website:val('l_website'),social:val('l_social'),value:num(val('l_value')),reason:(reason==='—'?'':reason),reasonNote:val('l_reasonNote'),next:val('l_next'),notes:val('l_notes'),file:fileVal('l_file')};
+    ()=>{ const reason=val('l_reason'); const d={company:val('l_company'),name:val('l_name'),villaOwner:val('l_villaOwner'),phone:val('l_phone'),position:val('l_position'),email:val('l_email'),segment:val('l_segment'),budgetRange:(val('l_budget')==='—'?'':val('l_budget')),solutionInterest:val('l_solution'),currentBill:num(val('l_bill')),lifecycle:(val('l_lifecycle')==='Auto'?'':val('l_lifecycle')),funnel:(val('l_funnel')==='—'?'':val('l_funnel')),bantB:val('l_bantb'),bantA:val('l_banta'),bantN:val('l_bantn'),bantT:val('l_bantt'),branch:val('l_branch'),stage:((bpOn()&&id)?(r.stage||'New'):val('l_stage')),owner:val('l_owner'),source:val('l_source'),campaignId:val('l_campaign'),ctype:val('l_ctype'),btype:val('l_btype'),ptype:val('l_ptype'),service:val('l_service'),area:val('l_area'),address:val('l_address'),location:val('l_location'),projects:val('l_projects'),lastUpdate:val('l_lastUpdate'),updateDate:val('l_updateDate'),website:val('l_website'),social:val('l_social'),value:num(val('l_value')),reason:(reason==='—'?'':reason),reasonNote:val('l_reasonNote'),next:val('l_next'),notes:val('l_notes'),file:fileVal('l_file')};
       if(!d.name){alert('Name required');return false;} if(!dupGuard('leads',d,id))return false; if(!id)d.created=new Date().toISOString(); d.ownerEmail=ownerEmailFor(d.owner); saveDoc('leads',d,id); });
 }
 function editCamp(id){
@@ -3144,6 +3147,7 @@ function printVariation(id){
   <script>window.print()<\/script></body></html>`); w.document.close();
 }
 function quoteSections(q){ if(q.sections&&q.sections.length)return q.sections; if(q.items&&q.items.length)return [{title:'Items',items:q.items.map(i=>({item:i.item||'',desc:i.desc||'',brand:i.brand||'',qty:num(i.qty),price:num(i.price),image:i.image||''}))}]; return []; }
+function vatForBranch(b){ var s=(settings&&settings.vatRates)||{}; var d={Egypt:14,UAE:5,KSA:15}; return (s[b]!=null)?num(s[b]):(d[b]!=null?d[b]:14); }
 function quoteTotal(q){ const secs=quoteSections(q); let sub=0; const secTotals=secs.map(s=>{ const t=(s.items||[]).reduce((a,i)=>a+num(i.qty)*num(i.price),0); sub+=t; return t; }); const vat=sub*num(q.vat)/100; return {sub,vat,total:sub+vat,secTotals,secs}; }
 function vQuotes(){
   const meName=(me&&me.name)||'';
@@ -3286,7 +3290,7 @@ function deliverRFQ(id){
   }).catch(function(e){ alert('Error: '+(e.message||e)); });
 }
 function editQuote(id){
-  const r=id?quotes.find(x=>x.id===id):{branch:defBranch(),type:'Quotation',status:'Draft',vat:5,dept:(me.dept==='Management'?'Operations':me.dept),date:today(),service:'Home Automation',number:genQuoteNo('home-automation'),preparedBy:(me&&me.name)||'',presalesName:(me&&me.name)||'',validity:30};
+  const r=id?quotes.find(x=>x.id===id):{branch:defBranch(),type:'Quotation',status:'Draft',vat:vatForBranch(defBranch()),dept:(me.dept==='Management'?'Operations':me.dept),date:today(),service:'Home Automation',number:genQuoteNo('home-automation'),preparedBy:(me&&me.name)||'',presalesName:(me&&me.name)||'',validity:30};
   _qsec=JSON.parse(JSON.stringify(quoteSections(r))); if(!_qsec.length)_qsec=[{title:'Smart Home System',items:[qBlankItem()]}];
   openModal(id?'Edit quotation':'New quotation',
     rfqSummaryHTML(r)+
@@ -3300,7 +3304,7 @@ function editQuote(id){
     `<div class="row2">${selEl('Branch','q_branch',branchOpts(),r.branch)}<div class="fld"><label>Currency</label><select id="q_cur" onchange="qCurChange()">${CURRENCIES.map(function(c){return '<option '+((r.currency||CUR[r.branch||defBranch()]||'EGP')===c?'selected':'')+'>'+c+'</option>';}).join('')}</select></div></div>`+
     `<div class="card" id="q_fxbox" style="background:#f6f9fc;padding:10px;margin-bottom:8px"><div class="mini" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span>💱 ${lang==='ar'?'سعر الصرف (1 جنيه =)':'Exchange rate (1 EGP =)'}</span><label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="q_fxman" ${r.fxManual?'checked':''} onchange="qCurChange()"> ${lang==='ar'?'أحدّده يدويًا':'set manually'}</label><input id="q_fx" type="number" step="0.0001" value="${num(r.fxRate)||''}" style="width:110px" oninput="qRecalc()" ${r.fxManual?'':'disabled'}><span id="q_fxinfo" class="mini" style="color:#157f96"></span></div></div>`+
     `<div class="fld"><label>Sections & line items (pick products from inventory in the Description field)</label><div id="qSec"></div></div>`+
-    `<div class="row2">${selEl('Status','q_status',QSTAT,r.status||'Draft')}${fEl('VAT %','q_vat',r.vat!=null?r.vat:5,'number','qRecalc()')}</div>`+
+    `<div class="row2">${selEl('Status','q_status',QSTAT,r.status||'Draft')}${fEl('VAT %','q_vat',r.vat!=null?r.vat:vatForBranch(r.branch||defBranch()),'number','qRecalc()')}</div>`+
     `<div class="card" id="qTotals" style="background:#f6f9fc"></div>`+
     fTa('Excluding (one per line)','q_excl',r.excluding||defQExcluding())+
     fTa('Features list (one per line — shown as a highlighted section in the quotation)','q_features',r.featuresList||'')+
@@ -4603,7 +4607,7 @@ function setLeave(id,status){ const l=leaves.find(x=>x.id===id); if(l&&!canAppro
 function leaveNotice(type){ const d={Annual:7,Sick:0,Emergency:0,Unpaid:7,Other:3}; const s=settings.leaveNotice||{}; return (s[type]!=null)?num(s[type]):(d[type]!=null?d[type]:0); }
 function editLeaveNotice(){ openModal('⚙ Leave notice rules (days required before start)', `<div class="mini" style="margin-bottom:8px">حدّد كم يوم إشعار مطلوب قبل بداية كل نوع إجازة (0 = بدون).</div>`+LEAVE_TYPES.map(t=>fEl(t+' — notice days','ln_'+t,leaveNotice(t),'number')).join(''), ()=>{ const o={}; LEAVE_TYPES.forEach(t=>{o[t]=num(val('ln_'+t));}); saveSetting('leaveNotice',o); }); }
 function leaveReqEmp(l){ return employees.find(e=>(e.email||'').toLowerCase()===(l.email||'').toLowerCase()); }
-function canApproveLeave(l){ if(!me)return false; if(me.role==='Super Admin')return true; const emp=leaveReqEmp(l); if(emp&&emp.manager&&emp.manager===me.name)return true; if(me.role==='Manager'&&emp&&emp.dept===me.dept)return true; if(me.role==='Manager'&&!emp)return true; return false; }
+function canApproveLeave(l){ if(!me)return false; const emp=leaveReqEmp(l); const isSelf=emp&&(emp.email||'').toLowerCase()===(me.email||'').toLowerCase(); if(me.role==='Super Admin')return true; if(isSelf)return false; /* no self-approval */ if(emp&&emp.manager&&emp.manager===me.name)return true; if(me.role==='Manager'&&emp&&emp.dept===me.dept)return true; return false; }
 function editLeave(id){
   const r=id?leaves.find(x=>x.id===id):{branch:defBranch(),type:'Annual',from:today(),to:today()};
   openModal('Request leave',
@@ -4756,6 +4760,8 @@ function checkInAuto(){
     if(best && best.d<=best.o.radius){
       const o=best.o;
       const id=(me.email||'').toLowerCase().replace(/[^a-z0-9]/g,'_')+'_'+today();
+      const _ex2=(attendance||[]).find(function(a){return a.id===id;});
+      if(_ex2 && _ex2.inTime){ g('attMsg').innerHTML=`<span style="color:var(--muted)">${lang==='ar'?('مسجّل حضور بالفعل النهاردة ('+_ex2.inTime+')'):('Already checked in today ('+_ex2.inTime+')')}</span>`; return; }
       apiMerge('attendance',id,{email:(me.email||'').toLowerCase(),name:me.name,branch:o.branch,date:today(),inTime:nowT(),inLat:lat,inLng:lng,inDist:best.d}).then(synced);
       g('attMsg').innerHTML=`<span style="color:var(--ok)">${lang==='ar'?'تم تسجيل الحضور':'Checked in'} — ${(FLAG[o.branch]||'')} ${o.branch} (${Math.round(best.d)}m).</span>`;
     } else if(best){
@@ -5308,7 +5314,7 @@ function checkChatNotifications(){
   if(toasted)pingMessage();
   if(_wantDesktop&&document.visibilityState==='hidden')desktopNotify(fresh[fresh.length-1]);
 }
-function showChatToast(m){ const mention=isMentionMe(m.text); showToast({title:(mention?'📣 ':'💬 ')+esc(m.sender||m.email||'')+(mention?' mentioned you':''),body:esc(m.text),sub:chLabel(m.channel),onclick:()=>openChatChannel(m.channel)}); }
+function showChatToast(m){ const mention=isMentionMe(m.text); showToast({title:(mention?'📣 ':'💬 ')+esc(m.sender||m.email||'')+(mention?' mentioned you':''),body:esc(m.text),sub:esc(chLabel(m.channel)),onclick:()=>openChatChannel(m.channel)}); }
 function showToast(o){ const wrap=g('toasts'); if(!wrap)return; const el=document.createElement('div'); el.className='toast';
   el.innerHTML=`<div class="th">${o.title}</div>${o.body?`<div class="tb">${o.body}</div>`:''}${o.sub?`<div class="tx2">${o.sub} · click to open</div>`:''}`;
   el.onclick=function(){ try{o.onclick&&o.onclick();}catch(e){} el.remove(); };
@@ -8078,6 +8084,12 @@ function delCmt(cid,id){ if(!confirm(lang==='ar'?'حذف التعليق؟':'Dele
 function recOpen(id){
   var f=findRec(id); if(!f){ alert(lang==='ar'?'التسجيل غير موجود':'Record not found'); return; }
   var r=f.rec, coll=f.coll, skip={id:1,file:1,importId:1,ownerEmail:1};
+  var _HRC={employees:1,payslips:1,loans:1,eosb:1,salaryadvance:1,appraisals:1,overtimes:1,expclaims:1};
+  if(_HRC[coll]){
+    var _compOk=me&&(me.role==='Super Admin'||me.dept==='HR'||me.dept==='Management'||roleRank(me.role)>=ROLE_RANK['Director']);
+    var _own=me&&(((r.email||'').toLowerCase()===(me.email||'').toLowerCase())||r.employee===me.name||r.name===me.name);
+    if(!_compOk&&!_own){ ['salary','allowances','iban','socialInsNo','medicalIns','birthDate','docLabourExp','docPassportExp','docPassportNo','docResidenceExp','docUaeIdExp','leaveEntitlement','loanBalance','netSalary','net','basic','gross','deductions','bonus'].forEach(function(k){skip[k]=1;}); }
+  }
   var keys=Object.keys(r).filter(function(k){ return !skip[k] && r[k]!==null && typeof r[k]!=='object' && String(r[k]).trim()!==''; });
   var h='<div class="mini" style="margin-bottom:8px">'+esc(coll)+'</div>';
   h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"><button class="btn gh sm" onclick="tplPrint(\''+id+'\')">🖨 '+(lang==='ar'?'طباعة / PDF':'Print / PDF')+'</button><button class="btn gh sm" onclick="tplDocx(\''+id+'\')">⬇ Word (.docx)</button><button class="btn gh sm" onclick="tplXlsx(\''+id+'\')">⬇ Excel (.xlsx)</button></div>';
