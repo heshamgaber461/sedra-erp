@@ -8457,6 +8457,7 @@ function postImportOpen(){ importType='posts'; importRows=[];
     function(){ return true; });
 }
 var mktCalView='list';
+var POST_COL={Idea:'#5A6B7B',Draft:'#8a94a6',Scheduled:'#c9861a',Published:'#1a7a4f',Archived:'#889aa9',Cancelled:'#c0392b'};
 function vContentCal(){
   const rows=posts.filter(inBranch).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   let h=`<div class="sect"><h2>🗓️ Content Calendar</h2><div class="sp"></div><button class="btn gh sm" onclick="mktCalView=(mktCalView==='cal'?'list':'cal');render()">${mktCalView==='cal'?'▤ List':'🗓️ Calendar'}</button> <button class="btn gh sm" onclick="postImportOpen()">📥 Import CSV</button> <button class="btn cy" onclick="editPost()">+ Add post</button></div>`;
@@ -8469,6 +8470,26 @@ function vContentCal(){
     <td><span class="tag" style="background:${POST_COL[st]}22;color:${POST_COL[st]}">${st}</span></td>
     <td style="white-space:nowrap"><button class="btn gh sm" onclick="recOpen('${p.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${p.id}')">📎</button> <button class="btn gh sm" onclick="editPost('${p.id}')">Edit</button> ${isMgr()?`<button class="btn dn sm" onclick="delDoc('posts','${p.id}')">✕</button>`:''}</td></tr>`}).join('')+`</tbody></table></div>`;
   return h;
+}
+function mktCalendar(rows){
+  var now=new Date(), y=now.getFullYear(), mo=now.getMonth();
+  var first=new Date(y,mo,1), start=first.getDay(), dim=new Date(y,mo+1,0).getDate();
+  var monthName=first.toLocaleString('en-US',{month:'long',year:'numeric'});
+  var byDay={}; (rows||[]).forEach(function(p){ if(!p.date)return; var d=new Date(p.date); if(d.getFullYear()===y&&d.getMonth()===mo){ var k=d.getDate(); (byDay[k]=byDay[k]||[]).push(p); } });
+  var dows=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var h='<div class="card" style="padding:10px"><div style="font-weight:800;color:var(--navy);margin-bottom:8px">'+monthName+'</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">';
+  dows.forEach(function(d){ h+='<div class="mini" style="text-align:center;font-weight:700;color:var(--muted)">'+d+'</div>'; });
+  for(var i=0;i<start;i++){ h+='<div></div>'; }
+  for(var day=1;day<=dim;day++){
+    var ps=byDay[day]||[], isTod=(day===now.getDate());
+    h+='<div style="min-height:74px;border:1px solid var(--mist);border-radius:8px;padding:4px;'+(isTod?'background:#eef6fb;border-color:#36C5E0':'')+'">';
+    h+='<div class="mini" style="font-weight:700;color:'+(isTod?'#0d6ea8':'var(--muted)')+'">'+day+'</div>';
+    ps.slice(0,4).forEach(function(p){ var st=p.status||'Idea', c=POST_COL[st]||'#5A6B7B'; h+='<div onclick="editPost(\''+p.id+'\')" title="'+esc(p.title||'')+'" style="cursor:pointer;background:'+c+'22;color:'+c+';border-radius:4px;padding:1px 4px;margin-top:2px;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.title||'post')+'</div>'; });
+    if(ps.length>4) h+='<div class="mini" style="color:var(--muted)">+'+(ps.length-4)+'</div>';
+    h+='</div>';
+  }
+  h+='</div></div>'; return h;
 }
 const GROWTH_STAGES=['Acquisition','Activation','Retention','Revenue','Referral'];
 const GROWTH_STAT=['Backlog','Planned','Running','Won','Lost','Paused'];
