@@ -3185,7 +3185,7 @@ function qItemDel(si,ii){ qReadDOM(); _qsec[si].items.splice(ii,1); if(!_qsec[si
 function qPickProduct(si,ii,val){ var v=String(val||'').trim(); var lv=v.toLowerCase();
   const p=inventory.find(x=>((x.sku?x.sku+' — ':'')+(x.name||''))===v) || inventory.find(x=>(x.name||'')===v) || inventory.find(x=>(x.sku||'')===v) || inventory.find(x=>String(x.sku||'').toLowerCase()===lv || String(x.name||'').toLowerCase()===lv);
   qReadDOM(); const it=_qsec[si].items[ii];
-  if(p){ it.item=p.sku||p.code||it.item||''; it.desc=p.name||p.desc||it.desc||''; if(p.brand)it.brand=p.brand; const pr=num(p.price)||num(p.cost); if(pr)it.price=pr; if(p.image)it.image=p.image; }
+  if(p){ it.item=p.sku||p.code||it.item||''; it.desc=p.name||p.desc||it.desc||''; if(p.brand)it.brand=p.brand; const pr=num(p.price)||num(p.cost); if(pr){ var _rt=qCurRate(); it.price=(_rt&&_rt!==1)?Math.round(pr*_rt*100)/100:pr; } if(p.image)it.image=p.image; }
   qSecRender(); }
 function qSecRender(){ const el=g('qSec'); if(!el)return;
   const dl=`<datalist id="prod_dl">${inventory.filter(inBranch).map(p=>`<option value="${esc((p.sku?p.sku+' — ':'')+(p.name||''))}">`).join('')}</datalist><datalist id="sys_dl">${QSYS_ALL.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>`;
@@ -3206,9 +3206,9 @@ function qSecRender(){ const el=g('qSec'); if(!el)return;
 }
 function qCurRate(){ var cur=(g('q_cur')&&val('q_cur'))||'EGP'; if(cur==='EGP') return 1; var man=g('q_fxman')&&g('q_fxman').checked; if(man){ var r=num(val('q_fx')); return r>0?r:fxRateFor(cur); } return fxRateFor(cur); }
 function qCurChange(){ var cur=(g('q_cur')&&val('q_cur'))||'EGP'; var man=g('q_fxman')&&g('q_fxman').checked; var fx=g('q_fx'); if(fx){ fx.disabled=!man; if(!man) fx.value=(cur==='EGP'?'':fxRateFor(cur)); else if(!num(fx.value)) fx.value=fxRateFor(cur); } var info=g('q_fxinfo'); if(info){ info.textContent = cur==='EGP'?(lang==='ar'?'العملة الأساسية':'base currency'):((fxDate()?('auto '+fxDate()+' — '):'')+'1 EGP = '+fxRateFor(cur)+' '+cur); } qRecalc(); }
-function qRecalc(){ qReadDOM(); const cur=(g('q_cur')&&val('q_cur'))||'EGP'; const vat=num(val('q_vat')); const rate=qCurRate(); const f=n=>(n*rate).toLocaleString(undefined,{maximumFractionDigits:2}); let sub=0;
+function qRecalc(){ qReadDOM(); const cur=(g('q_cur')&&val('q_cur'))||'EGP'; const vat=num(val('q_vat')); const rate=qCurRate(); const f=n=>Number(num(n)).toLocaleString(undefined,{maximumFractionDigits:2}); let sub=0;
   _qsec.forEach((s,si)=>{ (s.items||[]).forEach((it,ii)=>{ const t=num(it.qty)*num(it.price); sub+=t; const c=g('q_'+si+'_'+ii+'_sub'); if(c)c.textContent=f(t)+' '+cur; }); });
-  const v=sub*vat/100; const tot=g('qTotals'); const baseNote=cur!=='EGP'?`<div class="mini" style="text-align:right;color:var(--muted)">base: ${Math.round(sub+v).toLocaleString()} EGP</div>`:'';
+  const v=sub*vat/100; const tot=g('qTotals'); const baseNote=cur!=='EGP'?`<div class="mini" style="text-align:right;color:var(--muted)">≈ ${Math.round(rate>0?(sub+v)/rate:(sub+v)).toLocaleString()} EGP (base)</div>`:'';
   if(tot)tot.innerHTML=`<div style="display:flex;justify-content:space-between"><span>Subtotal (excl. VAT)</span><b>${f(sub)} ${cur}</b></div><div style="display:flex;justify-content:space-between"><span>VAT (${vat}%)</span><b>${f(v)} ${cur}</b></div><div style="display:flex;justify-content:space-between;font-size:16px;color:var(--navy)"><span>Grand total</span><b>${f(sub+v)} ${cur}</b></div>`+baseNote;
 }
 const QSERVICES=['Home Automation','Smart Home','Home Cinema','Indoor Sound System','Outdoor Sound System','Security Camera','Intrusion System','Safety System','Intercom System','Structured Cabling System','MATV Satellite System','Solar Energy','Smart Gates'];
@@ -3323,7 +3323,7 @@ function printQuote(id){
   const t=quoteTotal(q); const cur=docCur(q)||'EGP'; const rate=quoteRate(q);
   const w=window.open('','_blank'); if(!w){ alert('Allow pop-ups to print/PDF the quotation.'); return; }
   const NL=String.fromCharCode(10), CR=String.fromCharCode(13);
-  const M=n=>Number(num(n)*rate).toLocaleString('en-US',{maximumFractionDigits:2})+' '+cur;
+  const M=n=>Number(num(n)).toLocaleString('en-US',{maximumFractionDigits:2})+' '+cur;
   const validTill=(function(){ try{ var d=new Date(q.date||today()); d.setDate(d.getDate()+(num(q.validity)||30)); return d.toISOString().slice(0,10); }catch(e){ return ''; } })();
   const lines=z=>(z||'').split(NL).map(x=>x.split(CR).join('').trim()).filter(Boolean);
   const base=location.origin+'/quotation-covers/';
@@ -3348,7 +3348,7 @@ function printQuote(id){
   const metaHTML=`<div class="metabox"><span>Client: <b>${esc(q.client||'-')}</b></span><span>Location: <b>${esc(q.location||'-')}</b></span><span>Prepared by: <b>${esc(q.preparedBy||'-')}</b></span></div>`;
   const ftHTML=`<div class="ft"><span>info@sedra-electric.com</span><span>www.sedra-electric.com</span><span>Tel: 0226783906</span></div>`;
   const rowsTbl=sc=>`<table><thead><tr><th class="c">Image</th><th>Item</th><th>Description</th><th>Brand</th><th class="c">Qty</th><th class="r">Unit Price</th><th class="r">Total</th></tr></thead><tbody>${(sc.items||[]).map(it=>`<tr><td class="c">${it.image?`<img src="${esc(it.image)}" style="width:62px;height:62px;object-fit:contain;display:block;margin:0 auto;mix-blend-mode:multiply">`:''}</td><td class="pn">${esc(it.item||'')}</td><td>${esc(it.desc||'')}</td><td class="br">${esc(it.brand||'-')}</td><td class="c">${num(it.qty)}</td><td class="r">${M(it.price)}</td><td class="r"><b>${M(num(it.qty)*num(it.price))}</b></td></tr>`).join('')}</tbody></table>`;
-  const finHTML=`${cur!=='EGP'?`<div class="mini" style="text-align:right;color:#5a6b7b;font-size:11px;margin-bottom:4px">${lang==='ar'?'كل المبالغ بعملة':'All amounts in'} ${cur} &mdash; 1 EGP = ${rate} ${cur}</div>`:''}<div class="fin"><div class="r2"><span>Subtotal (excl. VAT)</span><b>${M(t.sub)}</b></div><div class="r2"><span>VAT (${num(q.vat)}%)</span><b>${M(t.vat)}</b></div><div class="g"><span>Grand Total</span><span>${M(t.total)}</span></div></div>`;
+  const finHTML=`${cur!=='EGP'?`<div class="mini" style="text-align:right;color:#5a6b7b;font-size:11px;margin-bottom:4px">${lang==='ar'?'كل المبالغ بعملة':'All amounts in'} ${cur}</div>`:''}<div class="fin"><div class="r2"><span>Subtotal (excl. VAT)</span><b>${M(t.sub)}</b></div><div class="r2"><span>VAT (${num(q.vat)}%)</span><b>${M(t.vat)}</b></div><div class="g"><span>Grand Total</span><span>${M(t.total)}</span></div></div>`;
   const featHTML=(function(){var fl=lines(q.featuresList);return fl.length?`<div class="stitle" style="font-size:15px;margin-top:10px">✨ Features list</div><div class="sec" style="page-break-inside:avoid;border-color:#37c0dc"><ul style="padding:14px 30px;margin:0;line-height:1.9;font-size:12.5px;color:#1c2b3a;columns:2;-webkit-columns:2;column-gap:30px">${fl.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')}</ul></div>`:'';})();
   const payHTML=pay.length?`<div class="stitle" style="font-size:15px;margin-top:6px">Payment terms</div><div class="pay">${pay.map(pp=>`<div class="pc"><div class="k">${esc(pp[0].toUpperCase())}</div><div class="v">${num(pp[1])}%</div></div>`).join('')}</div>`:'';
   const notesHTML=(function(){var nl=lines(q.notes);return nl.length?`<div class="stitle" style="font-size:15px;margin-top:10px">📝 ${lang==='ar'?'ملاحظات':'Notes'}</div><div class="sec" style="page-break-inside:avoid;border-color:#37c0dc"><ul style="padding:14px 30px;margin:0;line-height:1.9;font-size:12.5px;color:#1c2b3a">${nl.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')}</ul></div>`:'';})();
@@ -3455,14 +3455,14 @@ function createProjectFromQuote(id){
   const q=quotes.find(x=>x.id===id); if(!q)return; const t=quoteTotal(q);
   const name=(q.client||'Project')+' — '+(q.number||'');
   if(!confirm((lang==='ar'?'إنشاء مشروع من هذا العرض؟':'Create a project from this quotation?')+String.fromCharCode(10)+name+' · '+money2(docCur(q),t.total)))return;
-  apiAdd('projects',{name:name,client:q.client,branch:q.branch,dept:q.dept||'Operations',status:'Planning',progress:0,owner:(me&&me.name)||'',ownerEmail:(me&&me.email||'').toLowerCase(),value:t.total,start:today(),end:q.date,fromQuote:q.id,created:new Date().toISOString()})
+  apiAdd('projects',{name:name,client:q.client,branch:q.branch,dept:q.dept||'Operations',status:'Planning',progress:0,owner:(me&&me.name)||'',ownerEmail:(me&&me.email||'').toLowerCase(),value:t.total,currency:docCur(q),fxRate:(quoteRate(q)>0?(1/quoteRate(q)):1),start:today(),end:q.date,fromQuote:q.id,created:new Date().toISOString()})
     .then(pid=>{ apiMerge('quotes',id,{status:'Approved',projectId:pid||''}); logAudit('create','projects',pid||'','from quote '+(q.number||'')); synced(); alert(lang==='ar'?'تم إنشاء المشروع ✔ — شوفه في Projects':'Project created ✔ — see Projects.'); })
     .catch(e=>alert('Error: '+(e.message||e)));
 }
 function quoteToInvoice(id){
   const q=quotes.find(x=>x.id===id); if(!q)return; const t=quoteTotal(q);
   if(!confirm('Create an invoice from this quotation ('+money2(docCur(q),t.total)+')?'))return;
-  apiAdd('invoices',{number:'INV-'+Date.now().toString().slice(-6),date:today(),client:q.client,branch:q.branch,currency:docCur(q),fxRate:fxOf(q),amount:t.total,paid:0,due:addMonths(today(),1),notes:'From quotation '+(q.number||''),fromQuote:q.id,created:new Date().toISOString()})
+  apiAdd('invoices',{number:'INV-'+Date.now().toString().slice(-6),date:today(),client:q.client,branch:q.branch,currency:docCur(q),fxRate:(quoteRate(q)>0?(1/quoteRate(q)):1),amount:t.total,paid:0,due:addMonths(today(),1),notes:'From quotation '+(q.number||''),fromQuote:q.id,created:new Date().toISOString()})
     .then(()=>{ apiMerge('quotes',id,{status:'Approved',invoiced:true}); synced(); alert('Invoice created ✔'); })
     .catch(e=>alert('Error: '+(e.message||e)));
 }
@@ -3511,7 +3511,8 @@ function scheduleAMCVisit(id){
 function genContractInvoice(id){
   const c=contracts.find(x=>x.id===id); if(!c)return;
   if(!confirm('Generate an invoice for this contract cycle ('+money(c.branch,c.amount)+')?'))return;
-  apiAdd('invoices',{number:'INV-'+Date.now().toString().slice(-6),date:today(),client:c.customer,branch:c.branch,amount:num(c.amount),paid:0,due:addMonths(today(),1),notes:'Contract: '+(c.title||''),contractId:c.id,created:new Date().toISOString()})
+  var _ccur=c.currency||CUR[c.branch]||'EGP'; var _cfx=num(c.fxRate)||(fxRateFor(_ccur)>0?(1/fxRateFor(_ccur)):1);
+  apiAdd('invoices',{number:'INV-'+Date.now().toString().slice(-6),date:today(),client:c.customer,branch:c.branch,currency:_ccur,fxRate:_cfx,amount:num(c.amount),paid:0,due:addMonths(today(),1),notes:'Contract: '+(c.title||''),contractId:c.id,created:new Date().toISOString()})
     .then(()=>{ const months=CYCLES[c.cycle]||1; apiMerge('contracts',id,{nextDue:addMonths(c.nextDue||today(),months),lastInvoiced:today()}); synced(); alert('Invoice generated ✔'); })
     .catch(e=>alert('Error: '+(e.message||e)));
 }
