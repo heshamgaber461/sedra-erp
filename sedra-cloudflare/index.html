@@ -8456,6 +8456,7 @@ function postImportOpen(){ importType='posts'; importRows=[];
     '<div style="margin-top:10px"><button class="btn cy" onclick="runImport()">'+(lang==='ar'?'استيراد':'Import')+'</button></div>',
     function(){ return true; });
 }
+var mktCalView='list';
 function vContentCal(){
   const rows=posts.filter(inBranch).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   let h=`<div class="sect"><h2>🗓️ Content Calendar</h2><div class="sp"></div><button class="btn gh sm" onclick="mktCalView=(mktCalView==='cal'?'list':'cal');render()">${mktCalView==='cal'?'▤ List':'🗓️ Calendar'}</button> <button class="btn gh sm" onclick="postImportOpen()">📥 Import CSV</button> <button class="btn cy" onclick="editPost()">+ Add post</button></div>`;
