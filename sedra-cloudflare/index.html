@@ -3332,6 +3332,7 @@ function defQTerms(){ return ['- Prices don’t include VAT unless mentioned.','
 function qReadDOM(){ _qsec.forEach((s,si)=>{ const t=g('qsT'+si); if(t)s.title=t.value; (s.items||[]).forEach((it,ii)=>{ const gv=f=>{const e=g('q_'+si+'_'+ii+'_'+f);return e?e.value:it[f];}; it.item=gv('item'); it.desc=gv('desc'); it.brand=gv('brand'); it.qty=num(gv('qty')); it.price=num(gv('price')); });
   const io=g('qi_'+si+'_on'); if(io){ s.instOn=io.checked; s.instType=((g('qi_'+si+'_type')||{}).value)||'percent'; s.instVal=num((g('qi_'+si+'_val')||{}).value); }
   const dn=g('qd_'+si+'_on'); if(dn){ s.discOn=dn.checked; s.discType=((g('qd_'+si+'_type')||{}).value)||'percent'; s.discVal=num((g('qd_'+si+'_val')||{}).value); }
+  const fe=g('qf_'+si); if(fe)s.features=fe.value; const ne=g('qn_'+si); if(ne)s.notes=ne.value;
 }); }
 function qSecAdd(){ qReadDOM(); _qsec.push({title:'',items:[qBlankItem()]}); qSecRender(); }
 function qSecDel(si){ qReadDOM(); _qsec.splice(si,1); if(!_qsec.length)_qsec=[{title:'Section',items:[qBlankItem()]}]; qSecRender(); }
@@ -3397,6 +3398,10 @@ function qSecRender(){ const el=g('qSec'); if(!el)return;
         <label style="display:flex;align-items:center;gap:5px;font-weight:700;color:var(--navy);margin-inline-start:8px"><input type="checkbox" id="qd_${si}_on" ${s.discOn?'checked':''} onchange="qRecalc()"> 🏷️ ${lang==='ar'?'خصم':'Discount'}</label>
         <select id="qd_${si}_type" onchange="qRecalc()" style="padding:3px 6px"><option value="percent" ${s.discType!=='amount'?'selected':''}>%</option><option value="amount" ${s.discType==='amount'?'selected':''}>${lang==='ar'?'مبلغ':'Amount'}</option></select>
         <input id="qd_${si}_val" type="number" value="${num(s.discVal)||''}" style="width:80px" oninput="qRecalc()" placeholder="0">
+      </div>
+      <div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fld" style="margin:0"><label style="font-size:11px;color:var(--navy)">✨ ${lang==='ar'?'مميزات السيستم دا (سطر لكل ميزة)':'Features for this system (one per line)'}</label><textarea id="qf_${si}" rows="2" placeholder="${lang==='ar'?'اختياري':'optional'}" style="width:100%">${esc(s.features||'')}</textarea></div>
+        <div class="fld" style="margin:0"><label style="font-size:11px;color:var(--navy)">📝 ${lang==='ar'?'ملاحظات السيستم دا (سطر لكل ملاحظة)':'Notes for this system (one per line)'}</label><textarea id="qn_${si}" rows="2" placeholder="${lang==='ar'?'اختياري':'optional'}" style="width:100%">${esc(s.notes||'')}</textarea></div>
       </div>
       <div class="mini" id="qsecT${si}" style="text-align:right;margin-top:6px;font-weight:800;color:var(--navy)"></div></div>`;
   }).join('')+`<button class="btn cy" onclick="qSecAdd()">➕ Add another system</button><div class="mini" style="color:var(--muted);margin-top:4px">${lang==='ar'?'كل سيستم بيحسب التركيب والخصم بتاعه لوحده، والصفحة الأخيرة بتجمع كل السيستمز وتحسب الضريبة على المجموع.':'Each system computes its own installation & discount; the final page sums all systems and applies VAT to the total.'}</div>`;
@@ -3546,7 +3551,7 @@ function editQuote(id){
     `<div class="row2">${fEl('Validity (days)','q_valid',r.validity!=null?r.validity:30,'number')}${fEl('Due date (finish by)','q_due',r.dueDate||r.deadline||'','date')}</div>`+
     fTa('Terms & conditions (one per line)','q_terms',r.terms||defQTerms())+
     fTa('Notes','q_notes',r.notes),
-    ()=>{ qReadDOM(); const secs=_qsec.map(s=>({title:s.title||'Section',items:(s.items||[]).filter(i=>(i.desc||i.item)).map(i=>({item:i.item||'',desc:i.desc||'',brand:i.brand||'',qty:num(i.qty),price:num(i.price),image:i.image||''})),instOn:!!s.instOn,instType:s.instType||'percent',instVal:num(s.instVal),discOn:!!s.discOn,discType:s.discType||'percent',discVal:num(s.discVal)})).filter(s=>s.items.length);
+    ()=>{ qReadDOM(); const secs=_qsec.map(s=>({title:s.title||'Section',items:(s.items||[]).filter(i=>(i.desc||i.item)).map(i=>({item:i.item||'',desc:i.desc||'',brand:i.brand||'',qty:num(i.qty),price:num(i.price),image:i.image||''})),instOn:!!s.instOn,instType:s.instType||'percent',instVal:num(s.instVal),discOn:!!s.discOn,discType:s.discType||'percent',discVal:num(s.discVal),features:s.features||'',notes:s.notes||''})).filter(s=>s.items.length);
       const d={number:val('q_number'),type:val('q_type'),subject:val('q_subject'),presalesName:val('q_presales'),client:val('q_client'),date:val('q_date'),dueDate:val('q_due'),buildingType:val('q_btype'),location:val('q_loc'),consultant:val('q_consultant'),preparedBy:val('q_prep'),service:val('q_service'),useGeneralCover:!!(g('q_gencover')&&g('q_gencover').checked),branch:val('q_branch'),dept:r.dept||'Operations',currency:val('q_cur'),fxManual:!!(g('q_fxman')&&g('q_fxman').checked),fxRate:(typeof qCurRate==='function'?qCurRate():1),fxEgp:num(val('q_fx'))||0,status:val('q_status'),vat:num(val('q_vat')),sections:secs,excluding:val('q_excl'),featuresList:val('q_features'),payAdvance:num(val('q_pa')),payBefore:num(val('q_pb')),payAfter:num(val('q_pc')),payTest:num(val('q_pd')),validity:num(val('q_valid')),terms:val('q_terms'),notes:val('q_notes')};
       if(!d.client){alert('Client name required');return false;} if(!secs.length){alert('Add at least one line item with a description.');return false;} if(!id){d.created=new Date().toISOString(); d.number=genQuoteNo(svcKey(d.service));}
       /* Version history: append this saved state as a version so any past version can be restored later. */
@@ -3628,7 +3633,10 @@ function printQuote(id,opts){
   const sysPages=secs.map((sc,i)=>{
     const sc_url=sysCoverURL(sc.title);
     const scover=sc_url?`<div class="sheet A4 cover syscover"><img src="${sc_url}"></div>`:'';
-    const spage=`<div class="sheet pad">${theadHTML}<div class="sysbig"><span class="ix">System ${i+1}</span>${esc(sc.title||('System '+(i+1)))}</div><div class="sysrule"></div>${SYS_IMG[sc.title]?`<div class="sysbanner"><img src="${esc(SYS_IMG[sc.title])}"></div>`:''}${metaHTML}<div class="sec">${rowsTbl(sc)}${secFinRows(sc,i)}</div>${ftHTML}</div>`;
+    const scFeat=lines(sc.features), scNotes=lines(sc.notes);
+    const scFeatHTML=scFeat.length?`<div class="stitle" style="font-size:14px;margin-top:12px">✨ Features</div><div class="sec" style="page-break-inside:avoid;border-color:#37c0dc"><ul style="padding:12px 28px;margin:0;line-height:1.8;font-size:12px;color:#1c2b3a;columns:2;-webkit-columns:2;column-gap:26px">${scFeat.map(x=>'<li>'+esc(x)+'</li>').join('')}</ul></div>`:'';
+    const scNotesHTML=scNotes.length?`<div class="stitle" style="font-size:14px;margin-top:10px">📝 Notes</div><div class="sec" style="page-break-inside:avoid;border-color:#37c0dc"><ul style="padding:12px 28px;margin:0;line-height:1.8;font-size:12px;color:#1c2b3a">${scNotes.map(x=>'<li>'+esc(x)+'</li>').join('')}</ul></div>`:'';
+    const spage=`<div class="sheet pad">${theadHTML}<div class="sysbig"><span class="ix">System ${i+1}</span>${esc(sc.title||('System '+(i+1)))}</div><div class="sysrule"></div>${SYS_IMG[sc.title]?`<div class="sysbanner"><img src="${esc(SYS_IMG[sc.title])}"></div>`:''}${metaHTML}<div class="sec">${rowsTbl(sc)}${secFinRows(sc,i)}</div>${scFeatHTML}${scNotesHTML}${ftHTML}</div>`;
     return scover+spage;
   }).join('');
   const summaryPage=`<div class="sheet pad">${theadHTML}<div class="stitle">Financial Summary</div>${metaHTML}<div class="sec"><table class="sumtbl"><thead><tr><th>System</th><th class="r">Total</th></tr></thead><tbody>${secs.map((sc,i)=>`<tr><td class="pn">${esc(sc.title||('System '+(i+1)))}</td><td class="r"><b>${M(t.secTotals[i])}</b></td></tr>`).join('')}</tbody></table></div>${finHTML}${featHTML}${payHTML}${ftHTML}</div>`;
