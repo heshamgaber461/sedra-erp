@@ -3315,7 +3315,7 @@ function vQuotes(){
   h+=tableView('quotes', rows,
     `<th>#</th><th>Type</th><th>Client</th><th>Branch</th><th>Dept</th><th>Total</th><th>Status</th><th></th>`,
     q=>{const t=quoteTotal(q);return `<tr>
-    <td><b>${esc(q.number||q.id.slice(-5))}</b><div class="mini">${esc(q.date||'')}</div></td><td>${esc(q.type||'Quotation')}</td><td>${esc(q.client||'')}</td>
+    <td><b>${esc(q.number||q.id.slice(-5))}</b> <span class="tag" style="background:#37c0dc22;color:#157f96;font-weight:800">v${qVerNum(q)}</span><div class="mini">${esc(q.date||'')}</div></td><td>${esc(q.type||'Quotation')}</td><td>${esc(q.client||'')}</td>
     <td>${FLAG[q.branch]||''} ${esc(q.branch||'')}</td><td>${esc(q.dept||'')}</td><td>${money2(docCur(q),t.total*quoteRate(q))}</td>
     <td><span class="tag" style="background:${QSTAT_COL[q.status]||'#eee'}22;color:${QSTAT_COL[q.status]||'#333'}">${esc(q.status||'Draft')}</span></td>
     <td style="white-space:nowrap">${q.invoiced?'<span class="tag" style="background:#1a7a4f22;color:#1a7a4f">Invoiced</span> ':`<button class="btn cy sm" onclick="quoteToInvoice('${q.id}')">→ Invoice</button> `}${q.projectId?'<span class="tag" style="background:#1a7a4f22;color:#1a7a4f">Project ✓</span> ':`<button class="btn gh sm" onclick="createProjectFromQuote('${q.id}')">🏗️ Project</button> `}<button class="btn gh sm" onclick="printQuote('${q.id}')">Print</button> <button class="btn gh sm" title="${lang==='ar'?'النسخ المحفوظة (History)':'Saved versions (history)'}" onclick="qVersions('${q.id}')">🕘${(Array.isArray(q.history)&&q.history.length)?(' '+q.history.length):''}</button> <button class="btn gh sm" title="Send on WhatsApp" onclick="waQuote('${q.id}')">💬</button> ${(isMgr()||me.dept==='Management')?`<button class="btn gh sm" title="Generate payment schedule" onclick="genPaySchedule('${q.id}')">💳</button> `:''}<button class="btn gh sm" title="Open record" onclick="recOpen('${q.id}')">👁</button> <button class="btn gh sm" title="Attachments — files / images / links" onclick="attachOpen('${q.id}')">📎${attCount(q.id)?' '+attCount(q.id):''}</button> ${(q.isRFQ&&!q.rfqDone&&q.assignedEmail)?`<button class="btn gh sm" title="${lang==='ar'?'ابعت إيميل للمكتب الفني':'Email the technical office'}" onclick="emailTechRFQ('${q.id}')">📧</button> `:''}${(q.isRFQ&&!q.rfqDone)?`<button class="btn cy sm" title="Deliver the finished quotation back to the sales requester" onclick="deliverRFQ('${q.id}')">✅ ${lang==='ar'?'سلّم للسيلز':'Deliver to Sales'}</button> `:''}${(q.isRFQ&&q.rfqDone)?`<span class="tag" style="background:#1a7a4f22;color:#1a7a4f">${lang==='ar'?'اتسلّم ✓':'Delivered ✓'}</span> `:''}<button class="btn gh sm" onclick="editQuote('${q.id}')">Edit</button> ${isMgr()?`<button class="btn dn sm" onclick="delDoc('quotes','${q.id}')">✕</button>`:''}</td></tr>`},
@@ -3529,7 +3529,7 @@ function qVersions(id){ var q=quotes.find(function(x){return x.id===id;}); if(!q
   var h=Array.isArray(q.history)?q.history:[];
   if(!h.length){ openModal(lang==='ar'?'🕘 نسخ العرض':'🕘 Quote versions','<div class="card empty">'+(lang==='ar'?'لا توجد نسخ محفوظة بعد — أول حفظ بعد التحديث هيبدأ التاريخ.':'No saved versions yet — history starts from the next save.')+'</div>',function(){return true;}); return; }
   var body=h.slice().reverse().map(function(s,ri){ var idx=h.length-1-ri; var isCur=(idx===h.length-1); var when=String(s._savedAt||'').replace('T',' ').slice(0,16);
-    return '<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 11px;margin-bottom:6px"><div style="min-width:0"><b>'+(lang==='ar'?'نسخة':'Version')+' #'+(idx+1)+'</b>'+(isCur?' <span class="tag" style="background:#1a7a4f22;color:#1a7a4f">'+(lang==='ar'?'الحالية':'current')+'</span>':'')+(s._restoredFrom?(' <span class="tag" style="background:#e0a93b22;color:#a9781a">'+(lang==='ar'?'مسترجعة من #':'from #')+s._restoredFrom+'</span>'):'')+'<div class="mini">'+esc(when)+' · '+esc(s._savedBy||'')+(s._total!=null?(' · '+nfmt(s._total)+' '+esc(s.currency||'')):'')+'</div></div>'+(isCur?'':'<button class="btn cy sm" style="flex-shrink:0" onclick="qRestore(\''+id+'\','+idx+')">'+(lang==='ar'?'↩ استرجاع':'↩ Restore')+'</button>')+'</div>';
+    return '<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 11px;margin-bottom:6px"><div style="min-width:0"><b>'+(lang==='ar'?'نسخة':'Version')+' #'+(idx+1)+'</b>'+(isCur?' <span class="tag" style="background:#1a7a4f22;color:#1a7a4f">'+(lang==='ar'?'الحالية':'current')+'</span>':'')+(s._restoredFrom?(' <span class="tag" style="background:#e0a93b22;color:#a9781a">'+(lang==='ar'?'مسترجعة من #':'from #')+s._restoredFrom+'</span>'):'')+'<div class="mini">'+esc(when)+' · '+esc(s._savedBy||'')+(s._total!=null?(' · '+nfmt(s._total)+' '+esc(s.currency||'')):'')+'</div></div><div style="display:flex;gap:6px;flex-shrink:0"><button class="btn gh sm" onclick="qViewVersion(\''+id+'\','+idx+')">'+(lang==='ar'?'👁 عرض':'👁 View')+'</button>'+(isCur?'':'<button class="btn cy sm" onclick="qRestore(\''+id+'\','+idx+')">'+(lang==='ar'?'↩ استرجاع':'↩ Restore')+'</button>')+'</div></div>';
   }).join('');
   openModal((lang==='ar'?'🕘 نسخ عرض السعر':'🕘 Quotation versions')+' — '+esc(q.number||''), body, function(){return true;}); }
 function qRestore(id,idx){ var q=quotes.find(function(x){return x.id===id;}); if(!q)return; var h=Array.isArray(q.history)?q.history:[]; var snap=h[idx]; if(!snap)return;
@@ -3539,8 +3539,15 @@ function qRestore(id,idx){ var q=quotes.find(function(x){return x.id===id;}); if
   delete d.history[d.history.length-1].history;
   saveDoc('quotes',d,id); try{ Object.assign(q,d); }catch(e){} closeModal();
   try{ alert(lang==='ar'?('تم استرجاع النسخة #'+(idx+1)):('Version #'+(idx+1)+' restored')); }catch(e){} }
-function printQuote(id){
-  const q=quotes.find(x=>x.id===id); if(!q)return;
+function qVerNum(q){ return (q&&Array.isArray(q.history)&&q.history.length)?q.history.length:1; }
+/* Build a full quote object out of a saved history snapshot (strip the _meta fields). */
+function qFromSnap(id,snap){ var d={}; for(var k in snap){ if(k.charAt(0)==='_')continue; d[k]=snap[k]; } d.id=id; return d; }
+/* View any saved version exactly as it would print, without touching the live quote. */
+function qViewVersion(id,idx){ var q=quotes.find(function(x){return x.id===id;}); if(!q)return; var h=Array.isArray(q.history)?q.history:[]; var snap=h[idx]; if(!snap)return; printQuote(id,{quote:qFromSnap(id,snap),ver:idx+1}); }
+function printQuote(id,opts){
+  opts=opts||{};
+  const q=opts.quote||quotes.find(x=>x.id===id); if(!q)return;
+  const verNum=opts.ver||qVerNum(q); const verTag='v'+verNum;
   const t=quoteTotal(q); const cur=docCur(q)||'EGP'; const rate=quoteRate(q);
   const w=window.open('','_blank'); if(!w){ alert('Allow pop-ups to print/PDF the quotation.'); return; }
   const NL=String.fromCharCode(10), CR=String.fromCharCode(13);
@@ -3571,8 +3578,8 @@ function printQuote(id){
   const pay=[['Advance',q.payAdvance],['Before delivery',q.payBefore],['After delivery',q.payAfter],['Testing & commissioning',q.payTest]].filter(pp=>num(pp[1]));
   const excl=lines(q.excluding), terms=lines(q.terms);
   const multi=secs.length>1;
-  const ccardHTML=`<div class="ccard"><div class="cc-row"><span class="k">Quote Subject</span><span class="v">${esc(q.subject||q.projectName||q.client||'-')}</span></div><div class="cc-row"><span class="k">Quote Num.</span><span class="v">${esc(q.number||'')}</span></div><div class="cc-row"><span class="k">Valid Till</span><span class="v">${esc(validTill||'')}</span></div><div class="cc-row"><span class="k">Presales Name</span><span class="v">${esc(q.presalesName||q.preparedBy||'-')}</span></div></div>`;
-  const theadHTML=`<div class="thead"><div style="display:flex;align-items:center;gap:12px"><img src="${LOGO}" style="height:40px;width:auto"><div><div class="nm">SEDRA ELECTRIC</div><div class="sub">SMART &amp; LOW-CURRENT SYSTEMS &mdash; CAIRO, EGYPT</div></div></div><div style="text-align:right"><div class="qid">${esc(q.number||'')}</div><div class="sub" style="margin-top:4px">${esc(q.date||'')}</div></div></div>`;
+  const ccardHTML=`<div class="ccard"><div class="cc-row"><span class="k">Quote Subject</span><span class="v">${esc(q.subject||q.projectName||q.client||'-')}</span></div><div class="cc-row"><span class="k">Quote Num.</span><span class="v">${esc(q.number||'')} · ${verTag}</span></div><div class="cc-row"><span class="k">Valid Till</span><span class="v">${esc(validTill||'')}</span></div><div class="cc-row"><span class="k">Presales Name</span><span class="v">${esc(q.presalesName||q.preparedBy||'-')}</span></div></div>`;
+  const theadHTML=`<div class="thead"><div style="display:flex;align-items:center;gap:12px"><img src="${LOGO}" style="height:40px;width:auto"><div><div class="nm">SEDRA ELECTRIC</div><div class="sub">SMART &amp; LOW-CURRENT SYSTEMS &mdash; CAIRO, EGYPT</div></div></div><div style="text-align:right"><div class="qid">${esc(q.number||'')} <span style="font-size:12px;font-weight:800;color:#37c0dc;letter-spacing:1px">${verTag}</span></div><div class="sub" style="margin-top:4px">${esc(q.date||'')}</div></div></div>`;
   const metaHTML=`<div class="metabox"><span>Client: <b>${esc(q.client||'-')}</b></span><span>Location: <b>${esc(q.location||'-')}</b></span><span>Prepared by: <b>${esc(q.preparedBy||'-')}</b></span></div>`;
   const ftHTML=`<div class="ft"><span>info@sedra-electric.com</span><span>www.sedra-electric.com</span><span>Tel: 0226783906</span></div>`;
   const rowsTbl=sc=>`<table><thead><tr><th class="c">Image</th><th>Item</th><th>Description</th><th>Brand</th><th class="c">Qty</th><th class="r">Unit Price</th><th class="r">Total</th></tr></thead><tbody>${(sc.items||[]).map(it=>`<tr><td class="c">${it.image?`<img src="${esc(it.image)}" style="width:62px;height:62px;object-fit:contain;display:block;margin:0 auto;mix-blend-mode:multiply">`:''}</td><td class="pn">${esc(it.item||'')}</td><td>${esc(it.desc||'')}</td><td class="br">${esc(it.brand||'-')}</td><td class="c">${num(it.qty)}</td><td class="r">${M(it.price)}</td><td class="r"><b>${M(num(it.qty)*num(it.price))}</b></td></tr>`).join('')}</tbody></table>`;
@@ -3598,7 +3605,7 @@ function printQuote(id){
   const partnersPage=`<div class="sheet A4 cover"><img src="${base}page-partners.jpg"></div>`;
   /* Page order: general cover → About → Partners → (each system: its cover page then its details) → financial summary → terms. */
   const bodyHTML=coverHTML+aboutPage+partnersPage+sysPages+summaryPage+termsPage;
-  w.document.write(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=822, initial-scale=1"><title>${esc(q.number||'Quotation')} &mdash; Sedra</title>
+  w.document.write(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=822, initial-scale=1"><title>${esc(q.number||'Quotation')} ${verTag} &mdash; Sedra</title>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,600;0,700;0,800;1,800&display=swap" rel="stylesheet">
   <style>
   *{box-sizing:border-box;margin:0;padding:0}
@@ -3680,7 +3687,7 @@ function printQuote(id){
   @media print{ @page{size:A4;margin:0} body{background:#fff} .bar{display:none} .doc{padding:0} .sheet{margin:0;box-shadow:none;page-break-after:always} }
   @media screen and (max-width:840px){ .sheet{width:100%} }
   </style></head><body>
-  <div class="bar"><b>Sedra Quotation &mdash; ${esc(q.number||'')}</b><button onclick="window.print()">Print / Save PDF</button></div>
+  <div class="bar"><b>Sedra Quotation &mdash; ${esc(q.number||'')} ${verTag}</b><button onclick="window.print()">Print / Save PDF</button></div>
   <div class="doc">${bodyHTML}</div></body></html>`);
   w.document.close();
 }
