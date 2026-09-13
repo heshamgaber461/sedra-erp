@@ -1094,7 +1094,7 @@ function ensureAdminDoc(u){
 function pickBranch(b){ curBranch=b; localStorage.setItem('sedra_branch',b); enterApp(); }
 function enterApp(){ appReady=true; lastSig=''; hideLoad(); hideGate(); g('app').classList.remove('hide'); buildNav();
   try{ var _dh=DEPT_HOME[me.dept]||'hub'; var _dm=MODULES.find(function(x){return x.id===_dh;}); curView=(_dm&&canSee(_dm))?_dh:'hub'; }catch(e){ curView='hub'; }
-  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); }
+  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); migrateStagesOnce(); }
 
 /* ---- "My Tasks" pop-up on first open each day (Phase 1) ---- */
 function maybeTasksPopup(){
@@ -2150,7 +2150,41 @@ function tvPage(key,p){ if(!TV[key])return; TV[key].state.page=p; tvSave(key); c
 function tvSort(key,si){ if(!TV[key])return; TV[key].state.s=si; TV[key].state.page=1; tvSave(key); const b=g('tvb_'+key); if(b)b.innerHTML=tvBody(key); tvCount(key); }
 
 /* ===================== SALES / CRM ===================== */
-const STAGES=['New','Contacted','Qualified','Site Survey','BOQ / Design','Quotation Sent','Negotiation','Won','Lost','Qualification','Pending Quotation','Quotation Ready','Quote Sent','Closed Won','Closed Lost'];
+/* Canonical, de-duplicated & correctly ordered sales pipeline. Legacy Zoho-import
+   synonyms (Qualification, Pending Quotation, Quotation Ready, Quote Sent, Closed Won,
+   Closed Lost) are migrated to these by migrateStagesOnce() on first admin load. */
+const STAGES=['New','Contacted','Qualified','Site Survey','BOQ / Design','Quotation Sent','Negotiation','Won','Lost'];
+const STAGE_ALIAS={'Qualification':'Qualified','Pending Quotation':'BOQ / Design','Quotation Ready':'Quotation Sent','Quote Sent':'Quotation Sent','Closed Won':'Won','Closed Lost':'Lost'};
+function canonStage(s){ s=s||'New'; return STAGE_ALIAS[s]||s; }
+async function migrateStagesOnce(){
+  try{
+    if(typeof isAdmin==='function'?!isAdmin():true) return;
+    if(settings && settings.stageMigrationDone) return;
+    var upd={}, n=0;
+    (leads||[]).forEach(function(l){ if(l&&l.id&&l.stage&&STAGE_ALIAS[l.stage]){ upd[l.id+'/stage']=STAGE_ALIAS[l.stage]; n++; } });
+    if(n){ await apiCall('PATCH','/leads.json',upd); (leads||[]).forEach(function(l){ if(l&&l.stage&&STAGE_ALIAS[l.stage]) l.stage=STAGE_ALIAS[l.stage]; }); }
+    await apiMerge('meta','settings',{stageMigrationDone:true}); if(!settings)settings={}; settings.stageMigrationDone=true;
+    if(n){ try{ render(); }catch(e){} }
+  }catch(e){}
+}
+/* Combobox UX fix: an <input list=…> filters its datalist by the current text, so once a
+   value is chosen, clicking the arrow shows only that value — forcing a manual delete before
+   re-picking. Fix: when a field already holds a value that IS one of its options (a completed
+   selection), clear it on focus so the FULL list shows; restore it on blur if nothing new was
+   picked. Free-typed text (not matching an option) is left untouched. Delegated once, globally. */
+document.addEventListener('focusin',function(e){
+  var el=e.target; if(!(el&&el.tagName==='INPUT'&&el.getAttribute)) return;
+  var lid=el.getAttribute('list'); if(!lid||el.readOnly||el.disabled||!el.value) return;
+  var dl=document.getElementById(lid); if(!dl||!dl.options) return;
+  for(var i=0;i<dl.options.length;i++){ if(dl.options[i].value===el.value){ el.setAttribute('data-prevval',el.value); el.value=''; return; } }
+},true);
+document.addEventListener('focusout',function(e){
+  var el=e.target; if(!(el&&el.tagName==='INPUT'&&el.getAttribute)) return;
+  if(!el.getAttribute('list')) return;
+  var pv=el.getAttribute('data-prevval'); if(pv==null) return;
+  if(el.value==='') el.value=pv;
+  el.removeAttribute('data-prevval');
+},true);
 const SEGMENTS=['B2C Homeowner','Developer','Contractor','Hotel / Hospitality','Commercial','Industrial','Government','Consultant','Other'];
 const SOLUTIONS=['Solar PV','Home Automation','BMS','EV Charger','MEP','Lighting','Solar Water Heating','Energy Audit','Maintenance','Other'];
 const BUDGET_RANGES=['<100k','100k–500k','500k–1M','>1M'];
@@ -2320,7 +2354,7 @@ function salesKanban(rows){
   const q=(salesQ||'').toLowerCase();
   const filt=q?rows.filter(r=>[r.name,r.phone,r.owner,r.source,r.service].join(' ').toLowerCase().indexOf(q)>=0):rows;
   let h=`<div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;margin-top:6px">`;
-  STAGES.forEach(stage=>{ const cards=filt.filter(r=>(r.stage||'New')===stage);
+  STAGES.forEach(stage=>{ const cards=filt.filter(r=>canonStage(r.stage||'New')===stage);
     const sum=cards.reduce((s,r)=>s+num(r.value),0);
     h+=`<div class="kcol" ondragover="event.preventDefault()" ondrop="leadDrop(event,'${stage}')" style="flex:0 0 220px;min-width:220px;background:#f6f9fc;border:1px solid var(--mist);border-radius:10px;padding:10px">
       <div class="ch-t" style="display:flex;justify-content:space-between;align-items:center"><span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${STAGE_COL[stage]};margin-right:5px"></span>${stage}</span><span class="tag" style="background:${STAGE_COL[stage]}22;color:${STAGE_COL[stage]}">${cards.length}</span></div>
@@ -8380,17 +8414,54 @@ function editMkTask(id){
       if(!d.title){alert('Title required');return false;} if(!id)d.created=new Date().toISOString(); saveDoc('mktasks',d,id); });
 }
 const LIB_TYPES=['Image','Video','Logo','Template','Icon','Font','Audio','Document','Brand asset','Other'];
-let libType='', libQ='';
+const ASSET_CATEGORIES=['Logos','Brand Guidelines','Product Photos','Project Photos','Social Media Creatives','Campaign Creatives','Videos','Reels / Shorts','Templates','Icons','Fonts','Brochures','Catalogs','Presentations','Banners','Ad Creatives','Case Studies','Certificates','Print Materials','Website Assets','Other'];
+function assetCatDatalist(){ return '<datalist id="as_catlist">'+ASSET_CATEGORIES.map(c=>'<option value="'+esc(c)+'">').join('')+'</datalist>'; }
+let libType='', libCat='', libQ='';
+function _guessAssetType(name){ var e=(String(name).split('.').pop()||'').toLowerCase();
+  if(['png','jpg','jpeg','gif','webp','svg','bmp','tif','tiff'].indexOf(e)>=0)return 'Image';
+  if(['mp4','mov','avi','webm','mkv','m4v'].indexOf(e)>=0)return 'Video';
+  if(['mp3','wav','aac','m4a','ogg','flac'].indexOf(e)>=0)return 'Audio';
+  if(['ttf','otf','woff','woff2'].indexOf(e)>=0)return 'Font';
+  if(['pdf','doc','docx','ppt','pptx','xls','xlsx','csv','txt'].indexOf(e)>=0)return 'Document';
+  return 'Other'; }
+function bulkAssetModal(){
+  openModal(lang==='ar'?'📁 رفع مجمّع للأصول':'📁 Bulk upload assets',
+    `<div class="row2"><div class="fld"><label>${lang==='ar'?'التصنيف (يتطبّق على الكل)':'Category (applies to all)'}</label><input id="bulk_cat" list="as_catlist" placeholder="${lang==='ar'?'اختر أو اكتب تصنيف':'pick or type a category'}">${assetCatDatalist()}</div>${selEl(lang==='ar'?'الفرع':'Branch','bulk_branch',branchOpts(),defBranch())}</div>`+
+    `<div class="fld"><label>${lang==='ar'?'📁 اختر فولدر كامل':'📁 Choose a whole folder'}</label><input type="file" webkitdirectory directory multiple onchange="bulkAssetPick(this)"></div>`+
+    `<div class="fld"><label>${lang==='ar'?'🗂 أو اختر عدة ملفات':'🗂 Or choose multiple files'}</label><input type="file" multiple accept="image/*,video/*,audio/*,application/pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.ttf,.otf,.woff,.woff2,.svg" onchange="bulkAssetPick(this)"></div>`+
+    `<div id="bulk_st" class="mini">${lang==='ar'?'الصور تتضغط تلقائيًا. حتى 60 ملف في المرة، وكل ملف حتى ~1.5MB (الأكبر يتخطّى).':'Images auto-compressed. Up to 60 files per batch, each up to ~1.5MB (larger skipped).'}</div>`,
+    function(){ return true; });
+}
+function bulkAssetPick(inp){
+  var files=[].slice.call(inp.files||[]); if(!files.length)return;
+  var cat=(g('bulk_cat')&&g('bulk_cat').value.trim())||'';
+  var br=(g('bulk_branch')&&g('bulk_branch').value)||defBranch();
+  var st=g('bulk_st');
+  if(files.length>60){ if(st)st.textContent=(lang==='ar'?'تم اختيار ':'Selected ')+files.length+(lang==='ar'?' — هيترفع أول 60 بس':' — only first 60 will upload'); files=files.slice(0,60); }
+  var total=files.length, done=0, made=0, skipped=0;
+  function tick(){ done++; if(st)st.textContent=(done<total?(lang==='ar'?'جارٍ الرفع… ':'Uploading… '):(lang==='ar'?'تم — ':'Done — '))+done+'/'+total+' ('+made+' ✓'+(skipped?(' · '+skipped+(lang==='ar'?' تخطّي':' skipped')):'')+')';
+    if(done===total){ if(appReady)refreshAll(); setTimeout(function(){ try{render();}catch(e){} },400); } }
+  function add(durl,f){ var rec={name:String(f.name).replace(/\.[^.]+$/,''),ltype:_guessAssetType(f.name),category:cat,tags:'',file:durl,desc:'',branch:br,by:(me&&me.name)||'',byEmail:(me&&me.email||'').toLowerCase(),visibility:'all',shareEmails:[],created:new Date().toISOString()};
+    apiAdd('mktlib',rec).then(function(idd){ rec.id=idd; mktlib.push(rec); made++; tick(); }).catch(function(){ skipped++; tick(); }); }
+  files.forEach(function(f){
+    if(f.type.indexOf('image/')===0){ compressImage(f,1000,0.6,function(durl){ if(durl.length>2*1024*1024){ skipped++; tick(); return; } add(durl,f); }); }
+    else if(f.size>1.5*1024*1024){ skipped++; tick(); }
+    else { var r=new FileReader(); r.onload=function(){ add(r.result,f); }; r.onerror=function(){ skipped++; tick(); }; r.readAsDataURL(f); }
+  });
+}
 function _isImg(u){ return /^data:image|\.(png|jpe?g|gif|webp|svg)(\?|$)/i.test(String(u||'')); }
 function vMktLib(){
   let rows=mktlib.filter(inBranch).filter(canSeeFile);
   if(libType)rows=rows.filter(r=>r.ltype===libType);
+  if(libCat)rows=rows.filter(r=>(r.category||'')===libCat);
   if(libQ){const q=libQ.toLowerCase();rows=rows.filter(r=>[r.name,r.tags,r.category,r.ltype].join(' ').toLowerCase().indexOf(q)>=0);}
   rows=rows.slice().sort((a,b)=>(b.created||'').localeCompare(a.created||''));
   let h=`<div class="sect"><h2>🖼️ Creative Asset Library</h2><div class="sp"></div>
     <input type="search" placeholder="🔍 ${lang==='ar'?'ابحث…':'Search…'}" value="${esc(libQ)}" oninput="libQ=this.value;render()" style="max-width:200px">
     <select onchange="libType=this.value;render()"><option value="">${lang==='ar'?'كل الأنواع':'All types'}</option>${LIB_TYPES.map(t=>`<option ${t===libType?'selected':''}>${t}</option>`).join('')}</select>
-    <button class="btn cy" onclick="editAsset()">+ Add asset</button></div>`;
+    <select onchange="libCat=this.value;render()"><option value="">${lang==='ar'?'كل التصنيفات':'All categories'}</option>${ASSET_CATEGORIES.map(c=>`<option ${c===libCat?'selected':''}>${c}</option>`).join('')}</select>
+    <button class="btn cy" onclick="editAsset()">+ Add asset</button>
+    <button class="btn gh" onclick="bulkAssetModal()">📁 ${lang==='ar'?'رفع مجمّع (فولدر/ملفات)':'Bulk upload (folder/files)'}</button></div>`;
   h+=`<div class="card mini" style="margin-bottom:8px">مكتبة أصولك الإبداعية (لوجوهات، قوالب، صور، فيديوهات، خطوط) — بمعاينة وبحث ووسوم. ارفع ملف أو الصق لينك.</div>`;
   if(!rows.length) return h+`<div class="card empty">No assets yet.</div>`;
   if(isMgr())h+=bulkBar('mktlib');
@@ -8408,7 +8479,7 @@ function editAsset(id){
   const r=id?mktlib.find(x=>x.id===id):{branch:defBranch(),ltype:'Image'};
   openModal(id?'Edit asset':'Add creative asset',
     `<div class="row2">${fEl('Asset name','as_name',r.name)}${selEl('Type','as_type',LIB_TYPES,r.ltype||'Image')}</div>`+
-    `<div class="row2">${fEl('Category / project','as_cat',r.category)}${fEl('Tags (comma separated)','as_tags',r.tags)}</div>`+
+    `<div class="row2"><div class="fld"><label>${lang==='ar'?'التصنيف':'Category'}</label><input id="as_cat" list="as_catlist" value="${esc(r.category||'')}" placeholder="${lang==='ar'?'اختر أو اكتب':'pick or type'}">${assetCatDatalist()}</div>${fEl('Tags (comma separated)','as_tags',r.tags)}</div>`+
     fileField('as_file','Upload file / image / video — or paste a link',r.file)+
     fTa('Description','as_desc',r.desc),
     ()=>{ const d={name:val('as_name'),ltype:val('as_type'),category:val('as_cat'),tags:val('as_tags'),file:fileVal('as_file'),desc:val('as_desc'),branch:val('as_branch')||defBranch(),by:(me&&me.name)||'',byEmail:(me&&me.email||'').toLowerCase(),visibility:(r.visibility||'all'),shareEmails:(r.shareEmails||[])};
