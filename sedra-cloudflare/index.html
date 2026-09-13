@@ -3341,7 +3341,7 @@ function qItemDel(si,ii){ qReadDOM(); _qsec[si].items.splice(ii,1); if(!_qsec[si
 function qPickProduct(si,ii,val){ var v=String(val||'').trim(); var lv=v.toLowerCase();
   const p=inventory.find(x=>((x.sku?x.sku+' — ':'')+(x.name||''))===v) || inventory.find(x=>(x.name||'')===v) || inventory.find(x=>(x.sku||'')===v) || inventory.find(x=>String(x.sku||'').toLowerCase()===lv || String(x.name||'').toLowerCase()===lv);
   qReadDOM(); const it=_qsec[si].items[ii];
-  if(p){ it.item=p.sku||p.code||it.item||''; it.desc=p.name||p.desc||it.desc||''; if(p.brand)it.brand=p.brand; const pr=num(p.price)||num(p.cost); if(pr){ var _rt=qCurRate(); it.price=(_rt&&_rt!==1)?Math.round(pr*_rt*100)/100:pr; } if(p.image)it.image=p.image; }
+  if(p){ it.item=p.sku||p.code||it.item||''; it.desc=p.name||p.desc||it.desc||''; if(p.brand)it.brand=p.brand; const pr=num(p.price)||num(p.cost); if(pr){ var _rt=qCurRate(); it.price=(_rt&&_rt!==1)?Math.round(pr*_rt*100)/100:pr; } if(p.image)it.image=p.image; it._pid=p.id; }
   qSecRender(); }
 /* Rich product picker — a searchable overlay (above the quote modal) that shows each product's
    photo, name, brand, SKU and price; click one to fill the line. Much clearer than the native
@@ -3375,14 +3375,97 @@ function qpickRender(si,ii){
   }).join('')+(total>list.length?('<div class="mini" style="padding:10px;text-align:center;color:var(--muted)">'+(lang==='ar'?('أول 60 من '+total+' نتيجة — اكتب أكتر للتضييق'):('Showing 60 of '+total+' — type to narrow'))+'</div>'):'');
 }
 function qpickChoose(si,ii,pid){ var p=(inventory||[]).find(function(x){return x.id===pid;}); if(!p){ qpickClose(); return; } qReadDOM(); var it=_qsec[si].items[ii];
-  it.item=p.sku||p.code||it.item||''; it.desc=p.name||p.desc||''; if(p.brand)it.brand=p.brand; var pr=num(p.price)||num(p.cost); if(pr){ var rt=qCurRate(); it.price=(rt&&rt!==1)?Math.round(pr*rt*100)/100:pr; } if(p.image)it.image=p.image;
+  it.item=p.sku||p.code||it.item||''; it.desc=p.name||p.desc||''; if(p.brand)it.brand=p.brand; var pr=num(p.price)||num(p.cost); if(pr){ var rt=qCurRate(); it.price=(rt&&rt!==1)?Math.round(pr*rt*100)/100:pr; } if(p.image)it.image=p.image; it._pid=p.id;
   qpickClose(); qSecRender(); }
+/* Resolve the inventory product a quote line points at (by stored id, else by SKU/name). */
+function qLineProduct(it){ if(!it)return null; if(it._pid){ var byId=(inventory||[]).find(function(x){return x.id===it._pid;}); if(byId)return byId; }
+  if(it.item){ var bySku=(inventory||[]).find(function(x){return (x.sku===it.item)||(x.code===it.item);}); if(bySku)return bySku; }
+  if(it.desc){ var byName=(inventory||[]).find(function(x){return x.name===it.desc;}); if(byName)return byName; }
+  return null; }
+/* Change / add the IMAGE of an EXISTING product from inside the quote. Managers & Super Admin only.
+   Only the image is editable here — price, description and code stay locked. */
+function qEditProductImage(si,ii){
+  if(!(isAdmin()||isMgr())){ alert(lang==='ar'?'تغيير صورة المنتج للمدير أو الـ Super Admin فقط':'Managers / Super Admin only'); return; }
+  qReadDOM(); var it=_qsec[si].items[ii]; var p=qLineProduct(it);
+  if(!p){ alert(lang==='ar'?'البند ده مش مربوط بمنتج في المخزون — لو منتج جديد استخدم زر «منتج جديد».':'This line is not linked to a saved product — use “New product” for a brand-new item.'); return; }
+  var ov=document.getElementById('qimg'); if(ov)ov.remove();
+  ov=document.createElement('div'); ov.id='qimg';
+  ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(8,22,38,.55);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto';
+  ov.innerHTML='<div style="background:var(--card,#fff);border-radius:14px;max-width:520px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.4)" onclick="event.stopPropagation()">'
+   +'<div style="padding:14px 18px;border-bottom:1px solid var(--mist,#e3edf4);display:flex;align-items:center;gap:8px"><b style="color:var(--navy);font-size:15px">🖼 '+(lang==='ar'?'تغيير صورة المنتج':'Change product image')+'</b><span style="flex:1"></span><button onclick="qCloseImg()" style="border:0;background:#eef3f8;border-radius:8px;padding:6px 12px;cursor:pointer;font-weight:800">✕</button></div>'
+   +'<div style="padding:16px 18px">'
+   +'<div class="mini" style="color:var(--muted);margin-bottom:8px">'+esc(p.name||'')+(p.sku?(' · '+esc(p.sku)):'')+'</div>'
+   +(p.image?('<div class="fld"><label>'+(lang==='ar'?'الصورة الحالية':'Current image')+'</label><div><img src="'+esc(p.image)+'" style="max-height:120px;border:1px solid var(--mist,#e3edf4);border-radius:8px;background:#fff;padding:2px"></div></div>'):'')
+   +fileField('qi_img',(lang==='ar'?'الصورة الجديدة — ارفع صورة أو الصق لينك':'New image — upload a photo or paste a link'),p.image)
+   +'<div class="mini" style="color:var(--muted)">'+(lang==='ar'?'السعر والوصف والكود مش بيتغيّروا من هنا — الصورة بس.':'Price, description and code are locked here — image only.')+'</div>'
+   +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button onclick="qCloseImg()" class="btn gh">'+(lang==='ar'?'إلغاء':'Cancel')+'</button><button id="qi_save" onclick="qSaveProductImage('+si+','+ii+',\''+p.id+'\')" class="btn cy">💾 '+(lang==='ar'?'حفظ الصورة':'Save image')+'</button></div>'
+   +'</div></div>';
+  ov.onclick=function(){ qCloseImg(); };
+  document.body.appendChild(ov);
+}
+function qCloseImg(){ var ov=document.getElementById('qimg'); if(ov)ov.remove(); }
+function qSaveProductImage(si,ii,pid){
+  if(!(isAdmin()||isMgr())){ return; }
+  var img=fileVal('qi_img'); if(!img){ alert(lang==='ar'?'اختر صورة أو الصق لينك':'Choose an image or paste a link'); return; }
+  var btn=document.getElementById('qi_save'); if(btn){ btn.disabled=true; btn.textContent='...'; }
+  apiMerge('inventory',pid,{image:img}).then(function(){
+    var p=(inventory||[]).find(function(x){return x.id===pid;}); if(p)p.image=img;
+    try{ qReadDOM(); var it=_qsec[si].items[ii]; if(it){ it.image=img; it._pid=pid; } }catch(e){}
+    try{ logAudit('update','inventory',pid,'image'); }catch(e){}
+    qCloseImg(); qSecRender();
+    try{ if(typeof showToast==='function') showToast({title:'✓ '+(lang==='ar'?'اتغيّرت صورة المنتج':'Image updated'),body:(p&&p.name)||''}); }catch(e){}
+  }).catch(function(e){ if(btn){ btn.disabled=false; btn.textContent='💾'; } alert('Error: '+(e.message||e)); });
+}
+/* New product from inside the quote: create a brand-new inventory item (image + code + full
+   details), save it to Products AND add it as a new line in this system. Overlay above the modal. */
+function qNewProduct(si){
+  if(me&&me.role==='Viewer'){ viewerBlock&&viewerBlock(); return; }
+  qReadDOM();
+  var cats=[].concat.apply([],[]); cats=Array.from(new Set((inventory||[]).map(function(x){return x.category;}).filter(Boolean))).sort();
+  var sups=Array.from(new Set((suppliers||[]).map(function(s){return s.name;}).filter(Boolean)));
+  var ov=document.getElementById('qnew'); if(ov)ov.remove();
+  ov=document.createElement('div'); ov.id='qnew';
+  ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(8,22,38,.55);display:flex;align-items:flex-start;justify-content:center;padding:30px 16px;overflow:auto';
+  var dl=function(id,arr){return '<datalist id="'+id+'">'+arr.map(function(x){return '<option value="'+esc(x)+'">';}).join('')+'</datalist>';};
+  var fld=function(label,id,type){return '<div class="fld"><label>'+label+'</label><input id="'+id+'" '+(type?('type="'+type+'"'):'')+'></div>';};
+  ov.innerHTML='<div style="background:var(--card,#fff);border-radius:14px;max-width:720px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.4)" onclick="event.stopPropagation()">'
+   +'<div style="padding:14px 18px;border-bottom:1px solid var(--mist,#e3edf4);display:flex;align-items:center;gap:8px"><b style="color:var(--navy);font-size:16px">➕ '+(lang==='ar'?'منتج جديد':'New product')+'</b><span style="flex:1"></span><button onclick="qCloseNewProduct()" style="border:0;background:#eef3f8;border-radius:8px;padding:6px 12px;cursor:pointer;font-weight:800">✕</button></div>'
+   +'<div style="padding:16px 18px;max-height:72vh;overflow:auto">'
+   +'<div class="mini" style="color:var(--muted);margin-bottom:10px">'+(lang==='ar'?'هيتسجّل في المخزون (Products) وكمان هيتضاف كبند في الكوتيشن دي.':'Saved to inventory (Products) and added as a line in this quote.')+'</div>'
+   +'<div class="row2">'+fld((lang==='ar'?'اسم المنتج *':'Item name *'),'np_name')+fld((lang==='ar'?'الكود / SKU':'SKU / code'),'np_sku')+'</div>'
+   +'<div class="row2">'+fld((lang==='ar'?'الماركة':'Brand'),'np_brand')+fld((lang==='ar'?'الموديل / رقم القطعة':'Model / part no.'),'np_model')+'</div>'
+   +'<div class="row2"><div class="fld"><label>'+(lang==='ar'?'التصنيف':'Category')+'</label><input id="np_cat" list="np_catl">'+dl('np_catl',cats)+'</div><div class="fld"><label>'+(lang==='ar'?'الوحدة':'Unit')+'</label><input id="np_unit" list="np_unitl" value="pcs">'+dl('np_unitl',INV_UNITS)+'</div></div>'
+   +'<div class="row2">'+fld((lang==='ar'?'سعر البيع (المستخدم في الكوتيشن)':'Selling price (used in quotes)'),'np_price','number')+fld((lang==='ar'?'تكلفة الوحدة':'Unit cost'),'np_cost','number')+'</div>'
+   +'<div class="row2"><div class="fld"><label>'+(lang==='ar'?'المورّد':'Supplier')+'</label><input id="np_sup" list="np_supl">'+dl('np_supl',sups)+'</div>'+fld((lang==='ar'?'الضمان':'Warranty'),'np_warr')+'</div>'
+   +'<div class="row2">'+fld((lang==='ar'?'الباركود':'Barcode'),'np_barcode')+fld((lang==='ar'?'الكمية في المخزن':'Quantity in stock'),'np_qty','number')+'</div>'
+   +fileField('np_img',(lang==='ar'?'صورة المنتج — ارفع صورة أو الصق لينك':'Product image — upload a photo or paste a link'))
+   +'<div class="fld"><label>'+(lang==='ar'?'الوصف / المواصفات':'Description / specifications')+'</label><textarea id="np_desc" rows="3"></textarea></div>'
+   +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button onclick="qCloseNewProduct()" class="btn gh">'+(lang==='ar'?'إلغاء':'Cancel')+'</button><button id="np_save" onclick="qNewProductSave('+si+')" class="btn cy">💾 '+(lang==='ar'?'حفظ وإضافة للكوتيشن':'Save & add to quote')+'</button></div>'
+   +'</div></div>';
+  ov.onclick=function(){ qCloseNewProduct(); };
+  document.body.appendChild(ov);
+  var n=document.getElementById('np_name'); if(n)n.focus();
+}
+function qCloseNewProduct(){ var ov=document.getElementById('qnew'); if(ov)ov.remove(); }
+function qNewProductSave(si){
+  var name=(val('np_name')||'').trim(); if(!name){ alert(lang==='ar'?'اكتب اسم المنتج الأول':'Item name required'); return; }
+  var d={name:name,sku:val('np_sku'),brand:val('np_brand'),model:val('np_model'),category:val('np_cat'),unit:val('np_unit')||'pcs',branch:defBranch(),warehouse:'Main',location:'',barcode:val('np_barcode'),qty:num(val('np_qty')),min:0,cost:num(val('np_cost')),price:num(val('np_price')),supplier:val('np_sup'),warranty:val('np_warr'),image:fileVal('np_img'),desc:val('np_desc'),created:new Date().toISOString()};
+  var rt=qCurRate(); var pr=num(d.price)||num(d.cost); var linePrice=pr?((rt&&rt!==1)?Math.round(pr*rt*100)/100:pr):0;
+  var btn=document.getElementById('np_save'); if(btn){ btn.disabled=true; btn.textContent='...'; }
+  apiAdd('inventory',d).then(function(newId){
+    if(newId){ d.id=newId; inventory.push(d); }
+    try{ logAudit('create','inventory',newId||'',name); }catch(e){}
+    qReadDOM(); _qsec[si].items.push({item:d.sku||'',desc:d.name||'',brand:d.brand||'',qty:1,price:linePrice,image:d.image||''});
+    qCloseNewProduct(); qSecRender();
+    try{ if(typeof showToast==='function') showToast({title:'✓ '+(lang==='ar'?'اتضاف منتج جديد':'New product added'),body:name+(lang==='ar'?' — اتسجّل في المخزون':' — saved to inventory')}); }catch(e){}
+  }).catch(function(e){ if(btn){ btn.disabled=false; btn.textContent='💾'; } alert('Error: '+(e.message||e)); });
+}
 function qSecRender(){ const el=g('qSec'); if(!el)return;
   const dl=`<datalist id="prod_dl">${inventory.filter(inBranch).map(p=>`<option value="${esc((p.sku?p.sku+' — ':'')+(p.name||''))}">`).join('')}</datalist><datalist id="sys_dl">${QSYS_ALL.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>`;
   el.innerHTML=dl+_qsec.map((s,si)=>{
     const rows=(s.items||[]).map((it,ii)=>`<tr>
       <td><input id="q_${si}_${ii}_item" value="${esc(it.item||'')}" placeholder="Item" style="width:84px"></td>
-      <td><div style="display:flex;gap:6px;align-items:center">${it.image?`<img src="${esc(it.image)}" title="${lang==='ar'?'صورة المنتج':'product image'}" style="width:34px;height:34px;object-fit:contain;border-radius:6px;background:#f4f8fb;flex-shrink:0">`:''}<input id="q_${si}_${ii}_desc" list="prod_dl" value="${esc(it.desc||'')}" placeholder="Description / pick product" onchange="qPickProduct(${si},${ii},this.value)" style="flex:1;min-width:130px"><button type="button" class="btn cy sm" title="${lang==='ar'?'اختر منتج من المخزون':'Pick product from inventory'}" onclick="qProductPicker(${si},${ii})" style="flex-shrink:0">📦</button></div></td>
+      <td><div style="display:flex;gap:6px;align-items:center">${it.image?`<img src="${esc(it.image)}" title="${lang==='ar'?'صورة المنتج':'product image'}" style="width:34px;height:34px;object-fit:contain;border-radius:6px;background:#f4f8fb;flex-shrink:0">`:''}<input id="q_${si}_${ii}_desc" list="prod_dl" value="${esc(it.desc||'')}" placeholder="Description / pick product" onchange="qPickProduct(${si},${ii},this.value)" style="flex:1;min-width:130px"><button type="button" class="btn cy sm" title="${lang==='ar'?'اختر منتج من المخزون':'Pick product from inventory'}" onclick="qProductPicker(${si},${ii})" style="flex-shrink:0">📦</button>${(isAdmin()||isMgr())?`<button type="button" class="btn gh sm" title="${lang==='ar'?'تغيير/إضافة صورة المنتج (مدير/Super Admin)':'Change/add product image (Manager/Super Admin)'}" onclick="qEditProductImage(${si},${ii})" style="flex-shrink:0">🖼</button>`:''}</div></td>
       <td><input id="q_${si}_${ii}_brand" value="${esc(it.brand||'')}" placeholder="Brand" style="width:80px"></td>
       <td><input id="q_${si}_${ii}_qty" type="number" value="${num(it.qty)||1}" style="width:50px" oninput="qRecalc()"></td>
       <td><input id="q_${si}_${ii}_price" type="number" value="${num(it.price)||0}" style="width:74px" oninput="qRecalc()"></td>
@@ -3390,7 +3473,7 @@ function qSecRender(){ const el=g('qSec'); if(!el)return;
       <td><button class="btn dn sm" onclick="qItemDel(${si},${ii})">✕</button></td></tr>`).join('');
     return `<div class="card" style="margin-bottom:10px;padding:10px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><span class="mini" style="color:#157f96;font-weight:800">System ${si+1}</span><input id="qsT${si}" list="sys_dl" value="${esc(s.title||'')}" placeholder="Choose a system — KNX / Wireless / Light Current / Sound System / CCTV" style="font-weight:700;flex:1"><button class="btn gh sm" onclick="qSecDel(${si})">🗑 Remove system</button></div>
       <div style="overflow-x:auto"><table class="items"><thead><tr><th>Item</th><th>Description</th><th>Brand</th><th>Qty</th><th>Unit</th><th>Sub</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
-      <button class="btn gh sm" style="margin-top:6px" onclick="qItemAdd(${si})">+ Add line</button>
+      <button class="btn gh sm" style="margin-top:6px" onclick="qItemAdd(${si})">+ Add line</button>${(me&&me.role==='Viewer')?'':` <button class="btn cy sm" style="margin-top:6px" title="${lang==='ar'?'منتج جديد مش موجود في المخزون — أضفه هنا ويتسجّل في Products':'New product not in inventory — add it here & save to Products'}" onclick="qNewProduct(${si})">➕ ${lang==='ar'?'منتج جديد':'New product'}</button>`}
       <div style="margin-top:8px;border-top:1px dashed var(--mist);padding-top:8px;display:flex;gap:8px 14px;flex-wrap:wrap;align-items:center">
         <label style="display:flex;align-items:center;gap:5px;font-weight:700;color:var(--navy)"><input type="checkbox" id="qi_${si}_on" ${s.instOn?'checked':''} onchange="qRecalc()"> 🔧 ${lang==='ar'?'تركيب':'Installation'}</label>
         <select id="qi_${si}_type" onchange="qRecalc()" style="padding:3px 6px"><option value="percent" ${s.instType!=='amount'?'selected':''}>%</option><option value="amount" ${s.instType==='amount'?'selected':''}>${lang==='ar'?'مبلغ':'Amount'}</option></select>
