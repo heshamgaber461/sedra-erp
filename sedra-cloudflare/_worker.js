@@ -305,6 +305,9 @@ export default {
       else if (HR_WRITE[coll])    { if (!ctx.comp) return deny(coll+' is HR/payroll-only'); }
       else if (FIN_COLLS[coll])   { if (!ctx.fin) return deny(coll+' is finance-only'); }
       else if (coll === 'audit')  { if (method!=='POST' && !ctx.admin) return deny('audit is append-only'); }
+      else if (coll === 'quotes' && method === 'POST' && !id && ctx.dept === 'Sales' && ctx.rank < ROLE_RANK['Team Leader'] && !ctx.admin) {
+        return deny('quote creation is limited to Sales Team Leader/Manager');
+      }
       else if (SALES_COLLS[coll] && method==='DELETE' && id) {
         if (!(ctx.admin || ctx.rank>=ROLE_RANK['Manager'] || ctx.scope==='all')) {
           const rr=await fetch(RTDB+'/'+coll+'/'+id+'.json?'+cred.param+'='+encodeURIComponent(cred.val));

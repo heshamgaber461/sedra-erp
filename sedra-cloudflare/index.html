@@ -540,11 +540,11 @@
   </div>
 </div></div>
 <div class="modal" id="modal"><div class="mc" id="mCard">
-  <button type="button" class="modal-x" onclick="closeModal()" aria-label="Close" title="Close (Esc)">✕</button>
+  <button type="button" class="modal-x" onclick="guardedClose()" aria-label="Close" title="Close (Esc)">✕</button>
   <h3 id="mTitle"></h3>
   <div id="mBody"></div>
   <div class="mact">
-    <button class="btn gh" onclick="closeModal()">Cancel</button>
+    <button class="btn gh" onclick="guardedClose()">Cancel</button>
     <button class="btn" id="mSave">Save</button>
   </div>
 </div></div>
@@ -573,6 +573,10 @@ const ROLE_RANK={'Viewer':1,'Member':2,'Team Leader':3,'Manager':4,'Director':5,
 function roleRank(r){ return ROLE_RANK[r||(me&&me.role)]||0; }
 function isMgr(){ return !!(me && roleRank(me.role)>=ROLE_RANK['Manager']); }
 function isExec(){ return !!(me && roleRank(me.role)>=ROLE_RANK['Director']); }
+/* Who may CREATE a quotation. From the Sales team only a Team Leader or Manager (and above)
+   can; regular sales members cannot. Super Admin, Management and other departments (e.g. the
+   Technical office that prepares quotes) are unaffected. */
+function canCreateQuote(){ if(!me) return false; if(isAdmin()||me.dept==='Management') return true; if(me.dept==='Sales') return roleRank(me.role)>=ROLE_RANK['Team Leader']; return true; }
 function exportGuard(){ if(!isAdmin()){ alert(lang==='ar'?'\uD83D\uDEAB \u0627\u0644\u062A\u0635\u062F\u064A\u0631/\u0627\u0644\u062A\u062D\u0645\u064A\u0644 \u0645\u062A\u0627\u062D \u0644\u0640 Super Admin \u0641\u0642\u0637':'\uD83D\uDEAB Export/Download is restricted to Super Admin'); return false; } return true; }
 const STAGE_PROB = {New:0.1,Contacted:0.15,Qualified:0.2,'Site Survey':0.35,'BOQ / Design':0.45,'Quotation Sent':0.55,Negotiation:0.7,Won:1,Lost:0};
 const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -3333,7 +3337,7 @@ function vQuotes(){
     if(isTechAssignee){ return (q.assignedTo||'')===meName || nameEq(q.preparedBy,meName) || nameEq(q.requestedBy,meName); }
     return !q.dept||q.dept===me.dept||nameEq(q.requestedBy,meName)||nameEq(q.preparedBy,meName)||(me.accessModules||[]).includes('quotes');
   });
-  let h=`<div class="sect"><h2>Quotations & Proposals</h2><div class="sp"></div><button class="btn cy" onclick="newQuoteChoice()">+ New quotation</button></div>`;
+  let h=`<div class="sect"><h2>Quotations & Proposals</h2><div class="sp"></div>${canCreateQuote()?`<button class="btn cy" onclick="newQuoteChoice()">+ New quotation</button>`:''}</div>`;
   h+=tableView('quotes', rows,
     `<th>#</th><th>Type</th><th>Client</th><th>Branch</th><th>Dept</th><th>Total</th><th>Status</th><th></th>`,
     q=>{const t=quoteTotal(q);return `<tr>
@@ -3568,7 +3572,7 @@ function genQuoteNo(k){
   (quotes||[]).forEach(function(q){ var m=/^Q\s*-\s*0*(\d+)/.exec(q.number||''); if(m){ var v=parseInt(m[1],10); if(v>maxN)maxN=v; } });
   return 'Q - '+('000000000'+(maxN+1)).slice(-9);
 }
-function newQuoteChoice(){ openModal('New quotation','<div class="mini" style="margin-bottom:12px">How do you want to create this quotation?</div><button class="btn cy" style="width:100%;margin-bottom:10px" onclick="closeModal();editQuote()">\uD83D\uDEE0\uFE0F Build it myself (choose products &amp; prices)</button><button class="btn" style="width:100%" onclick="closeModal();quoteToTech()">\uD83D\uDCE8 Send a request to the Technical Office</button>', null); }
+function newQuoteChoice(){ if(!canCreateQuote()){ alert(lang==='ar'?'إنشاء عروض الأسعار متاح للمدير أو الـ Team Leader في فريق المبيعات فقط.':'Creating quotations is limited to the Manager or Team Leader in the Sales team.'); return; } openModal('New quotation','<div class="mini" style="margin-bottom:12px">How do you want to create this quotation?</div><button class="btn cy" style="width:100%;margin-bottom:10px" onclick="closeModal();editQuote()">\uD83D\uDEE0\uFE0F Build it myself (choose products &amp; prices)</button><button class="btn" style="width:100%" onclick="closeModal();quoteToTech()">\uD83D\uDCE8 Send a request to the Technical Office</button>', null); }
 const RFQ_PTYPES=['Apartment','Villa','Duplex','Penthouse','Twin house','Townhouse','Administrative','Commercial','Clinic','Retail','Other'];
 const RFQ_DESIGN=['Plan','Qty by sales'];
 const RFQ_CATS=['Low budget','Mid-range','High-end','Premium'];
@@ -3638,6 +3642,7 @@ function deliverRFQ(id){
   }).catch(function(e){ alert('Error: '+(e.message||e)); });
 }
 function editQuote(id){
+  if(!id && !canCreateQuote()){ alert(lang==='ar'?'إنشاء عروض الأسعار متاح للمدير أو الـ Team Leader في فريق المبيعات فقط.':'Creating quotations is limited to the Manager or Team Leader in the Sales team.'); return; }
   const r=id?quotes.find(x=>x.id===id):{branch:defBranch(),type:'Quotation',status:'Draft',vat:vatForBranch(defBranch()),dept:(me.dept==='Management'?'Operations':me.dept),date:today(),service:'Home Automation',number:genQuoteNo('home-automation'),preparedBy:(me&&me.name)||'',presalesName:(me&&me.name)||'',validity:30};
   _qsec=JSON.parse(JSON.stringify(quoteSections(r))); if(!_qsec.length)_qsec=[{title:'Smart Home System',items:[qBlankItem()]}];
   openModal(id?'Edit quotation':'New quotation',
@@ -3674,7 +3679,7 @@ function editQuote(id){
       saveDoc('quotes',d,id);
       /* Update the in-memory quote immediately so Print / view reflect the edits at once
          (otherwise the change only appears after the next background sync). */
-      try{ if(id){ var _qq=quotes.find(function(x){return x.id===id;}); if(_qq) Object.assign(_qq,d); } }catch(e){} },{wide:true});
+      try{ if(id){ var _qq=quotes.find(function(x){return x.id===id;}); if(_qq) Object.assign(_qq,d); } }catch(e){} },{wide:true,confirmClose:true});
   qSecRender(); try{ qCurChange(); }catch(e){}
 }
 /* ---- Quote version history: snapshot on every save; restore any past version ---- */
@@ -5677,8 +5682,12 @@ function val(id){ const e=g(id); return e?e.value:''; }
 /* ===================== MODAL + CRUD ===================== */
 let _onSave=null;
 function _mSaveClick(){ if(_onSave){ const r=_onSave(); if(r!==false)closeModal(); } else closeModal(); }
-function openModal(title,body,onSave,opts){ const ro=(me&&me.role==='Viewer'); const sb=g('mSave'); if(sb){ if(ro){ sb.classList.add('hide'); } else { sb.classList.remove('hide'); sb.textContent='Save'; sb.onclick=_mSaveClick; } } var mc=g('mCard'); if(mc){ if(opts&&opts.wide){ mc.classList.add('wide'); } else { mc.classList.remove('wide'); } } g('mTitle').textContent=title; g('mBody').innerHTML=(ro?'<div class="card mini" style="background:#eef3f8;border-color:#ccd;color:#143F63;margin-bottom:8px">\u{1F441}\uFE0F '+(lang==='ar'?'\u0648\u0636\u0639 \u0627\u0644\u0645\u0634\u0627\u0647\u062F\u0629 \u2014 \u0644\u0644\u0639\u0631\u0636 \u0641\u0642\u0637':'Viewer mode \u2014 view only')+'</div>':'')+body; _onSave=onSave; g('modal').classList.add('show'); if(lang==='ar'){ try{translateDOM(g('modal'));}catch(e){} } }
-function closeModal(){ try{stopScan&&stopScan();}catch(e){} g('modal').classList.remove('show'); _onSave=null; }
+var _modalGuard=false;
+function openModal(title,body,onSave,opts){ const ro=(me&&me.role==='Viewer'); const sb=g('mSave'); if(sb){ if(ro){ sb.classList.add('hide'); } else { sb.classList.remove('hide'); sb.textContent='Save'; sb.onclick=_mSaveClick; } } var mc=g('mCard'); if(mc){ if(opts&&opts.wide){ mc.classList.add('wide'); } else { mc.classList.remove('wide'); } } _modalGuard=!!(opts&&opts.confirmClose); g('mTitle').textContent=title; g('mBody').innerHTML=(ro?'<div class="card mini" style="background:#eef3f8;border-color:#ccd;color:#143F63;margin-bottom:8px">\u{1F441}\uFE0F '+(lang==='ar'?'\u0648\u0636\u0639 \u0627\u0644\u0645\u0634\u0627\u0647\u062F\u0629 \u2014 \u0644\u0644\u0639\u0631\u0636 \u0641\u0642\u0637':'Viewer mode \u2014 view only')+'</div>':'')+body; _onSave=onSave; g('modal').classList.add('show'); if(lang==='ar'){ try{translateDOM(g('modal'));}catch(e){} } }
+function closeModal(){ try{stopScan&&stopScan();}catch(e){} g('modal').classList.remove('show'); _onSave=null; _modalGuard=false; }
+/* Guarded close: when a modal opted into confirmClose (e.g. the quote editor), asking before
+   discarding unsaved work. Used by ESC, the \u2715 and Cancel. Save calls closeModal() directly. */
+function guardedClose(){ if(_modalGuard){ if(!confirm(lang==='ar'?'\u062A\u0642\u0641\u0644 \u0645\u0646 \u063A\u064A\u0631 \u062D\u0641\u0638\u061F \u0643\u0644 \u0627\u0644\u0644\u064A \u0643\u062A\u0628\u062A\u0647 \u0641\u064A \u0627\u0644\u0643\u0648\u062A\u064A\u0634\u0646 \u0647\u064A\u0636\u064A\u0639.':'Close without saving? Everything you entered will be lost.')) return; } closeModal(); }
 g('mSave').onclick=_mSaveClick;
 function logAudit(action,coll,id,label){ if(coll==='audit')return; try{ apiAdd('audit',{ts:Date.now(),user:(me&&me.name)||'',email:(me&&me.email||'').toLowerCase(),action:action,coll:coll,docId:id||'',label:(label||'').toString().slice(0,80)}); }catch(e){} }
 function saveDoc(coll,d,id){
@@ -9927,7 +9936,7 @@ document.addEventListener('keydown',function(e){
   if((e.ctrlKey||e.metaKey)&&(e.key==='k'||e.key==='K')){
     var i=document.getElementById('globalSearch');
     if(i){ e.preventDefault(); i.focus(); i.select(); if(typeof globalSearch==='function') globalSearch(i.value); }
-  } else if(e.key==='Escape'){ var _md=document.getElementById('modal'); if(_md&&_md.classList.contains('show')){ if(typeof closeModal==='function') closeModal(); return; } if(typeof closeSearch==='function') closeSearch(); }
+  } else if(e.key==='Escape'){ var _ov=document.getElementById('qnew')||document.getElementById('qpick')||document.getElementById('qimg'); if(_ov){ _ov.remove(); return; } var _md=document.getElementById('modal'); if(_md&&_md.classList.contains('show')){ if(typeof guardedClose==='function') guardedClose(); else if(typeof closeModal==='function') closeModal(); return; } if(typeof closeSearch==='function') closeSearch(); }
 });
 </script>
 </body>
