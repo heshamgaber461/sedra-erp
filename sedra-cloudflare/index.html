@@ -3265,9 +3265,11 @@ function qCalcExtras(sub,cfg){ cfg=cfg||{};
   var disc = cfg.discOn ? (cfg.discType==='amount'?num(cfg.discVal):base*num(cfg.discVal)/100) : 0;
   if(disc>base) disc=base;
   return {inst:inst, disc:disc, taxable:base-disc}; }
-function quoteTotal(q){ const secs=quoteSections(q); let sub=0; const secTotals=secs.map(s=>{ const t=(s.items||[]).reduce((a,i)=>a+num(i.qty)*num(i.price),0); sub+=t; return t; });
-  const ex=qCalcExtras(sub,{instOn:q.instOn,instType:q.instType,instVal:q.instVal,discOn:q.discOn,discType:q.discType,discVal:q.discVal});
-  const vat=ex.taxable*num(q.vat)/100; return {sub,inst:ex.inst,disc:ex.disc,taxable:ex.taxable,vat,total:ex.taxable+vat,secTotals,secs}; }
+function quoteTotal(q){ const secs=quoteSections(q); let grand=0; const secTotals=[]; const secDetail=[];
+  secs.forEach(s=>{ const secSub=(s.items||[]).reduce((a,i)=>a+num(i.qty)*num(i.price),0);
+    const ex=qCalcExtras(secSub,{instOn:s.instOn,instType:s.instType,instVal:s.instVal,discOn:s.discOn,discType:s.discType,discVal:s.discVal});
+    secDetail.push({sub:secSub,inst:ex.inst,disc:ex.disc,total:ex.taxable}); secTotals.push(ex.taxable); grand+=ex.taxable; });
+  const vat=grand*num(q.vat)/100; return {sub:grand,secTotals,secDetail,vat,total:grand+vat,secs}; }
 function vQuotes(){
   const meName=(me&&me.name)||'';
   const techAssignees=Object.keys(TECH_ROUTING).map(function(k){return TECH_ROUTING[k].name;});
@@ -3296,7 +3298,10 @@ const NL=String.fromCharCode(10);
 function qBlankItem(){ return {item:'',desc:'',brand:'',qty:1,price:0}; }
 function defQExcluding(){ return ['Lights supply','Sockets & switches supply','Sanitary supply','MEP Work (Conduits, Pulling Cables)'].join(NL); }
 function defQTerms(){ return ['- Prices don’t include VAT unless mentioned.','','- Offer Includes:','    · Supervision on the Contractor team in the cabling phase','    · Full Design for all systems','    · Full Installation','    Installation prices include works within Cairo or Giza.','    For any other location, additional charges will apply.','','- Offer Excludes:','    · Any piping or wiring works unless mentioned otherwise','    · Any pipes or cables unless mentioned otherwise','    · Any protection circuit breakers unless mentioned otherwise','','- Payment Terms:','    · Advance Payment: 80% of the total price','    · After Delivery: 10% of the total price','    · After system installation: 10% of the total price','','- Warranty:','    · Warranty against manufacturing defects is 12 Months','','- Delivery:','    · 2-8 Weeks'].join(NL); }
-function qReadDOM(){ _qsec.forEach((s,si)=>{ const t=g('qsT'+si); if(t)s.title=t.value; (s.items||[]).forEach((it,ii)=>{ const gv=f=>{const e=g('q_'+si+'_'+ii+'_'+f);return e?e.value:it[f];}; it.item=gv('item'); it.desc=gv('desc'); it.brand=gv('brand'); it.qty=num(gv('qty')); it.price=num(gv('price')); }); }); }
+function qReadDOM(){ _qsec.forEach((s,si)=>{ const t=g('qsT'+si); if(t)s.title=t.value; (s.items||[]).forEach((it,ii)=>{ const gv=f=>{const e=g('q_'+si+'_'+ii+'_'+f);return e?e.value:it[f];}; it.item=gv('item'); it.desc=gv('desc'); it.brand=gv('brand'); it.qty=num(gv('qty')); it.price=num(gv('price')); });
+  const io=g('qi_'+si+'_on'); if(io){ s.instOn=io.checked; s.instType=((g('qi_'+si+'_type')||{}).value)||'percent'; s.instVal=num((g('qi_'+si+'_val')||{}).value); }
+  const dn=g('qd_'+si+'_on'); if(dn){ s.discOn=dn.checked; s.discType=((g('qd_'+si+'_type')||{}).value)||'percent'; s.discVal=num((g('qd_'+si+'_val')||{}).value); }
+}); }
 function qSecAdd(){ qReadDOM(); _qsec.push({title:'',items:[qBlankItem()]}); qSecRender(); }
 function qSecDel(si){ qReadDOM(); _qsec.splice(si,1); if(!_qsec.length)_qsec=[{title:'Section',items:[qBlankItem()]}]; qSecRender(); }
 function qItemAdd(si){ qReadDOM(); _qsec[si].items.push(qBlankItem()); qSecRender(); }
@@ -3319,8 +3324,17 @@ function qSecRender(){ const el=g('qSec'); if(!el)return;
       <td><button class="btn dn sm" onclick="qItemDel(${si},${ii})">✕</button></td></tr>`).join('');
     return `<div class="card" style="margin-bottom:10px;padding:10px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><span class="mini" style="color:#157f96;font-weight:800">System ${si+1}</span><input id="qsT${si}" list="sys_dl" value="${esc(s.title||'')}" placeholder="Choose a system — KNX / Wireless / Light Current / Sound System / CCTV" style="font-weight:700;flex:1"><button class="btn gh sm" onclick="qSecDel(${si})">🗑 Remove system</button></div>
       <div style="overflow-x:auto"><table class="items"><thead><tr><th>Item</th><th>Description</th><th>Brand</th><th>Qty</th><th>Unit</th><th>Sub</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
-      <button class="btn gh sm" style="margin-top:6px" onclick="qItemAdd(${si})">+ Add line</button></div>`;
-  }).join('')+`<button class="btn cy" onclick="qSecAdd()">➕ Add another system</button><div class="mini" style="color:var(--muted);margin-top:4px">Pick one system for a simple quote, or add more — each system prints on its own page with its own title, under one Sedra cover.</div>`;
+      <button class="btn gh sm" style="margin-top:6px" onclick="qItemAdd(${si})">+ Add line</button>
+      <div style="margin-top:8px;border-top:1px dashed var(--mist);padding-top:8px;display:flex;gap:8px 14px;flex-wrap:wrap;align-items:center">
+        <label style="display:flex;align-items:center;gap:5px;font-weight:700;color:var(--navy)"><input type="checkbox" id="qi_${si}_on" ${s.instOn?'checked':''} onchange="qRecalc()"> 🔧 ${lang==='ar'?'تركيب':'Installation'}</label>
+        <select id="qi_${si}_type" onchange="qRecalc()" style="padding:3px 6px"><option value="percent" ${s.instType!=='amount'?'selected':''}>%</option><option value="amount" ${s.instType==='amount'?'selected':''}>${lang==='ar'?'مبلغ':'Amount'}</option></select>
+        <input id="qi_${si}_val" type="number" value="${num(s.instVal)||''}" style="width:80px" oninput="qRecalc()" placeholder="0">
+        <label style="display:flex;align-items:center;gap:5px;font-weight:700;color:var(--navy);margin-inline-start:8px"><input type="checkbox" id="qd_${si}_on" ${s.discOn?'checked':''} onchange="qRecalc()"> 🏷️ ${lang==='ar'?'خصم':'Discount'}</label>
+        <select id="qd_${si}_type" onchange="qRecalc()" style="padding:3px 6px"><option value="percent" ${s.discType!=='amount'?'selected':''}>%</option><option value="amount" ${s.discType==='amount'?'selected':''}>${lang==='ar'?'مبلغ':'Amount'}</option></select>
+        <input id="qd_${si}_val" type="number" value="${num(s.discVal)||''}" style="width:80px" oninput="qRecalc()" placeholder="0">
+      </div>
+      <div class="mini" id="qsecT${si}" style="text-align:right;margin-top:6px;font-weight:800;color:var(--navy)"></div></div>`;
+  }).join('')+`<button class="btn cy" onclick="qSecAdd()">➕ Add another system</button><div class="mini" style="color:var(--muted);margin-top:4px">${lang==='ar'?'كل سيستم بيحسب التركيب والخصم بتاعه لوحده، والصفحة الأخيرة بتجمع كل السيستمز وتحسب الضريبة على المجموع.':'Each system computes its own installation & discount; the final page sums all systems and applies VAT to the total.'}</div>`;
   qRecalc();
 }
 /* Manual FX is entered the NATURAL way: "1 <currency> = X EGP" (e.g. 1 USD = 53 EGP).
@@ -3347,17 +3361,18 @@ function qCurChange(){ var sel=g('q_cur'); var cur=(sel&&sel.value)||'EGP'; var 
     sel.setAttribute('data-rate', newRate);
   }
   qRecalc(); }
-function qRecalc(){ qReadDOM(); const cur=(g('q_cur')&&val('q_cur'))||'EGP'; const vat=num(val('q_vat')); const rate=qCurRate(); const f=n=>Number(num(n)).toLocaleString(undefined,{maximumFractionDigits:2}); let sub=0;
-  _qsec.forEach((s,si)=>{ (s.items||[]).forEach((it,ii)=>{ const t=num(it.qty)*num(it.price); sub+=t; const c=g('q_'+si+'_'+ii+'_sub'); if(c)c.textContent=f(t)+' '+cur; }); });
-  const cfg={instOn:g('q_instOn')&&g('q_instOn').checked, instType:val('q_instType')||'percent', instVal:num(val('q_instVal')), discOn:g('q_discOn')&&g('q_discOn').checked, discType:val('q_discType')||'percent', discVal:num(val('q_discVal'))};
-  const ex=qCalcExtras(sub,cfg); const v=ex.taxable*vat/100; const grand=ex.taxable+v; const tot=g('qTotals');
+function qRecalc(){ qReadDOM(); const cur=(g('q_cur')&&val('q_cur'))||'EGP'; const vat=num(val('q_vat')); const rate=qCurRate(); const f=n=>Number(num(n)).toLocaleString(undefined,{maximumFractionDigits:2});
+  let grand=0;
+  _qsec.forEach((s,si)=>{ let secSub=0; (s.items||[]).forEach((it,ii)=>{ const t=num(it.qty)*num(it.price); secSub+=t; const c=g('q_'+si+'_'+ii+'_sub'); if(c)c.textContent=f(t)+' '+cur; });
+    const ex=qCalcExtras(secSub,{instOn:s.instOn,instType:s.instType,instVal:s.instVal,discOn:s.discOn,discType:s.discType,discVal:s.discVal});
+    grand+=ex.taxable;
+    const st=g('qsecT'+si); if(st){ let parts=[(lang==='ar'?'الإجمالي ':'Subtotal ')+f(secSub)]; if(s.instOn)parts.push('+ '+(lang==='ar'?'تركيب ':'Install ')+f(ex.inst)); if(s.discOn)parts.push('− '+(lang==='ar'?'خصم ':'Disc ')+f(ex.disc)); parts.push('= '+f(ex.taxable)+' '+cur); st.textContent=(lang==='ar'?('سيستم '+(si+1)+': '):('System '+(si+1)+': '))+parts.join('  ·  '); } });
+  const v=grand*vat/100; const grandTot=grand+v; const tot=g('qTotals');
   const rw=(l,val)=>`<div style="display:flex;justify-content:space-between"><span>${l}</span><b>${val}</b></div>`;
-  const baseNote=cur!=='EGP'?`<div class="mini" style="text-align:right;color:var(--muted)">≈ ${Math.round(rate>0?grand/rate:grand).toLocaleString()} EGP (base)</div>`:'';
-  let html=rw('Subtotal (excl. VAT)', f(sub)+' '+cur);
-  if(cfg.instOn) html+=rw('Installation'+(cfg.instType!=='amount'?(' ('+num(cfg.instVal)+'%)'):''), '+ '+f(ex.inst)+' '+cur);
-  if(cfg.discOn) html+=rw('Discount'+(cfg.discType!=='amount'?(' ('+num(cfg.discVal)+'%)'):''), '− '+f(ex.disc)+' '+cur);
+  const baseNote=cur!=='EGP'?`<div class="mini" style="text-align:right;color:var(--muted)">≈ ${Math.round(rate>0?grandTot/rate:grandTot).toLocaleString()} EGP (base)</div>`:'';
+  let html=rw((lang==='ar'?'إجمالي كل السيستمز (قبل الضريبة)':'All systems subtotal (excl. VAT)'), f(grand)+' '+cur);
   html+=rw('VAT ('+vat+'%)', f(v)+' '+cur);
-  html+=`<div style="display:flex;justify-content:space-between;font-size:16px;color:var(--navy)"><span>Grand total</span><b>${f(grand)} ${cur}</b></div>`;
+  html+=`<div style="display:flex;justify-content:space-between;font-size:16px;color:var(--navy)"><span>${lang==='ar'?'الإجمالي النهائي':'Grand total'}</span><b>${f(grandTot)} ${cur}</b></div>`;
   if(tot)tot.innerHTML=html+baseNote;
 }
 const QSERVICES=['Home Automation','Smart Home','Home Cinema','Indoor Sound System','Outdoor Sound System','Security Camera','Intrusion System','Safety System','Intercom System','Structured Cabling System','MATV Satellite System','Solar Energy','Smart Gates'];
@@ -3453,14 +3468,6 @@ function editQuote(id){
     `<div class="row2">${selEl('Branch','q_branch',branchOpts(),r.branch)}<div class="fld"><label>Currency</label><select id="q_cur" onchange="qCurChange()">${CURRENCIES.map(function(c){return '<option '+((r.currency||CUR[r.branch||defBranch()]||'EGP')===c?'selected':'')+'>'+c+'</option>';}).join('')}</select></div></div>`+
     `<div class="card" id="q_fxbox" style="background:#f6f9fc;padding:10px;margin-bottom:8px"><div class="mini" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span>💱 ${lang==='ar'?'سعر الصرف — 1 وحدة بالعملة = كام جنيه':'Exchange rate — 1 unit = how many EGP'}</span><label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="q_fxman" ${r.fxManual?'checked':''} onchange="qCurChange()"> ${lang==='ar'?'أحدّده يدويًا':'set manually'}</label><input id="q_fx" type="number" step="0.01" placeholder="${lang==='ar'?'مثال 53':'e.g. 53'}" value="${(r.fxManual&&num(r.fxEgp))?num(r.fxEgp):''}" style="width:100px" oninput="qRecalc()" onchange="qCurChange()" ${r.fxManual?'':'disabled'}><span id="q_fxinfo" class="mini" style="color:#157f96"></span></div><div class="mini" style="color:var(--muted);margin-top:4px">${lang==='ar'?'اكتب سعر الدولار/الدرهم بالجنيه اللي انت عايزه (مثلاً 1 دولار = 53 جنيه) والأسعار هتتحسب عليه.':'Type how many EGP one unit of the currency equals (e.g. 1 USD = 53 EGP); prices are computed from it.'}</div></div>`+
     `<div class="fld"><label>Sections & line items (pick products from inventory in the Description field)</label><div id="qSec"></div></div>`+
-    `<div class="card" style="background:#f6f9fc;padding:10px;margin-bottom:8px">
-      <label style="display:flex;align-items:center;gap:8px;font-weight:700;color:var(--navy);cursor:pointer"><input type="checkbox" id="q_instOn" ${r.instOn?'checked':''} onchange="qRecalc()"> 🔧 ${lang==='ar'?'تركيب (Installation)':'Installation'}</label>
-      <div class="row2" style="margin-top:6px"><div class="fld"><label>${lang==='ar'?'النوع':'Type'}</label><select id="q_instType" onchange="qRecalc()"><option value="percent" ${r.instType!=='amount'?'selected':''}>${lang==='ar'?'نسبة %':'Percent %'}</option><option value="amount" ${r.instType==='amount'?'selected':''}>${lang==='ar'?'مبلغ ثابت':'Fixed amount'}</option></select></div><div class="fld"><label>${lang==='ar'?'القيمة':'Value'}</label><input id="q_instVal" type="number" value="${num(r.instVal)||''}" oninput="qRecalc()"></div></div>
-      <hr style="border:none;border-top:1px solid var(--mist);margin:8px 0">
-      <label style="display:flex;align-items:center;gap:8px;font-weight:700;color:var(--navy);cursor:pointer"><input type="checkbox" id="q_discOn" ${r.discOn?'checked':''} onchange="qRecalc()"> 🏷️ ${lang==='ar'?'خصم (Discount)':'Discount'}</label>
-      <div class="row2" style="margin-top:6px"><div class="fld"><label>${lang==='ar'?'النوع':'Type'}</label><select id="q_discType" onchange="qRecalc()"><option value="percent" ${r.discType!=='amount'?'selected':''}>${lang==='ar'?'نسبة %':'Percent %'}</option><option value="amount" ${r.discType==='amount'?'selected':''}>${lang==='ar'?'مبلغ ثابت':'Fixed amount'}</option></select></div><div class="fld"><label>${lang==='ar'?'القيمة':'Value'}</label><input id="q_discVal" type="number" value="${num(r.discVal)||''}" oninput="qRecalc()"></div></div>
-      <div class="mini" style="color:var(--muted);margin-top:4px">${lang==='ar'?'لو مش مفعّل مش هيظهر في العرض. الترتيب: الإجمالي ← التركيب ← الخصم ← الضريبة.':'If off it won’t appear. Order: subtotal → installation → discount → VAT.'}</div>
-    </div>`+
     `<div class="row2">${selEl('Status','q_status',QSTAT,r.status||'Draft')}${fEl('VAT %','q_vat',r.vat!=null?r.vat:vatForBranch(r.branch||defBranch()),'number','qRecalc()')}</div>`+
     `<div class="card" id="qTotals" style="background:#f6f9fc"></div>`+
     fTa('Excluding (one per line)','q_excl',r.excluding||defQExcluding())+
@@ -3470,10 +3477,8 @@ function editQuote(id){
     `<div class="row2">${fEl('Validity (days)','q_valid',r.validity!=null?r.validity:30,'number')}${fEl('Due date (finish by)','q_due',r.dueDate||r.deadline||'','date')}</div>`+
     fTa('Terms & conditions (one per line)','q_terms',r.terms||defQTerms())+
     fTa('Notes','q_notes',r.notes),
-    ()=>{ qReadDOM(); const secs=_qsec.map(s=>({title:s.title||'Section',items:(s.items||[]).filter(i=>(i.desc||i.item)).map(i=>({item:i.item||'',desc:i.desc||'',brand:i.brand||'',qty:num(i.qty),price:num(i.price),image:i.image||''}))})).filter(s=>s.items.length);
-      const d={number:val('q_number'),type:val('q_type'),subject:val('q_subject'),presalesName:val('q_presales'),client:val('q_client'),date:val('q_date'),dueDate:val('q_due'),buildingType:val('q_btype'),location:val('q_loc'),consultant:val('q_consultant'),preparedBy:val('q_prep'),service:val('q_service'),useGeneralCover:!!(g('q_gencover')&&g('q_gencover').checked),branch:val('q_branch'),dept:r.dept||'Operations',currency:val('q_cur'),fxManual:!!(g('q_fxman')&&g('q_fxman').checked),fxRate:(typeof qCurRate==='function'?qCurRate():1),fxEgp:num(val('q_fx'))||0,status:val('q_status'),vat:num(val('q_vat')),sections:secs,excluding:val('q_excl'),featuresList:val('q_features'),payAdvance:num(val('q_pa')),payBefore:num(val('q_pb')),payAfter:num(val('q_pc')),payTest:num(val('q_pd')),validity:num(val('q_valid')),terms:val('q_terms'),notes:val('q_notes'),
-        instOn:!!(g('q_instOn')&&g('q_instOn').checked),instType:val('q_instType')||'percent',instVal:num(val('q_instVal')),
-        discOn:!!(g('q_discOn')&&g('q_discOn').checked),discType:val('q_discType')||'percent',discVal:num(val('q_discVal'))};
+    ()=>{ qReadDOM(); const secs=_qsec.map(s=>({title:s.title||'Section',items:(s.items||[]).filter(i=>(i.desc||i.item)).map(i=>({item:i.item||'',desc:i.desc||'',brand:i.brand||'',qty:num(i.qty),price:num(i.price),image:i.image||''})),instOn:!!s.instOn,instType:s.instType||'percent',instVal:num(s.instVal),discOn:!!s.discOn,discType:s.discType||'percent',discVal:num(s.discVal)})).filter(s=>s.items.length);
+      const d={number:val('q_number'),type:val('q_type'),subject:val('q_subject'),presalesName:val('q_presales'),client:val('q_client'),date:val('q_date'),dueDate:val('q_due'),buildingType:val('q_btype'),location:val('q_loc'),consultant:val('q_consultant'),preparedBy:val('q_prep'),service:val('q_service'),useGeneralCover:!!(g('q_gencover')&&g('q_gencover').checked),branch:val('q_branch'),dept:r.dept||'Operations',currency:val('q_cur'),fxManual:!!(g('q_fxman')&&g('q_fxman').checked),fxRate:(typeof qCurRate==='function'?qCurRate():1),fxEgp:num(val('q_fx'))||0,status:val('q_status'),vat:num(val('q_vat')),sections:secs,excluding:val('q_excl'),featuresList:val('q_features'),payAdvance:num(val('q_pa')),payBefore:num(val('q_pb')),payAfter:num(val('q_pc')),payTest:num(val('q_pd')),validity:num(val('q_valid')),terms:val('q_terms'),notes:val('q_notes')};
       if(!d.client){alert('Client name required');return false;} if(!secs.length){alert('Add at least one line item with a description.');return false;} if(!id){d.created=new Date().toISOString(); d.number=genQuoteNo(svcKey(d.service));}
       /* Version history: append this saved state as a version so any past version can be restored later. */
       var _prevHist=Array.isArray(r.history)?r.history.slice(-40):[]; d.history=_prevHist.concat([qSnap(d)]);
@@ -3514,10 +3519,17 @@ function printQuote(id){
   const MARK='<svg viewBox="22 30 132 140" fill="#0e2c49" style="height:58px"><path d="M70 34 L150 34 L128 70 L48 70 Z"/><path d="M48 82 L128 82 L106 118 L26 118 Z"/><rect x="116" y="82" width="30" height="30" rx="5"/><path d="M88 130 L150 130 L128 166 L66 166 Z"/><rect x="40" y="130" width="30" height="30" rx="5"/></svg>';
   const LOGO=base+'sedra-logo.png';
   const secs=t.secs;
+  /* Per-system financial rows: each system shows its own subtotal, installation, discount and total. */
+  const secFinRows=(sc,i)=>{ var d=(t.secDetail&&t.secDetail[i])||{sub:t.secTotals[i],inst:0,disc:0,total:t.secTotals[i]}; var r='';
+    if(sc.instOn||sc.discOn){ r+=`<div class="sect2"><span>${lang==='ar'?'الإجمالي':'Subtotal'}</span><span>${M(d.sub)}</span></div>`;
+      if(sc.instOn) r+=`<div class="sect2"><span>${lang==='ar'?'تركيب':'Installation'}${sc.instType!=='amount'?' ('+num(sc.instVal)+'%)':''}</span><span>+ ${M(d.inst)}</span></div>`;
+      if(sc.discOn) r+=`<div class="sect2"><span>${lang==='ar'?'خصم':'Discount'}${sc.discType!=='amount'?' ('+num(sc.discVal)+'%)':''}</span><span>− ${M(d.disc)}</span></div>`; }
+    r+=`<div class="sect"><span>Total &mdash; ${esc((sc.title||('System '+(i+1))).toUpperCase())}</span><span>${M(d.total)}</span></div>`;
+    return r; };
   const secTable=(sc,i)=>`<div class="sec"><div class="sech">${esc(sc.title||'Section')}</div>
     <table><thead><tr><th class="c">Image</th><th>Item</th><th>Description</th><th>Brand</th><th class="c">Qty</th><th class="r">Unit Price</th><th class="r">Total</th></tr></thead><tbody>
     ${(sc.items||[]).map(it=>`<tr><td class="c">${it.image?`<img src="${esc(it.image)}" style="width:62px;height:62px;object-fit:contain;display:block;margin:0 auto;mix-blend-mode:multiply">`:''}</td><td class="pn">${esc(it.item||'')}</td><td>${esc(it.desc||'')}</td><td class="br">${esc(it.brand||'-')}</td><td class="c">${num(it.qty)}</td><td class="r">${M(it.price)}</td><td class="r"><b>${M(num(it.qty)*num(it.price))}</b></td></tr>`).join('')}
-    </tbody></table><div class="sect"><span>Total &mdash; ${esc((sc.title||'').toUpperCase())}</span><span>${M(t.secTotals[i])}</span></div></div>`;
+    </tbody></table>${secFinRows(sc,i)}</div>`;
   const pay=[['Advance',q.payAdvance],['Before delivery',q.payBefore],['After delivery',q.payAfter],['Testing & commissioning',q.payTest]].filter(pp=>num(pp[1]));
   const excl=lines(q.excluding), terms=lines(q.terms);
   const multi=secs.length>1;
@@ -3526,7 +3538,8 @@ function printQuote(id){
   const metaHTML=`<div class="metabox"><span>Client: <b>${esc(q.client||'-')}</b></span><span>Location: <b>${esc(q.location||'-')}</b></span><span>Prepared by: <b>${esc(q.preparedBy||'-')}</b></span></div>`;
   const ftHTML=`<div class="ft"><span>info@sedra-electric.com</span><span>www.sedra-electric.com</span><span>Tel: 0226783906</span></div>`;
   const rowsTbl=sc=>`<table><thead><tr><th class="c">Image</th><th>Item</th><th>Description</th><th>Brand</th><th class="c">Qty</th><th class="r">Unit Price</th><th class="r">Total</th></tr></thead><tbody>${(sc.items||[]).map(it=>`<tr><td class="c">${it.image?`<img src="${esc(it.image)}" style="width:62px;height:62px;object-fit:contain;display:block;margin:0 auto;mix-blend-mode:multiply">`:''}</td><td class="pn">${esc(it.item||'')}</td><td>${esc(it.desc||'')}</td><td class="br">${esc(it.brand||'-')}</td><td class="c">${num(it.qty)}</td><td class="r">${M(it.price)}</td><td class="r"><b>${M(num(it.qty)*num(it.price))}</b></td></tr>`).join('')}</tbody></table>`;
-  const finHTML=`${cur!=='EGP'?`<div class="mini" style="text-align:right;color:#5a6b7b;font-size:11px;margin-bottom:4px">${lang==='ar'?'كل المبالغ بعملة':'All amounts in'} ${cur}</div>`:''}<div class="fin"><div class="r2"><span>Subtotal (excl. VAT)</span><b>${M(t.sub)}</b></div>${q.instOn?`<div class="r2"><span>Installation${q.instType!=='amount'?' ('+num(q.instVal)+'%)':''}</span><b>${M(t.inst)}</b></div>`:''}${q.discOn?`<div class="r2"><span>Discount${q.discType!=='amount'?' ('+num(q.discVal)+'%)':''}</span><b>− ${M(t.disc)}</b></div>`:''}<div class="r2"><span>VAT (${num(q.vat)}%)</span><b>${M(t.vat)}</b></div><div class="g"><span>Grand Total</span><span>${M(t.total)}</span></div></div>`;
+  const sysLines=(secs.length>1)?secs.map((sc,i)=>`<div class="r2"><span>${esc(sc.title||('System '+(i+1)))}</span><b>${M(t.secTotals[i])}</b></div>`).join(''):'';
+  const finHTML=`${cur!=='EGP'?`<div class="mini" style="text-align:right;color:#5a6b7b;font-size:11px;margin-bottom:4px">${lang==='ar'?'كل المبالغ بعملة':'All amounts in'} ${cur}</div>`:''}<div class="fin">${sysLines}<div class="r2"><span>${lang==='ar'?'إجمالي كل السيستمز (قبل الضريبة)':'All systems subtotal (excl. VAT)'}</span><b>${M(t.sub)}</b></div><div class="r2"><span>VAT (${num(q.vat)}%)</span><b>${M(t.vat)}</b></div><div class="g"><span>Grand Total</span><span>${M(t.total)}</span></div></div>`;
   const featHTML=(function(){var fl=lines(q.featuresList);return fl.length?`<div class="stitle" style="font-size:15px;margin-top:10px">✨ Features list</div><div class="sec" style="page-break-inside:avoid;border-color:#37c0dc"><ul style="padding:14px 30px;margin:0;line-height:1.9;font-size:12.5px;color:#1c2b3a;columns:2;-webkit-columns:2;column-gap:30px">${fl.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')}</ul></div>`:'';})();
   const payHTML=pay.length?`<div class="stitle" style="font-size:15px;margin-top:6px">Payment terms</div><div class="pay">${pay.map(pp=>`<div class="pc"><div class="k">${esc(pp[0].toUpperCase())}</div><div class="v">${num(pp[1])}%</div></div>`).join('')}</div>`:'';
   const notesHTML=(function(){var nl=lines(q.notes);return nl.length?`<div class="stitle" style="font-size:15px;margin-top:10px">📝 ${lang==='ar'?'ملاحظات':'Notes'}</div><div class="sec" style="page-break-inside:avoid;border-color:#37c0dc"><ul style="padding:14px 30px;margin:0;line-height:1.9;font-size:12.5px;color:#1c2b3a">${nl.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')}</ul></div>`:'';})();
@@ -3536,7 +3549,7 @@ function printQuote(id){
   const sysPages=secs.map((sc,i)=>{
     const sc_url=sysCoverURL(sc.title);
     const scover=sc_url?`<div class="sheet A4 cover syscover"><img src="${sc_url}"></div>`:'';
-    const spage=`<div class="sheet pad">${theadHTML}<div class="sysbig"><span class="ix">System ${i+1}</span>${esc(sc.title||('System '+(i+1)))}</div><div class="sysrule"></div>${SYS_IMG[sc.title]?`<div class="sysbanner"><img src="${esc(SYS_IMG[sc.title])}"></div>`:''}${metaHTML}<div class="sec">${rowsTbl(sc)}<div class="sect"><span>Total &mdash; ${esc((sc.title||('System '+(i+1))).toUpperCase())}</span><span>${M(t.secTotals[i])}</span></div></div>${ftHTML}</div>`;
+    const spage=`<div class="sheet pad">${theadHTML}<div class="sysbig"><span class="ix">System ${i+1}</span>${esc(sc.title||('System '+(i+1)))}</div><div class="sysrule"></div>${SYS_IMG[sc.title]?`<div class="sysbanner"><img src="${esc(SYS_IMG[sc.title])}"></div>`:''}${metaHTML}<div class="sec">${rowsTbl(sc)}${secFinRows(sc,i)}</div>${ftHTML}</div>`;
     return scover+spage;
   }).join('');
   const summaryPage=`<div class="sheet pad">${theadHTML}<div class="stitle">Financial Summary</div>${metaHTML}<div class="sec"><table class="sumtbl"><thead><tr><th>System</th><th class="r">Total</th></tr></thead><tbody>${secs.map((sc,i)=>`<tr><td class="pn">${esc(sc.title||('System '+(i+1)))}</td><td class="r"><b>${M(t.secTotals[i])}</b></td></tr>`).join('')}</tbody></table></div>${finHTML}${featHTML}${payHTML}${ftHTML}</div>`;
@@ -3544,10 +3557,10 @@ function printQuote(id){
   const termsPage=`<div class="sheet pad"><div class="stitle">Terms &amp; Conditions</div><div class="tc">${(function(){ var ls=terms.length?terms:lines(defQTerms()); return ls.map(function(x){ var s=x.replace(/\t/g,'    '); var tt=s.trim(); if(/^[-•]\s/.test(tt)){ return '<div class="tc-h">'+esc(tt.replace(/^[-•]\s*/,''))+'</div>'; } if(/^·/.test(tt)||/^\s{2,}·/.test(s)){ return '<div class="tc-b">'+esc(tt.replace(/^·\s*/,''))+'</div>'; } return '<div class="tc-p">'+esc(tt)+'</div>'; }).join(''); })()}</div>${excl.length?`<div class="stitle" style="font-size:15px;margin-top:12px">Offer excludes</div><ul style="padding-inline-start:18px;line-height:1.9;font-size:12.5px;color:#3a4a5a">${excl.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}<div class="tc" style="margin-top:12px"><div class="tc-b">This offer is valid for ${num(q.validity)||30} days (until ${esc(validTill||'')}).</div></div>${notesHTML}<div class="sign"><div class="s">Prepared by &mdash; ${esc(q.preparedBy||'-')}</div><div class="s">Client approval &mdash; signature &amp; date</div></div>${ftHTML}</div>`;
   const aboutPage=`<div class="sheet A4 apage"><div class="ap-top"><span class="ap-mk"><img src="${LOGO}" style="height:62px;width:auto"></span><div class="ap-title">About Sedra</div><div class="ap-rule"></div></div><p class="ap-lead">Sedra Electric started in 2014 as an L.L.C company based in Cairo, Egypt. Our focus was consulting and training for solar energy and energy efficiency. With the growing demand for renewable energy, we rebranded with a more professional image to capitalise on our technical know-how and global business network, serving both the Egyptian and international markets with the latest innovative solutions.</p><div class="ap-pillars"><div class="ap-pill"><b>2014</b><span>Established in Cairo, Egypt</span></div><div class="ap-pill"><b>3</b><span>Branches &mdash; Egypt &middot; UAE &middot; KSA</span></div><div class="ap-pill"><b>Smart</b><span>&amp; Low-current systems</span></div></div><div class="ap-band"><div class="ap-band-t">Powering the Future, Simplifying Life</div><div class="ap-band-s">KNX &middot; Wireless &middot; Light Current &middot; Sound System &middot; CCTV &middot; Fire</div></div><div class="ap-foot">info@sedra-electric.com &nbsp;&middot;&nbsp; www.sedra-electric.com &nbsp;&middot;&nbsp; Tel: 0226783906</div></div>`;
   const partnersPage=`<div class="sheet A4 apage"><div class="ap-top"><span class="ap-mk"><img src="${LOGO}" style="height:62px;width:auto"></span><div class="ap-title">Our Partners</div><div class="ap-rule"></div></div><div class="ap-partsub">Authorized integrator of leading global brands</div><div class="ap-logos"><img src="${base}partners-logos.png"></div><div class="ap-foot">info@sedra-electric.com &nbsp;&middot;&nbsp; www.sedra-electric.com &nbsp;&middot;&nbsp; Tel: 0226783906</div></div>`;
-  /* First-system cover page after the partners page. Multi-system quotes already show a
-     cover before each system inside sysPages; single-system quotes were skipping it — so
-     show the first system's own cover here (unless the front page is already that image). */
-  const firstSysURL=sysCoverURL((secs[0]&&secs[0].title))||coverURL;
+  /* First-system cover page after the partners page — ONLY when that system actually has its
+     own cover image (no generic fallback), and only if the front page isn't already that image.
+     This respects the existing per-system covers (e.g. Sound System) instead of substituting one. */
+  const firstSysURL=sysCoverURL((secs[0]&&secs[0].title));
   const firstSysCoverHTML=(!multi && firstSysURL && firstSysURL!==frontURL)?`<div class="sheet A4 cover"><img src="${firstSysURL}"></div>`:'';
   const bodyHTML=coverHTML+aboutPage+partnersPage+(multi?(sysPages+summaryPage):(firstSysCoverHTML+singlePage))+termsPage;
   w.document.write(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=822, initial-scale=1"><title>${esc(q.number||'Quotation')} &mdash; Sedra</title>
@@ -3617,6 +3630,7 @@ function printQuote(id){
   th{background:#f1f5f9;color:#0e2c49;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px}
   .c{text-align:center}.r{text-align:right}.br{color:#6c7c8c}.pn{font-weight:800;color:#0e2c49}
   .sect{background:#123a5f;color:#fff;font-weight:800;padding:9px 14px;display:flex;justify-content:space-between}
+  .sect2{display:flex;justify-content:space-between;padding:7px 14px;font-size:12.5px;color:#1c2b3a;border-top:1px solid #eef}
   .fin{border:2px solid #0e2c49;border-radius:10px;overflow:hidden;max-width:420px;margin:16px 0 16px auto}
   .fin .r2{display:flex;justify-content:space-between;gap:24px;padding:10px 16px;font-size:13px;border-bottom:1px solid #eee}
   .fin .g{background:#0e2c49;color:#fff;display:flex;justify-content:space-between;gap:24px;padding:13px 16px;font-size:17px;font-weight:800}
