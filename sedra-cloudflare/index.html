@@ -988,6 +988,28 @@ async function importProductImagesOnce(){
     try{ if(typeof showToast==='function') showToast({title:'✓ Product images',body:done+' / '+todo.length+(lang==='ar'?' صورة اتضافت':' images added')}); }catch(e){}
   }catch(e){ window.__imgImport={err:String(e&&e.message||e)}; }
 }
+/* One-time cleanup: strip the leading/trailing decorative dashes that came from the Zoho import
+   (e.g. "--------------NVR 8ch POE" -> "NVR 8ch POE"). Internal dashes in model numbers
+   (e.g. DS-7608NI-K2/8P) are kept. Admin-only, runs as the app; one bulk PATCH. Re-runs on rev bump. */
+var PROD_CLEAN_REV=1;
+async function cleanProductDashesOnce(){
+  try{
+    if(typeof isAdmin==='function'?!isAdmin():true) return;
+    if(settings && num(settings.prodCleanRev)>=PROD_CLEAN_REV) return;
+    var clean=function(s){ return String(s||'').replace(/^[\s\-–—_]+/,'').replace(/[\s\-–—_]+$/,'').replace(/\s{2,}/g,' ').trim(); };
+    var upd={}, n=0;
+    (inventory||[]).forEach(function(p){
+      if(!p||!p.id) return;
+      var nn=clean(p.name); if(nn && nn!==(p.name||'')){ upd[p.id+'/name']=nn; p.name=nn; n++; }
+      if(p.desc){ var nd=clean(p.desc); if(nd!==p.desc){ upd[p.id+'/desc']=nd; p.desc=nd; } }
+    });
+    if(Object.keys(upd).length){ try{ await apiCall('PATCH','/inventory.json',upd); }catch(e){ window.__prodClean={err:String(e&&e.message||e)}; return; } }
+    try{ await apiMerge('meta','settings',{prodCleanRev:PROD_CLEAN_REV}); }catch(e){} if(!settings)settings={}; settings.prodCleanRev=PROD_CLEAN_REV;
+    try{ render(); }catch(e){}
+    window.__prodClean={cleaned:n};
+    try{ if(typeof showToast==='function'&&n) showToast({title:'✓ '+(lang==='ar'?'اتنضّفت أسماء المنتجات':'Product names cleaned'),body:n+(lang==='ar'?' منتج':' products')}); }catch(e){}
+  }catch(e){ window.__prodClean={err:String(e&&e.message||e)}; }
+}
 /* Auto-update nudge: the app document is served network-first, so a reload always gets the
    latest deploy. This checks the deployed index.html's ETag periodically and on tab focus, and
    shows a one-click "Refresh" toast when a newer version is live — so nobody runs stale code. */
@@ -1191,7 +1213,7 @@ function ensureAdminDoc(u){
 function pickBranch(b){ curBranch=b; localStorage.setItem('sedra_branch',b); enterApp(); }
 function enterApp(){ appReady=true; lastSig=''; hideLoad(); hideGate(); g('app').classList.remove('hide'); buildNav();
   try{ var _dh=DEPT_HOME[me.dept]||'hub'; var _dm=MODULES.find(function(x){return x.id===_dh;}); curView=(_dm&&canSee(_dm))?_dh:'hub'; }catch(e){ curView='hub'; }
-  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); migrateStagesOnce(); importAdelOnce(); importProductImagesOnce(); _setupUpdateCheck(); }
+  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); migrateStagesOnce(); importAdelOnce(); importProductImagesOnce(); cleanProductDashesOnce(); _setupUpdateCheck(); }
 
 /* ---- "My Tasks" pop-up on first open each day (Phase 1) ---- */
 function maybeTasksPopup(){
@@ -3625,6 +3647,7 @@ function editQuote(id){
     `<div class="row2">${fEl('Quote Subject (cover)','q_subject',r.subject||r.projectName||'')}${fEl('Presales Name (cover)','q_presales',r.presalesName||r.preparedBy||'')}</div>`+
     selEl('Main system / service (default cover)','q_service',QSYS_ALL,r.service||QSYS_ALL[0])+
     `<label class="fld" style="display:flex;align-items:center;gap:8px;background:#f6f9fc;border:1px solid #e3edf4;border-radius:8px;padding:9px 12px;cursor:pointer;font-weight:700;color:var(--navy)"><input type="checkbox" id="q_gencover" ${r.useGeneralCover?'checked':''} style="width:16px;height:16px"> ${lang==='ar'?'استخدم كافر سيدرا العام (Powering the Future) كصفحة رئيسية':'Use the Sedra general cover (Powering the Future) as the front page'}</label>`+
+    `<label class="fld" style="display:flex;align-items:center;gap:8px;background:#f6f9fc;border:1px solid #e3edf4;border-radius:8px;padding:9px 12px;cursor:pointer;font-weight:700;color:var(--navy)"><input type="checkbox" id="q_showpn" ${(r.showPartNo!==false)?'checked':''} style="width:16px;height:16px"> ${lang==='ar'?'إظهار الـ Part Number (كود المنتج) في العرض المطبوع':'Show the Part Number (item code) in the printed quotation'}</label>`+
     `<div class="row2"><div class="fld"><label>Client name</label><input id="q_client" list="cust_dl" value="${esc(r.client||'')}">${custDatalist()}</div>${fEl('Date','q_date',r.date,'date')}</div>`+
     `<div class="row2">${fEl('Building type','q_btype',r.buildingType)}${fEl('Location','q_loc',r.location)}</div>`+
     `<div class="row2">${fEl('Consultant','q_consultant',r.consultant)}${fEl('Prepared by','q_prep',r.preparedBy||(me&&me.name)||'')}</div>`+
@@ -3644,7 +3667,7 @@ function editQuote(id){
     fTa('Terms & conditions (one per line)','q_terms',r.terms||defQTerms())+
     fTa('Notes','q_notes',r.notes),
     ()=>{ qReadDOM(); const secs=_qsec.map(s=>({title:s.title||'Section',items:(s.items||[]).filter(i=>(i.desc||i.item)).map(i=>({item:i.item||'',desc:i.desc||'',brand:i.brand||'',qty:num(i.qty),price:num(i.price),image:i.image||''})),instOn:!!s.instOn,instType:s.instType||'percent',instVal:num(s.instVal),discOn:!!s.discOn,discType:s.discType||'percent',discVal:num(s.discVal),features:s.features||'',notes:s.notes||''})).filter(s=>s.items.length);
-      const d={number:val('q_number'),type:val('q_type'),subject:val('q_subject'),presalesName:val('q_presales'),client:val('q_client'),date:val('q_date'),dueDate:val('q_due'),buildingType:val('q_btype'),location:val('q_loc'),consultant:val('q_consultant'),preparedBy:val('q_prep'),service:val('q_service'),useGeneralCover:!!(g('q_gencover')&&g('q_gencover').checked),branch:val('q_branch'),dept:r.dept||'Operations',currency:val('q_cur'),fxManual:!!(g('q_fxman')&&g('q_fxman').checked),fxRate:(typeof qCurRate==='function'?qCurRate():1),fxEgp:num(val('q_fx'))||0,status:val('q_status'),vat:num(val('q_vat')),sections:secs,excluding:val('q_excl'),featuresList:val('q_features'),payAdvance:num(val('q_pa')),payBefore:num(val('q_pb')),payAfter:num(val('q_pc')),payTest:num(val('q_pd')),validity:num(val('q_valid')),terms:val('q_terms'),notes:val('q_notes')};
+      const d={number:val('q_number'),type:val('q_type'),subject:val('q_subject'),presalesName:val('q_presales'),client:val('q_client'),date:val('q_date'),dueDate:val('q_due'),buildingType:val('q_btype'),location:val('q_loc'),consultant:val('q_consultant'),preparedBy:val('q_prep'),service:val('q_service'),useGeneralCover:!!(g('q_gencover')&&g('q_gencover').checked),showPartNo:!!(g('q_showpn')&&g('q_showpn').checked),branch:val('q_branch'),dept:r.dept||'Operations',currency:val('q_cur'),fxManual:!!(g('q_fxman')&&g('q_fxman').checked),fxRate:(typeof qCurRate==='function'?qCurRate():1),fxEgp:num(val('q_fx'))||0,status:val('q_status'),vat:num(val('q_vat')),sections:secs,excluding:val('q_excl'),featuresList:val('q_features'),payAdvance:num(val('q_pa')),payBefore:num(val('q_pb')),payAfter:num(val('q_pc')),payTest:num(val('q_pd')),validity:num(val('q_valid')),terms:val('q_terms'),notes:val('q_notes')};
       if(!d.client){alert('Client name required');return false;} if(!secs.length){alert('Add at least one line item with a description.');return false;} if(!id){d.created=new Date().toISOString(); d.number=genQuoteNo(svcKey(d.service));}
       /* Version history: append this saved state as a version so any past version can be restored later. */
       var _prevHist=Array.isArray(r.history)?r.history.slice(-40):[]; d.history=_prevHist.concat([qSnap(d)]);
@@ -3702,10 +3725,12 @@ function printQuote(id,opts){
       if(sc.discOn) r+=`<div class="sect2"><span>${lang==='ar'?'خصم':'Discount'}${sc.discType!=='amount'?' ('+num(sc.discVal)+'%)':''}</span><span>− ${M(d.disc)}</span></div>`; }
     r+=`<div class="sect"><span>Total &mdash; ${esc((sc.title||('System '+(i+1))).toUpperCase())}</span><span>${M(d.total)}</span></div>`;
     return r; };
+  /* Show the Part Number (item code) only when enabled on the quote (default: shown). */
+  const showPN = (q.showPartNo!==false);
+  const qThead = `<thead><tr><th class="c">Image</th><th>Item &amp; Description</th><th>Brand</th><th class="c">Qty</th><th class="r">Unit Price</th><th class="r">Total</th></tr></thead>`;
+  const qRows = sc => (sc.items||[]).map(it=>`<tr><td class="c">${it.image?`<img src="${esc(it.image)}" class="pimg">`:''}</td><td class="pd">${(showPN&&it.item)?`<div class="pn">${esc(it.item)}</div>`:''}<div class="ds">${esc(it.desc||'')}</div></td><td class="br">${esc(it.brand||'-')}</td><td class="c">${num(it.qty)}</td><td class="r">${M(it.price)}</td><td class="r"><b>${M(num(it.qty)*num(it.price))}</b></td></tr>`).join('');
   const secTable=(sc,i)=>`<div class="sec"><div class="sech">${esc(sc.title||'Section')}</div>
-    <table><thead><tr><th class="c">Image</th><th>Item</th><th>Description</th><th>Brand</th><th class="c">Qty</th><th class="r">Unit Price</th><th class="r">Total</th></tr></thead><tbody>
-    ${(sc.items||[]).map(it=>`<tr><td class="c">${it.image?`<img src="${esc(it.image)}" style="width:62px;height:62px;object-fit:contain;display:block;margin:0 auto;mix-blend-mode:multiply">`:''}</td><td class="pn">${esc(it.item||'')}</td><td>${esc(it.desc||'')}</td><td class="br">${esc(it.brand||'-')}</td><td class="c">${num(it.qty)}</td><td class="r">${M(it.price)}</td><td class="r"><b>${M(num(it.qty)*num(it.price))}</b></td></tr>`).join('')}
-    </tbody></table>${secFinRows(sc,i)}</div>`;
+    <table>${qThead}<tbody>${qRows(sc)}</tbody></table>${secFinRows(sc,i)}</div>`;
   const pay=[['Advance',q.payAdvance],['Before delivery',q.payBefore],['After delivery',q.payAfter],['Testing & commissioning',q.payTest]].filter(pp=>num(pp[1]));
   const excl=lines(q.excluding), terms=lines(q.terms);
   const multi=secs.length>1;
@@ -3713,7 +3738,7 @@ function printQuote(id,opts){
   const theadHTML=`<div class="thead"><div style="display:flex;align-items:center;gap:12px"><img src="${LOGO}" style="height:40px;width:auto"><div><div class="nm">SEDRA ELECTRIC</div><div class="sub">SMART &amp; LOW-CURRENT SYSTEMS &mdash; CAIRO, EGYPT</div></div></div><div style="text-align:right"><div class="qid">${esc(q.number||'')} <span style="font-size:12px;font-weight:800;color:#37c0dc;letter-spacing:1px">${verTag}</span></div><div class="sub" style="margin-top:4px">${esc(q.date||'')}</div></div></div>`;
   const metaHTML=`<div class="metabox"><span>Client: <b>${esc(q.client||'-')}</b></span><span>Location: <b>${esc(q.location||'-')}</b></span><span>Prepared by: <b>${esc(q.preparedBy||'-')}</b></span></div>`;
   const ftHTML=`<div class="ft"><span>info@sedra-electric.com</span><span>www.sedra-electric.com</span><span>Tel: 0226783906</span></div>`;
-  const rowsTbl=sc=>`<table><thead><tr><th class="c">Image</th><th>Item</th><th>Description</th><th>Brand</th><th class="c">Qty</th><th class="r">Unit Price</th><th class="r">Total</th></tr></thead><tbody>${(sc.items||[]).map(it=>`<tr><td class="c">${it.image?`<img src="${esc(it.image)}" style="width:62px;height:62px;object-fit:contain;display:block;margin:0 auto;mix-blend-mode:multiply">`:''}</td><td class="pn">${esc(it.item||'')}</td><td>${esc(it.desc||'')}</td><td class="br">${esc(it.brand||'-')}</td><td class="c">${num(it.qty)}</td><td class="r">${M(it.price)}</td><td class="r"><b>${M(num(it.qty)*num(it.price))}</b></td></tr>`).join('')}</tbody></table>`;
+  const rowsTbl=sc=>`<table>${qThead}<tbody>${qRows(sc)}</tbody></table>`;
   const sysLines=(secs.length>1)?secs.map((sc,i)=>`<div class="r2"><span>${esc(sc.title||('System '+(i+1)))}</span><b>${M(t.secTotals[i])}</b></div>`).join(''):'';
   const finHTML=`${cur!=='EGP'?`<div class="mini" style="text-align:right;color:#5a6b7b;font-size:11px;margin-bottom:4px">${lang==='ar'?'كل المبالغ بعملة':'All amounts in'} ${cur}</div>`:''}<div class="fin">${sysLines}<div class="r2"><span>${lang==='ar'?'إجمالي كل السيستمز (قبل الضريبة)':'All systems subtotal (excl. VAT)'}</span><b>${M(t.sub)}</b></div><div class="r2"><span>VAT (${num(q.vat)}%)</span><b>${M(t.vat)}</b></div><div class="g"><span>Grand Total</span><span>${M(t.total)}</span></div></div>`;
   const featHTML=(function(){var fl=lines(q.featuresList);return fl.length?`<div class="stitle" style="font-size:15px;margin-top:10px">✨ Features list</div><div class="sec" style="page-break-inside:avoid;border-color:#37c0dc"><ul style="padding:14px 30px;margin:0;line-height:1.9;font-size:12.5px;color:#1c2b3a;columns:2;-webkit-columns:2;column-gap:30px">${fl.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')}</ul></div>`:'';})();
@@ -3802,9 +3827,11 @@ function printQuote(id,opts){
   .metabox{background:#eef3f8;border-radius:10px;padding:12px 16px;font-size:12.5px;display:flex;flex-wrap:wrap;gap:6px 26px;margin-bottom:16px}.metabox b{color:#0e2c49}
   .sec{border:1px solid #d7dee6;border-radius:8px;overflow:hidden;margin-bottom:14px;page-break-inside:avoid}
   .sech{background:#0e2c49;color:#fff;font-weight:800;padding:9px 14px;font-size:14px}
-  table{width:100%;border-collapse:collapse}th,td{padding:8px 12px;border-bottom:1px solid #e6ebf0;font-size:12px;text-align:left;vertical-align:top}
+  table{width:100%;border-collapse:collapse}th,td{padding:9px 12px;border-bottom:1px solid #e6ebf0;font-size:12px;text-align:left;vertical-align:middle}
   th{background:#f1f5f9;color:#0e2c49;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px}
-  .c{text-align:center}.r{text-align:right}.br{color:#6c7c8c}.pn{font-weight:800;color:#0e2c49}
+  .c{text-align:center}.r{text-align:right}.br{color:#6c7c8c}.pn{font-weight:800;color:#0e2c49;font-size:12.5px}
+  .pimg{width:58px;height:58px;object-fit:contain;background:#fff;border:1px solid #e6ebf0;border-radius:8px;display:block;margin:0 auto;padding:3px}
+  td.pd{min-width:230px}.pd .ds{color:#33445a;line-height:1.5;margin-top:2px}.pd .pn+.ds{margin-top:3px}
   .sect{background:#123a5f;color:#fff;font-weight:800;padding:9px 14px;display:flex;justify-content:space-between}
   .sect2{display:flex;justify-content:space-between;padding:7px 14px;font-size:12.5px;color:#1c2b3a;border-top:1px solid #eef}
   .fin{border:2px solid #0e2c49;border-radius:10px;overflow:hidden;max-width:420px;margin:16px 0 16px auto}
