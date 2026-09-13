@@ -1,14 +1,24 @@
 // Sedra system — Cloudflare Pages (advanced mode) worker.
 // DB proxy at POST /db + SERVER-SIDE ACCESS CONTROL.
-// The browser talks only to this worker; the user's Firebase ID token is the DB
-// credential AND identifies the caller so this worker can authorize each request
-// by role/department and redact sensitive data.
 //
-// Design note: the app currently loads the WHOLE DB (large, incl. product images)
-// in one bulk read. To stay well under Cloudflare's CPU limits we NEVER parse that
-// bulk blob — it passes straight through. Enforcement applies to WRITES (small
-// bodies) and to SENSITIVE single-collection reads (small). Once the client fetches
-// sensitive collections individually (next stage), their redaction here takes effect.
+// ── STAGE 2: worker is the ONLY door to the database ───────────────────────────
+// The worker authenticates to Firebase with a SERVICE ACCOUNT (admin) token, so
+// once the Firebase rules are locked to deny direct client access, the browser can
+// no longer reach the DB by bypassing this worker with its own ID token. The user's
+// ID token is still sent by the client (as p.token) and is used ONLY to identify
+// the caller so this worker can authorize each request by role/department and redact
+// sensitive data. Firebase access itself is done with the service-account token.
+//
+// SAFE FALLBACK (important): if the SA_KEY environment variable is NOT set, or the
+// service-account token cannot be minted, the worker falls back to forwarding the
+// user's ID token exactly like the previous version. So deploying this file changes
+// NOTHING until you (a) add the SA_KEY env var and (b) flip the Firebase rules to
+// deny-client. See DEPLOY-STAGE2.txt for the exact, reversible cutover order.
+//
+// Design note: the app loads the WHOLE DB (large, incl. product images) in one bulk
+// read. To stay well under Cloudflare's CPU limits we NEVER parse that bulk blob — it
+// passes straight through. Enforcement applies to WRITES (small bodies) and to
+// SENSITIVE single-collection reads (small).
 //
 // KILL SWITCH: set ENFORCE=false to revert to a plain pass-through proxy instantly.
 
@@ -39,11 +49,70 @@ const EMP_PRIV = ['salary','allowances','role','dept','branches','accessModules'
   'iban','socialInsNo','medicalIns','manager','code','title','leaveEntitlement','email'];
 const SALES_COLLS = { leads:1, customers:1, contacts:1, quotes:1, activities:1, variations:1, rfqs:1 };
 
+// ───────────────────────── service-account credential layer ─────────────────────
+// The DB credential is either the service-account OAuth token (preferred, locks the
+// worker as the only door) or, as a fallback, the user's ID token (current behavior).
+let SA_KEY_PARSED; // undefined = not tried yet, false = none/invalid, object = parsed key
+let SA_TOKEN = null, SA_TOKEN_EXP = 0;
+
+function getSAKey(env){
+  if (SA_KEY_PARSED !== undefined) return SA_KEY_PARSED;
+  const raw = env && env.SA_KEY;
+  if (!raw){ SA_KEY_PARSED = false; return false; }
+  try { const k = JSON.parse(raw); SA_KEY_PARSED = (k && k.private_key && k.client_email) ? k : false; }
+  catch(e){ SA_KEY_PARSED = false; }
+  return SA_KEY_PARSED;
+}
+
+function pemToBuf(pem){
+  const b = String(pem).replace(/-----BEGIN [^-]+-----/,'').replace(/-----END [^-]+-----/,'').replace(/\s+/g,'');
+  const bin = atob(b); const u = new Uint8Array(bin.length);
+  for (let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
+  return u.buffer;
+}
+function b64url(input){
+  let s;
+  if (typeof input === 'string') s = btoa(unescape(encodeURIComponent(input)));
+  else { let bin=''; const u=new Uint8Array(input); for(let i=0;i<u.length;i++) bin+=String.fromCharCode(u[i]); s=btoa(bin); }
+  return s.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+async function getSAToken(env){
+  if (SA_TOKEN && Date.now() < SA_TOKEN_EXP) return SA_TOKEN;
+  const key = getSAKey(env);
+  if (!key) return null;
+  try {
+    const now = Math.floor(Date.now()/1000);
+    const aud = key.token_uri || 'https://oauth2.googleapis.com/token';
+    const header = { alg:'RS256', typ:'JWT' };
+    const claim  = { iss:key.client_email,
+      scope:'https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email',
+      aud, iat:now, exp:now+3600 };
+    const unsigned = b64url(JSON.stringify(header)) + '.' + b64url(JSON.stringify(claim));
+    const pk = await crypto.subtle.importKey('pkcs8', pemToBuf(key.private_key),
+      { name:'RSASSA-PKCS1-v1_5', hash:'SHA-256' }, false, ['sign']);
+    const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', pk, new TextEncoder().encode(unsigned));
+    const jwt = unsigned + '.' + b64url(sig);
+    const res = await fetch(aud, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:'grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion='+encodeURIComponent(jwt) });
+    if (!res.ok) return null;
+    const j = await res.json();
+    if (!j || !j.access_token) return null;
+    SA_TOKEN = j.access_token;
+    SA_TOKEN_EXP = Date.now() + (((j.expires_in||3600) - 120) * 1000);
+    return SA_TOKEN;
+  } catch(e){ return null; }
+}
+// Returns the query param + value to authenticate the RTDB REST call.
+async function dbCred(env, userToken){
+  const sa = await getSAToken(env);
+  return sa ? { param:'access_token', val:sa } : { param:'auth', val:userToken };
+}
+
 let EMP_CACHE = null, EMP_TS = 0;
-async function getEmployees(token){
+async function getEmployees(cred){
   if (EMP_CACHE && (Date.now() - EMP_TS) < 45000) return EMP_CACHE;
   try{
-    const r = await fetch(RTDB + '/employees.json?auth=' + encodeURIComponent(token));
+    const r = await fetch(RTDB + '/employees.json?' + cred.param + '=' + encodeURIComponent(cred.val));
     if(!r.ok) return EMP_CACHE || {};
     EMP_CACHE = (await r.json()) || {}; EMP_TS = Date.now();
     return EMP_CACHE;
@@ -118,8 +187,12 @@ export default {
     let path = p.path || '/.json'; if (path[0] !== '/') path = '/' + path;
     const token = p.token || '';
 
+    // Resolve the DB credential once: service-account token if available, else the
+    // caller's ID token (fallback = pre-Stage-2 behavior).
+    const cred = await dbCred(env, token);
+
     const forward = async (body) => {
-      const rurl = RTDB + path + (path.indexOf('?')>=0?'&':'?') + 'auth=' + encodeURIComponent(token);
+      const rurl = RTDB + path + (path.indexOf('?')>=0?'&':'?') + cred.param + '=' + encodeURIComponent(cred.val);
       const opts = { method };
       if (body !== undefined && method!=='GET' && method!=='DELETE'){ opts.headers={'Content-Type':'application/json'}; opts.body=JSON.stringify(body); }
       return fetch(rurl, opts);
@@ -142,7 +215,7 @@ export default {
         const sensitive = (coll==='employees')||HR_OWNED[coll]||HR_ADMIN[coll]||FIN_COLLS[coll]||ADMIN_READ[coll];
         if (!sensitive) return await pass();
 
-        const ctx = ctxFor(email, await getEmployees(token));
+        const ctx = ctxFor(email, await getEmployees(cred));
         // fully denied -> return empty without even fetching
         if (ADMIN_READ[coll] && !ctx.admin) return new Response('{}',{status:200,headers:CORS});
         if (FIN_COLLS[coll]  && !ctx.fin)   return new Response('{}',{status:200,headers:CORS});
@@ -158,7 +231,7 @@ export default {
       }
 
       // ===================== WRITES =====================
-      const ctx = ctxFor(email, await getEmployees(token));
+      const ctx = ctxFor(email, await getEmployees(cred));
 
       if (segs.length === 0) return deny('root write');
       if (!id) { if (method !== 'POST' && !ctx.admin) return deny('bulk write requires admin'); }
@@ -182,7 +255,7 @@ export default {
       else if (coll === 'audit')  { if (method!=='POST' && !ctx.admin) return deny('audit is append-only'); }
       else if (SALES_COLLS[coll] && method==='DELETE' && id) {
         if (!(ctx.admin || ctx.rank>=ROLE_RANK['Manager'] || ctx.scope==='all')) {
-          const rr=await fetch(RTDB+'/'+coll+'/'+id+'.json?auth='+encodeURIComponent(token));
+          const rr=await fetch(RTDB+'/'+coll+'/'+id+'.json?'+cred.param+'='+encodeURIComponent(cred.val));
           const rec=rr.ok? await rr.json():null;
           if(rec && !recordIsMine(rec,ctx)) return deny('delete others\' record');
         }
