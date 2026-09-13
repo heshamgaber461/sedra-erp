@@ -1615,16 +1615,25 @@ function editCustomer(id){
     ()=>{ const d={name:val('cu_name'),ctype:val('cu_type'),branch:val('cu_branch'),contact:val('cu_contact'),phone:val('cu_phone'),email:val('cu_email'),city:val('cu_city'),creditLimit:num(val('cu_credit')),address:val('cu_address'),notes:val('cu_notes')};
       if(!d.name){alert('Name required');return false;} if(!id)d.created=new Date().toISOString(); saveDoc('customers',d,id); });
 }
+const INV_UNITS=['pcs','set','unit','m','m²','box','pack','roll','kit','pair','license','hour'];
 function editItem(id){
-  const r=id?inventory.find(x=>x.id===id):{branch:defBranch(),qty:0,min:0,warehouse:'Main'};
+  const r=id?inventory.find(x=>x.id===id):{branch:defBranch(),qty:0,min:0,warehouse:'Main',unit:'pcs'};
   const whs=warehouseList();
+  const supNames=[...new Set((suppliers||[]).map(s=>s.name).filter(Boolean))];
+  const cats=[...new Set((inventory||[]).map(x=>x.category).filter(Boolean))].sort();
   openModal(id?'Edit item':'Add item',
-    `<div class="row2">${fEl('Item name','i_name',r.name)}${fEl('SKU','i_sku',r.sku)}</div>`+
-    `<div class="row2">${fEl('Category','i_cat',r.category)}${selEl('Branch','i_branch',branchOpts(),r.branch)}</div>`+
-    `<div class="row2"><div class="fld"><label>Warehouse</label><input id="i_wh" list="i_whl" value="${esc(r.warehouse||'Main')}"><datalist id="i_whl">${whs.map(w=>`<option value="${esc(w)}">`).join('')}</datalist></div>${fEl('Location / shelf','i_loc',r.location)}</div>`+
-    `<div class="row2">${fEl('Quantity','i_qty',r.qty,'number')}${fEl('Min stock','i_min',r.min,'number')}</div>`+
-    fEl('Unit cost','i_cost',r.cost,'number'),
-    ()=>{ const d={name:val('i_name'),sku:val('i_sku'),category:val('i_cat'),branch:val('i_branch'),warehouse:(val('i_wh')||'Main'),qty:num(val('i_qty')),min:num(val('i_min')),cost:num(val('i_cost')),location:val('i_loc')};
+    `<div class="row2">${fEl('Item name','i_name',r.name)}${fEl('SKU / code','i_sku',r.sku)}</div>`+
+    `<div class="row2">${fEl('Brand','i_brand',r.brand)}${fEl('Model / part no.','i_model',r.model)}</div>`+
+    `<div class="row2"><div class="fld"><label>Category</label><input id="i_cat" list="i_catl" value="${esc(r.category||'')}" placeholder="${lang==='ar'?'اختر أو اكتب':'pick or type'}"><datalist id="i_catl">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div><div class="fld"><label>Unit</label><input id="i_unit" list="i_unitl" value="${esc(r.unit||'pcs')}"><datalist id="i_unitl">${INV_UNITS.map(u=>`<option value="${u}">`).join('')}</datalist></div></div>`+
+    `<div class="row2">${selEl('Branch','i_branch',branchOpts(),r.branch)}<div class="fld"><label>Warehouse</label><input id="i_wh" list="i_whl" value="${esc(r.warehouse||'Main')}"><datalist id="i_whl">${whs.map(w=>`<option value="${esc(w)}">`).join('')}</datalist></div></div>`+
+    `<div class="row2">${fEl('Location / shelf','i_loc',r.location)}${fEl('Barcode','i_barcode',r.barcode)}</div>`+
+    `<div class="row2">${fEl('Quantity in stock','i_qty',r.qty,'number')}${fEl('Min stock (reorder level)','i_min',r.min,'number')}</div>`+
+    `<div class="row2">${fEl('Unit cost','i_cost',r.cost,'number')}${fEl('Selling price (used in quotes)','i_price',r.price,'number')}</div>`+
+    `<div class="row2"><div class="fld"><label>Supplier</label><input id="i_sup" list="i_supl" value="${esc(r.supplier||'')}"><datalist id="i_supl">${supNames.map(s=>`<option value="${esc(s)}">`).join('')}</datalist></div>${fEl('Warranty','i_warr',r.warranty)}</div>`+
+    (r.image?`<div class="fld"><label>${lang==='ar'?'الصورة الحالية':'Current image'}</label><div><img src="${esc(r.image)}" style="max-height:100px;border:1px solid var(--mist);border-radius:8px;background:#fff;padding:2px"></div></div>`:'')+
+    fileField('i_img',(lang==='ar'?'صورة المنتج — ارفع صورة أو الصق لينك':'Product image — upload a photo or paste a link'),r.image)+
+    fTa('Description / specifications','i_desc',r.desc||r.description),
+    ()=>{ const d={name:val('i_name'),sku:val('i_sku'),brand:val('i_brand'),model:val('i_model'),category:val('i_cat'),unit:val('i_unit')||'pcs',branch:val('i_branch'),warehouse:(val('i_wh')||'Main'),location:val('i_loc'),barcode:val('i_barcode'),qty:num(val('i_qty')),min:num(val('i_min')),cost:num(val('i_cost')),price:num(val('i_price')),supplier:val('i_sup'),warranty:val('i_warr'),image:fileVal('i_img'),desc:val('i_desc')};
       if(!d.name){alert('Name required');return false;} saveDoc('inventory',d,id); });
 }
 function custInvoices(c){ return invoices.filter(v=>v.customerId===c.id||nameEq(v.client,c.name)); }
