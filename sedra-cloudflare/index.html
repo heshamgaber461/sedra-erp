@@ -926,6 +926,19 @@ function dupReassign(id,name){ if(!id||!name)return; var priv=(typeof seesAll===
   var l=(leads||[]).find(function(x){return x.id===id;}); if(l){ l.owner=name; l.ownerEmail=((e&&e.email)||'').toLowerCase(); l.pool=false; }
   var el=g('dupres'); if(el){ var note=document.createElement('div'); note.className='mini'; note.style.cssText='color:#1a7a4f;font-weight:700;margin-top:6px'; note.textContent=(lang==='ar'?'✅ اتحوّلت لـ ':'✅ Reassigned to ')+name; el.appendChild(note); }
   setTimeout(function(){ try{ runDupCheck(); }catch(e){} },500); }
+/* Auto-update nudge: the app document is served network-first, so a reload always gets the
+   latest deploy. This checks the deployed index.html's ETag periodically and on tab focus, and
+   shows a one-click "Refresh" toast when a newer version is live — so nobody runs stale code. */
+var _appEtag=null, _updSetup=false;
+function _showUpdateToast(){ if(document.getElementById('appUpd'))return;
+  var d=document.createElement('div'); d.id='appUpd';
+  d.style.cssText='position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:99999;background:#0e2c49;color:#fff;padding:12px 18px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.35);display:flex;gap:12px;align-items:center;font-family:inherit;font-size:14px;max-width:92vw';
+  d.innerHTML='<span>'+(lang==='ar'?'🚀 نزل تحديث جديد للنظام':'🚀 A new version is available')+'</span><button style="background:#37c0dc;color:#0e2c49;border:0;font-weight:800;padding:7px 14px;border-radius:8px;cursor:pointer" onclick="location.reload(true)">'+(lang==='ar'?'تحديث الآن':'Refresh now')+'</button>';
+  document.body.appendChild(d); }
+function _checkAppUpdate(){ try{ fetch('/index.html',{method:'HEAD',cache:'no-store'}).then(function(r){ var tag=r.headers.get('etag')||r.headers.get('last-modified')||''; if(!tag)return; if(_appEtag && tag!==_appEtag){ _showUpdateToast(); } else if(!_appEtag){ _appEtag=tag; } }).catch(function(){}); }catch(e){} }
+function _setupUpdateCheck(){ if(_updSetup)return; _updSetup=true;
+  try{ fetch('/index.html',{method:'HEAD',cache:'no-store'}).then(function(r){ _appEtag=r.headers.get('etag')||r.headers.get('last-modified')||''; }).catch(function(){}); }catch(e){}
+  try{ setInterval(_checkAppUpdate, 5*60*1000); window.addEventListener('focus',_checkAppUpdate); document.addEventListener('visibilitychange',function(){ if(!document.hidden)_checkAppUpdate(); }); }catch(e){} }
 /* ===================== INIT / AUTH ===================== */
 function initBackend(){
   try{ firebase.initializeApp(firebaseConfig); auth=firebase.auth(); }
@@ -1116,7 +1129,7 @@ function ensureAdminDoc(u){
 function pickBranch(b){ curBranch=b; localStorage.setItem('sedra_branch',b); enterApp(); }
 function enterApp(){ appReady=true; lastSig=''; hideLoad(); hideGate(); g('app').classList.remove('hide'); buildNav();
   try{ var _dh=DEPT_HOME[me.dept]||'hub'; var _dm=MODULES.find(function(x){return x.id===_dh;}); curView=(_dm&&canSee(_dm))?_dh:'hub'; }catch(e){ curView='hub'; }
-  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); migrateStagesOnce(); }
+  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); migrateStagesOnce(); _setupUpdateCheck(); }
 
 /* ---- "My Tasks" pop-up on first open each day (Phase 1) ---- */
 function maybeTasksPopup(){
