@@ -3239,7 +3239,23 @@ function qSecRender(){ const el=g('qSec'); if(!el)return;
   qRecalc();
 }
 function qCurRate(){ var cur=(g('q_cur')&&val('q_cur'))||'EGP'; if(cur==='EGP') return 1; var man=g('q_fxman')&&g('q_fxman').checked; if(man){ var r=num(val('q_fx')); return r>0?r:fxRateFor(cur); } return fxRateFor(cur); }
-function qCurChange(){ var cur=(g('q_cur')&&val('q_cur'))||'EGP'; var man=g('q_fxman')&&g('q_fxman').checked; var fx=g('q_fx'); if(fx){ fx.disabled=!man; if(!man) fx.value=(cur==='EGP'?'':fxRateFor(cur)); else if(!num(fx.value)) fx.value=fxRateFor(cur); } var info=g('q_fxinfo'); if(info){ info.textContent = cur==='EGP'?(lang==='ar'?'العملة الأساسية':'base currency'):((fxDate()?('auto '+fxDate()+' — '):'')+'1 EGP = '+fxRateFor(cur)+' '+cur); } qRecalc(); }
+function qCurChange(){ var sel=g('q_cur'); var cur=(sel&&sel.value)||'EGP'; var man=g('q_fxman')&&g('q_fxman').checked; var fx=g('q_fx'); if(fx){ fx.disabled=!man; if(!man) fx.value=(cur==='EGP'?'':fxRateFor(cur)); else if(!num(fx.value)) fx.value=fxRateFor(cur); } var info=g('q_fxinfo'); if(info){ info.textContent = cur==='EGP'?(lang==='ar'?'العملة الأساسية':'base currency'):((fxDate()?('auto '+fxDate()+' — '):'')+'1 EGP = '+fxRateFor(cur)+' '+cur); }
+  /* When the currency changes, convert every line-item unit price from the OLD currency
+     to the NEW one (ratio = newRate/oldRate) so prices move WITH the currency. The rate
+     the current prices are expressed in is remembered on the select (data-rate); on the
+     first call (editor open) we only record it, we don't convert. */
+  var newRate=qCurRate();
+  if(sel){ var prev=sel.getAttribute('data-rate');
+    if(prev!=null){ var oldRate=num(prev);
+      if(oldRate>0 && newRate>0 && Math.abs(newRate-oldRate)>1e-9){
+        var ratio=newRate/oldRate; qReadDOM();
+        _qsec.forEach(function(s){ (s.items||[]).forEach(function(it){ var p=num(it.price); if(p) it.price=Math.round(p*ratio*100)/100; }); });
+        qSecRender();
+      }
+    }
+    sel.setAttribute('data-rate', newRate);
+  }
+  qRecalc(); }
 function qRecalc(){ qReadDOM(); const cur=(g('q_cur')&&val('q_cur'))||'EGP'; const vat=num(val('q_vat')); const rate=qCurRate(); const f=n=>Number(num(n)).toLocaleString(undefined,{maximumFractionDigits:2}); let sub=0;
   _qsec.forEach((s,si)=>{ (s.items||[]).forEach((it,ii)=>{ const t=num(it.qty)*num(it.price); sub+=t; const c=g('q_'+si+'_'+ii+'_sub'); if(c)c.textContent=f(t)+' '+cur; }); });
   const v=sub*vat/100; const tot=g('qTotals'); const baseNote=cur!=='EGP'?`<div class="mini" style="text-align:right;color:var(--muted)">≈ ${Math.round(rate>0?(sub+v)/rate:(sub+v)).toLocaleString()} EGP (base)</div>`:'';
@@ -3469,8 +3485,9 @@ function printQuote(id){
   .c{text-align:center}.r{text-align:right}.br{color:#6c7c8c}.pn{font-weight:800;color:#0e2c49}
   .sect{background:#123a5f;color:#fff;font-weight:800;padding:9px 14px;display:flex;justify-content:space-between}
   .fin{border:2px solid #0e2c49;border-radius:10px;overflow:hidden;max-width:420px;margin:16px 0 16px auto}
-  .fin .r2{display:flex;justify-content:space-between;padding:10px 16px;font-size:13px;border-bottom:1px solid #eee}
-  .fin .g{background:#0e2c49;color:#fff;display:flex;justify-content:space-between;padding:13px 16px;font-size:17px;font-weight:800}
+  .fin .r2{display:flex;justify-content:space-between;gap:24px;padding:10px 16px;font-size:13px;border-bottom:1px solid #eee}
+  .fin .g{background:#0e2c49;color:#fff;display:flex;justify-content:space-between;gap:24px;padding:13px 16px;font-size:17px;font-weight:800}
+  .fin .g span:last-child,.fin .r2 b{white-space:nowrap}
   .cols{display:flex;gap:16px;flex-wrap:wrap;margin-top:6px}.col{flex:1;min-width:230px;border:1px solid #d7dee6;border-radius:8px;padding:14px;page-break-inside:avoid}
   .col h3{margin:0 0 8px;color:#0e2c49;font-size:13px}.col ul{margin:0;padding-inline-start:16px;line-height:1.8;font-size:12px}
   .tc{font-size:12.5px;color:#263646;line-height:1.7}.tc-h{font-weight:800;color:#0e2c49;margin:10px 0 3px}.tc-b{padding-inline-start:18px;position:relative}.tc-b:before{content:"·";position:absolute;inset-inline-start:6px;color:#37c0dc;font-weight:800}.tc-p{padding-inline-start:2px}
