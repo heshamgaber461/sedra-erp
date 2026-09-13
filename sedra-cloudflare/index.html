@@ -3342,12 +3342,46 @@ function qPickProduct(si,ii,val){ var v=String(val||'').trim(); var lv=v.toLower
   qReadDOM(); const it=_qsec[si].items[ii];
   if(p){ it.item=p.sku||p.code||it.item||''; it.desc=p.name||p.desc||it.desc||''; if(p.brand)it.brand=p.brand; const pr=num(p.price)||num(p.cost); if(pr){ var _rt=qCurRate(); it.price=(_rt&&_rt!==1)?Math.round(pr*_rt*100)/100:pr; } if(p.image)it.image=p.image; }
   qSecRender(); }
+/* Rich product picker — a searchable overlay (above the quote modal) that shows each product's
+   photo, name, brand, SKU and price; click one to fill the line. Much clearer than the native
+   datalist over ~2000 items. */
+function qProductPicker(si,ii){
+  qReadDOM();
+  var ov=document.getElementById('qpick'); if(ov)ov.remove();
+  ov=document.createElement('div'); ov.id='qpick';
+  ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(8,22,38,.55);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto';
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;max-width:720px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.4);overflow:hidden" onclick="event.stopPropagation()">'
+    +'<div style="padding:14px 16px;border-bottom:1px solid #e3edf4;display:flex;gap:8px;align-items:center"><b style="color:var(--navy);font-size:15px">📦 '+(lang==='ar'?'اختر منتج من المخزون':'Pick a product')+'</b><span style="flex:1"></span><button onclick="qpickClose()" style="border:0;background:#eef3f8;border-radius:8px;padding:6px 12px;cursor:pointer;font-weight:800">✕</button></div>'
+    +'<div style="padding:12px 16px"><input id="qpickq" autocomplete="off" placeholder="'+(lang==='ar'?'ابحث بالاسم أو الكود أو الماركة…':'Search by name, code or brand…')+'" style="width:100%;padding:10px 12px;border:1px solid #cdd;border-radius:10px;font-size:14px" oninput="qpickRender('+si+','+ii+')"></div>'
+    +'<div id="qpicklist" style="max-height:58vh;overflow:auto;padding:0 16px 16px"></div></div>';
+  ov.onclick=function(){ qpickClose(); };
+  document.body.appendChild(ov);
+  var inp=document.getElementById('qpickq'); if(inp)inp.focus();
+  qpickRender(si,ii);
+}
+function qpickClose(){ var ov=document.getElementById('qpick'); if(ov)ov.remove(); }
+function qpickRender(si,ii){
+  var q=(document.getElementById('qpickq')||{}).value||''; var lv=q.toLowerCase().trim();
+  var list=(inventory||[]).filter(inBranch);
+  if(lv){ var terms=lv.split(/\s+/); list=list.filter(function(p){ var s=((p.name||'')+' '+(p.brand||'')+' '+(p.sku||'')+' '+(p.model||'')).toLowerCase(); return terms.every(function(t){return s.indexOf(t)>=0;}); }); }
+  var total=list.length; list=list.slice(0,60);
+  var el=document.getElementById('qpicklist'); if(!el)return;
+  if(!list.length){ el.innerHTML='<div class="mini" style="padding:24px;text-align:center;color:var(--muted)">'+(lang==='ar'?'لا نتائج — جرّب كلمة تانية':'No results — try another word')+'</div>'; return; }
+  var rt=qCurRate(); var cur=(g('q_cur')&&val('q_cur'))||'EGP';
+  el.innerHTML=list.map(function(p){ var pr=num(p.price)||num(p.cost); var shown=(rt&&rt!==1)?Math.round(pr*rt*100)/100:pr;
+    var img=p.image?('<img src="'+esc(p.image)+'" style="width:46px;height:46px;object-fit:contain;border-radius:8px;background:#f4f8fb;flex-shrink:0">'):('<div style="width:46px;height:46px;border-radius:8px;background:#eef3f8;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#9fb3c4;font-size:18px">📦</div>');
+    return '<div onclick="qpickChoose('+si+','+ii+',\''+p.id+'\')" style="display:flex;gap:10px;align-items:center;padding:8px;border-bottom:1px solid #eef3f5;cursor:pointer;border-radius:8px" onmouseover="this.style.background=\'#f4f8fb\'" onmouseout="this.style.background=\'transparent\'">'+img+'<div style="min-width:0;flex:1"><div style="font-weight:700;color:#1c2b3a;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.name||'')+'</div><div class="mini" style="color:var(--muted)">'+esc(p.brand||'-')+(p.sku?(' · '+esc(p.sku)):'')+'</div></div>'+(pr?('<div style="font-weight:800;color:var(--navy);white-space:nowrap;font-size:13px">'+nfmt(shown)+' '+cur+'</div>'):'')+'</div>';
+  }).join('')+(total>list.length?('<div class="mini" style="padding:10px;text-align:center;color:var(--muted)">'+(lang==='ar'?('أول 60 من '+total+' نتيجة — اكتب أكتر للتضييق'):('Showing 60 of '+total+' — type to narrow'))+'</div>'):'');
+}
+function qpickChoose(si,ii,pid){ var p=(inventory||[]).find(function(x){return x.id===pid;}); if(!p){ qpickClose(); return; } qReadDOM(); var it=_qsec[si].items[ii];
+  it.item=p.sku||p.code||it.item||''; it.desc=p.name||p.desc||''; if(p.brand)it.brand=p.brand; var pr=num(p.price)||num(p.cost); if(pr){ var rt=qCurRate(); it.price=(rt&&rt!==1)?Math.round(pr*rt*100)/100:pr; } if(p.image)it.image=p.image;
+  qpickClose(); qSecRender(); }
 function qSecRender(){ const el=g('qSec'); if(!el)return;
   const dl=`<datalist id="prod_dl">${inventory.filter(inBranch).map(p=>`<option value="${esc((p.sku?p.sku+' — ':'')+(p.name||''))}">`).join('')}</datalist><datalist id="sys_dl">${QSYS_ALL.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>`;
   el.innerHTML=dl+_qsec.map((s,si)=>{
     const rows=(s.items||[]).map((it,ii)=>`<tr>
       <td><input id="q_${si}_${ii}_item" value="${esc(it.item||'')}" placeholder="Item" style="width:84px"></td>
-      <td><input id="q_${si}_${ii}_desc" list="prod_dl" value="${esc(it.desc||'')}" placeholder="Description / pick product" onchange="qPickProduct(${si},${ii},this.value)" style="width:100%;min-width:150px"></td>
+      <td><div style="display:flex;gap:6px;align-items:center">${it.image?`<img src="${esc(it.image)}" title="${lang==='ar'?'صورة المنتج':'product image'}" style="width:34px;height:34px;object-fit:contain;border-radius:6px;background:#f4f8fb;flex-shrink:0">`:''}<input id="q_${si}_${ii}_desc" list="prod_dl" value="${esc(it.desc||'')}" placeholder="Description / pick product" onchange="qPickProduct(${si},${ii},this.value)" style="flex:1;min-width:130px"><button type="button" class="btn cy sm" title="${lang==='ar'?'اختر منتج من المخزون':'Pick product from inventory'}" onclick="qProductPicker(${si},${ii})" style="flex-shrink:0">📦</button></div></td>
       <td><input id="q_${si}_${ii}_brand" value="${esc(it.brand||'')}" placeholder="Brand" style="width:80px"></td>
       <td><input id="q_${si}_${ii}_qty" type="number" value="${num(it.qty)||1}" style="width:50px" oninput="qRecalc()"></td>
       <td><input id="q_${si}_${ii}_price" type="number" value="${num(it.price)||0}" style="width:74px" oninput="qRecalc()"></td>
