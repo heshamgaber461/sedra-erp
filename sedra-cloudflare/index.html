@@ -870,7 +870,7 @@ function dupLookupHits(q){
         if(toks.indexOf(nk)>=0){ by.project=1; hitHere=true; }
         else if(nk.length>=4){ var pjn=_nk(r.projects||r.project); if(pjn && pjn.indexOf(nk)>=0){ by.project=1; hitHere=true; } }
       }
-      if(hitHere){ mods[label]=1; if(!best) best={coll:coll,label:label,name:(r.name||r.client||r.company||'—'),owner:(r.owner||'—')}; }
+      if(hitHere){ mods[label]=1; if(!best) best={coll:coll,label:label,id:(r.id||null),name:(r.name||r.client||r.company||'—'),owner:(r.owner||'—')}; }
     }
   }
   var keys=Object.keys(by); if(!keys.length) return null;
@@ -898,12 +898,34 @@ function runDupCheck(){
     var whereTxt=(res.mods||[]).join(lang==='ar'?' و ':', ');
     var priv=(typeof seesAll==='function'&&seesAll())||(typeof isMgr==='function'&&isMgr());
     var ownerLine = (priv && res.rec) ? ('<br>'+(lang==='ar'?'السجل: ':'Record: ')+'<b>'+esc(res.rec.name)+'</b> — '+(lang==='ar'?'المالك: ':'owner: ')+'<b>'+esc(res.rec.owner)+'</b>') : ('<br>'+(lang==='ar'?'لو عايز تعرف مين شغّال عليه، كلّم الأدمن.':'To find who owns it, ask the admin.'));
-    el.innerHTML='<div style="background:#fdecec;border:1px solid #f0b4b4;color:#b02a2a;border-radius:10px;padding:12px;font-weight:700">🚫 '+(lang==='ar'?'موجود بالفعل':'Already registered')+'<div class="mini" style="color:#b02a2a;font-weight:400;margin-top:4px">'+(lang==='ar'?'اتطابق في: ':'Matched by: ')+'<b>'+label+'</b>'+(whereTxt?(' · '+(lang==='ar'?'مكانه: ':'in: ')+'<b>'+esc(whereTxt)+'</b>'):'')+ownerLine+'</div></div>';
+    /* Privileged users (super-admin / manager) can open/edit the existing record and, for leads, reassign it to another employee. */
+    var actHTML='';
+    if(priv && res.rec && res.rec.id){
+      var rid=esc(res.rec.id), rcoll=esc(res.rec.coll);
+      var editBtn='<button class="btn gh sm" onclick="dupOpenRec(\''+rcoll+'\',\''+rid+'\')">'+(lang==='ar'?'✏️ فتح / تعديل':'✏️ Open / edit')+'</button>';
+      var reBtn='';
+      if(res.rec.coll==='leads'){
+        reBtn='<select onchange="if(this.value){dupReassign(\''+rid+'\',this.value)}" style="padding:5px 8px;border-radius:7px;border:1px solid var(--cyan);font-size:12px;background:#eafaf1;color:var(--navy);font-weight:700;max-width:180px"><option value="">'+(lang==='ar'?'أعِد التعيين لموظف… ▾':'Reassign to… ▾')+'</option>'+(employees||[]).slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');}).map(function(e){return e.name?('<option>'+esc(e.name)+'</option>'):'';}).join('')+'</select>';
+      }
+      actHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'+editBtn+reBtn+'</div>';
+    }
+    el.innerHTML='<div style="background:#fdecec;border:1px solid #f0b4b4;color:#b02a2a;border-radius:10px;padding:12px;font-weight:700">🚫 '+(lang==='ar'?'موجود بالفعل':'Already registered')+'<div class="mini" style="color:#b02a2a;font-weight:400;margin-top:4px">'+(lang==='ar'?'اتطابق في: ':'Matched by: ')+'<b>'+label+'</b>'+(whereTxt?(' · '+(lang==='ar'?'مكانه: ':'in: ')+'<b>'+esc(whereTxt)+'</b>'):'')+ownerLine+'</div>'+actHTML+'</div>';
   } else {
     el.innerHTML='<div style="background:#e9f8ef;border:1px solid #a9e0c0;color:#1a7a4f;border-radius:10px;padding:12px;font-weight:700">✅ '+(lang==='ar'?'متاح — مش متسجّل':'Available — not registered')+'<div class="mini" style="color:#1a7a4f;font-weight:400;margin-top:4px">'+(lang==='ar'?'مفيش تطابق في الرقم ولا الاسم ولا الشركة ولا المشروع — تقدر تسجّله.':'No match on phone, name, company, or project — you can register it.')+'</div></div>';
   }
 }
 
+function dupOpenRec(coll,id){ try{
+    if(coll==='leads'&&typeof editLead==='function') return editLead(id);
+    if(coll==='projects'&&typeof editProject==='function') return editProject(id);
+    if(coll==='customers'&&typeof editCustomer==='function') return editCustomer(id);
+  }catch(e){} try{ if(typeof recOpen==='function') recOpen(id); }catch(_){} }
+function dupReassign(id,name){ if(!id||!name)return; var priv=(typeof seesAll==='function'&&seesAll())||(typeof isMgr==='function'&&isMgr()); if(!priv){ alert(lang==='ar'?'الصلاحية للمدير أو الأدمن فقط':'Managers / admins only'); return; }
+  var e=(employees||[]).find(function(x){return x.name===name;});
+  if(typeof assignLead==='function') assignLead(id,name);
+  var l=(leads||[]).find(function(x){return x.id===id;}); if(l){ l.owner=name; l.ownerEmail=((e&&e.email)||'').toLowerCase(); l.pool=false; }
+  var el=g('dupres'); if(el){ var note=document.createElement('div'); note.className='mini'; note.style.cssText='color:#1a7a4f;font-weight:700;margin-top:6px'; note.textContent=(lang==='ar'?'✅ اتحوّلت لـ ':'✅ Reassigned to ')+name; el.appendChild(note); }
+  setTimeout(function(){ try{ runDupCheck(); }catch(e){} },500); }
 /* ===================== INIT / AUTH ===================== */
 function initBackend(){
   try{ firebase.initializeApp(firebaseConfig); auth=firebase.auth(); }
@@ -3416,7 +3438,12 @@ function printQuote(id){
   const termsPage=`<div class="sheet pad"><div class="stitle">Terms &amp; Conditions</div><div class="tc">${(function(){ var ls=terms.length?terms:lines(defQTerms()); return ls.map(function(x){ var s=x.replace(/\t/g,'    '); var tt=s.trim(); if(/^[-•]\s/.test(tt)){ return '<div class="tc-h">'+esc(tt.replace(/^[-•]\s*/,''))+'</div>'; } if(/^·/.test(tt)||/^\s{2,}·/.test(s)){ return '<div class="tc-b">'+esc(tt.replace(/^·\s*/,''))+'</div>'; } return '<div class="tc-p">'+esc(tt)+'</div>'; }).join(''); })()}</div>${excl.length?`<div class="stitle" style="font-size:15px;margin-top:12px">Offer excludes</div><ul style="padding-inline-start:18px;line-height:1.9;font-size:12.5px;color:#3a4a5a">${excl.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}<div class="tc" style="margin-top:12px"><div class="tc-b">This offer is valid for ${num(q.validity)||30} days (until ${esc(validTill||'')}).</div></div>${notesHTML}<div class="sign"><div class="s">Prepared by &mdash; ${esc(q.preparedBy||'-')}</div><div class="s">Client approval &mdash; signature &amp; date</div></div>${ftHTML}</div>`;
   const aboutPage=`<div class="sheet A4 apage"><div class="ap-top"><span class="ap-mk"><img src="${LOGO}" style="height:62px;width:auto"></span><div class="ap-title">About Sedra</div><div class="ap-rule"></div></div><p class="ap-lead">Sedra Electric started in 2014 as an L.L.C company based in Cairo, Egypt. Our focus was consulting and training for solar energy and energy efficiency. With the growing demand for renewable energy, we rebranded with a more professional image to capitalise on our technical know-how and global business network, serving both the Egyptian and international markets with the latest innovative solutions.</p><div class="ap-pillars"><div class="ap-pill"><b>2014</b><span>Established in Cairo, Egypt</span></div><div class="ap-pill"><b>3</b><span>Branches &mdash; Egypt &middot; UAE &middot; KSA</span></div><div class="ap-pill"><b>Smart</b><span>&amp; Low-current systems</span></div></div><div class="ap-band"><div class="ap-band-t">Powering the Future, Simplifying Life</div><div class="ap-band-s">KNX &middot; Wireless &middot; Light Current &middot; Sound System &middot; CCTV &middot; Fire</div></div><div class="ap-foot">info@sedra-electric.com &nbsp;&middot;&nbsp; www.sedra-electric.com &nbsp;&middot;&nbsp; Tel: 0226783906</div></div>`;
   const partnersPage=`<div class="sheet A4 apage"><div class="ap-top"><span class="ap-mk"><img src="${LOGO}" style="height:62px;width:auto"></span><div class="ap-title">Our Partners</div><div class="ap-rule"></div></div><div class="ap-partsub">Authorized integrator of leading global brands</div><div class="ap-logos"><img src="${base}partners-logos.png"></div><div class="ap-foot">info@sedra-electric.com &nbsp;&middot;&nbsp; www.sedra-electric.com &nbsp;&middot;&nbsp; Tel: 0226783906</div></div>`;
-  const bodyHTML=coverHTML+aboutPage+partnersPage+(multi?(sysPages+summaryPage):singlePage)+termsPage;
+  /* First-system cover page after the partners page. Multi-system quotes already show a
+     cover before each system inside sysPages; single-system quotes were skipping it — so
+     show the first system's own cover here (unless the front page is already that image). */
+  const firstSysURL=sysCoverURL((secs[0]&&secs[0].title))||coverURL;
+  const firstSysCoverHTML=(!multi && firstSysURL && firstSysURL!==frontURL)?`<div class="sheet A4 cover"><img src="${firstSysURL}"></div>`:'';
+  const bodyHTML=coverHTML+aboutPage+partnersPage+(multi?(sysPages+summaryPage):(firstSysCoverHTML+singlePage))+termsPage;
   w.document.write(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=822, initial-scale=1"><title>${esc(q.number||'Quotation')} &mdash; Sedra</title>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,600;0,700;0,800;1,800&display=swap" rel="stylesheet">
   <style>
