@@ -3482,7 +3482,10 @@ function editQuote(id){
       if(!d.client){alert('Client name required');return false;} if(!secs.length){alert('Add at least one line item with a description.');return false;} if(!id){d.created=new Date().toISOString(); d.number=genQuoteNo(svcKey(d.service));}
       /* Version history: append this saved state as a version so any past version can be restored later. */
       var _prevHist=Array.isArray(r.history)?r.history.slice(-40):[]; d.history=_prevHist.concat([qSnap(d)]);
-      saveDoc('quotes',d,id); });
+      saveDoc('quotes',d,id);
+      /* Update the in-memory quote immediately so Print / view reflect the edits at once
+         (otherwise the change only appears after the next background sync). */
+      try{ if(id){ var _qq=quotes.find(function(x){return x.id===id;}); if(_qq) Object.assign(_qq,d); } }catch(e){} });
   qSecRender(); try{ qCurChange(); }catch(e){}
 }
 /* ---- Quote version history: snapshot on every save; restore any past version ---- */
