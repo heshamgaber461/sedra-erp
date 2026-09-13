@@ -926,6 +926,37 @@ function dupReassign(id,name){ if(!id||!name)return; var priv=(typeof seesAll===
   var l=(leads||[]).find(function(x){return x.id===id;}); if(l){ l.owner=name; l.ownerEmail=((e&&e.email)||'').toLowerCase(); l.pool=false; }
   var el=g('dupres'); if(el){ var note=document.createElement('div'); note.className='mini'; note.style.cssText='color:#1a7a4f;font-weight:700;margin-top:6px'; note.textContent=(lang==='ar'?'✅ اتحوّلت لـ ':'✅ Reassigned to ')+name; el.appendChild(note); }
   setTimeout(function(){ try{ runDupCheck(); }catch(e){} },500); }
+/* One-time import: assign the "AD" phone list (adel-import.json) to sales rep Mohamed Adel.
+   Existing phones are reassigned to him (owner/ownerEmail/pool), missing ones are created.
+   Runs once (settings.adelImportDone), admin-only, as the app so bulk lead writes are allowed. */
+async function importAdelOnce(){
+  try{
+    if(typeof isAdmin==='function'?!isAdmin():true) return;
+    if(settings && settings.adelImportDone) return;
+    var rep=null; try{ rep=await fetch('/adel-import.json?nc='+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}); }catch(e){ return; }
+    if(!rep||!rep.length) return;
+    var adel=(employees||[]).find(function(e){return (e.email||'').toLowerCase()==='m.adel@sedra-electric.com';}) || (employees||[]).find(function(e){return /mohamed/i.test(e.name||'')&&/adel/i.test(e.name||'');});
+    if(!adel) return;
+    var oname=adel.name||'Mohamed adel', oemail=(adel.email||'').toLowerCase();
+    var pkf=(typeof _pk==='function')?_pk:function(x){return String(x||'').replace(/\D/g,'');};
+    var map={}; (leads||[]).forEach(function(l){ var k=pkf(l.phone); if(k)(map[k]=map[k]||[]).push(l); });
+    var upd={}, created=0, updated=0, nowd=(typeof today==='function')?today():new Date().toISOString().slice(0,10), newLeads=[];
+    rep.forEach(function(row){ var k=pkf(row.p); if(!k) return;
+      if(map[k]){ map[k].forEach(function(l){
+        upd[l.id+'/owner']=oname; upd[l.id+'/ownerEmail']=oemail; upd[l.id+'/pool']=false; upd[l.id+'/assignedAt']=nowd;
+        var nm=(l.name||'').trim(); if((!nm||nm===row.p||pkf(nm)===k)&&row.n) upd[l.id+'/name']=row.n;
+        if((!l.note||!String(l.note).trim())&&row.note) upd[l.id+'/note']=row.note;
+        l.owner=oname; l.ownerEmail=oemail; l.pool=false; updated++;
+      }); }
+      else { newLeads.push({name:row.n||row.p, phone:row.p, owner:oname, ownerEmail:oemail, pool:false, source:'Meta Ads', note:row.note||'', branch:'Egypt', stage:'New', assignedAt:nowd, created:new Date().toISOString(), importName:'AD list — Mohamed Adel'}); }
+    });
+    if(Object.keys(upd).length){ try{ await apiCall('PATCH','/leads.json',upd); }catch(e){} }
+    for(var i=0;i<newLeads.length;i++){ try{ var id=await apiAdd('leads',newLeads[i]); newLeads[i].id=id; if(id){leads.push(newLeads[i]); created++;} }catch(e){} }
+    try{ await apiMerge('meta','settings',{adelImportDone:true}); }catch(e){} if(!settings)settings={}; settings.adelImportDone=true;
+    try{ render(); }catch(e){}
+    try{ alert(lang==='ar'?('تم استيراد قائمة Mohamed Adel:\n- تحديث '+updated+' عميل موجود وتحويلهم له\n- إضافة '+created+' عميل جديد'):('Mohamed Adel list imported:\n- '+updated+' existing reassigned\n- '+created+' new created')); }catch(e){}
+  }catch(e){}
+}
 /* Auto-update nudge: the app document is served network-first, so a reload always gets the
    latest deploy. This checks the deployed index.html's ETag periodically and on tab focus, and
    shows a one-click "Refresh" toast when a newer version is live — so nobody runs stale code. */
@@ -1129,7 +1160,7 @@ function ensureAdminDoc(u){
 function pickBranch(b){ curBranch=b; localStorage.setItem('sedra_branch',b); enterApp(); }
 function enterApp(){ appReady=true; lastSig=''; hideLoad(); hideGate(); g('app').classList.remove('hide'); buildNav();
   try{ var _dh=DEPT_HOME[me.dept]||'hub'; var _dm=MODULES.find(function(x){return x.id===_dh;}); curView=(_dm&&canSee(_dm))?_dh:'hub'; }catch(e){ curView='hub'; }
-  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); migrateStagesOnce(); _setupUpdateCheck(); }
+  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); migrateStagesOnce(); importAdelOnce(); _setupUpdateCheck(); }
 
 /* ---- "My Tasks" pop-up on first open each day (Phase 1) ---- */
 function maybeTasksPopup(){
