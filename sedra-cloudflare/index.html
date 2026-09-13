@@ -5705,15 +5705,183 @@ function repCompute(){
   rows.forEach(v=>{ let k=(typeof acc==='function'?acc(v):(v[acc]))||'—'; (map[k]=map[k]||{k:k,count:0,sum:0}); map[k].count++; map[k].sum+=ds.amount(v); });
   return Object.keys(map).map(k=>map[k]).sort((a,b)=> repMeasure==='sum'? b.sum-a.sum : b.count-a.count);
 }
+/* ===== Reports / BI center — tabs, period filter, branch/source/team breakdowns ===== */
+let repTab='exec', repPeriod='ytd';
+const REP_PERIODS=[['mtd','This month'],['qtd','This quarter'],['ytd','This year'],['12m','Last 12 months'],['all','All time']];
+function repPeriodRange(){ const now=new Date(); let from;
+  if(repPeriod==='mtd') from=new Date(now.getFullYear(),now.getMonth(),1);
+  else if(repPeriod==='qtd') from=new Date(now.getFullYear(),Math.floor(now.getMonth()/3)*3,1);
+  else if(repPeriod==='ytd') from=new Date(now.getFullYear(),0,1);
+  else if(repPeriod==='12m') from=new Date(now.getFullYear(),now.getMonth()-11,1);
+  else from=new Date(2000,0,1);
+  return {from:from,to:now}; }
+function repInPeriod(iso){ if(repPeriod==='all')return true; if(!iso)return false; var d=new Date(iso); if(isNaN(d))return false; var r=repPeriodRange(); return d>=r.from && d<=r.to; }
+function repD(r){ return r.date||r.created||r.at||''; }
+function repLeads(){ return (leads||[]).filter(inBranch).filter(canSeeLead).filter(l=>repInPeriod(l.created||l.date)); }
+function repQuotes(){ return (quotes||[]).filter(inBranch).filter(q=>repInPeriod(repD(q))); }
+function repInvoices(){ return (invoices||[]).filter(inBranch).filter(v=>repInPeriod(repD(v))); }
+function repExpenses(){ return (expenses||[]).filter(inBranch).filter(v=>repInPeriod(repD(v))); }
+function repMonthsN(){ return repPeriod==='mtd'?1:(repPeriod==='qtd'?3:(repPeriod==='ytd'?(new Date().getMonth()+1):12)); }
+function repSum(a,f){ var s=0; a.forEach(function(x){ s+=num(f(x)); }); return s; }
+function repMoney(n){ return curBranch!=='All'?money(curBranch,n):(Math.round(num(n)).toLocaleString()+' EGP'); }
+function repKpi(n,label,sub,color){ return `<div class="card kpi" style="text-align:center"><div class="n" style="${color?('color:'+color):''}">${n}</div><div class="l">${esc(label)}</div>${sub?`<div class="mini" style="margin-top:2px">${esc(sub)}</div>`:''}</div>`; }
+function repKpiRow(cards){ return `<div class="grid kpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px">${cards.join('')}</div>`; }
+function repChart(title,inner){ return `<div class="card" style="margin-top:12px"><div class="ch-t">${esc(title)}</div>${inner||'<div class="empty">No data</div>'}</div>`; }
+function repIsWonQuote(q){ return !!q.invoiced || /won|approved|accept/i.test(q.status||''); }
+function repMonthKeys(n){ var a=[],d=new Date(); for(var i=n-1;i>=0;i--){ var x=new Date(d.getFullYear(),d.getMonth()-i,1); a.push({key:mKey(x.toISOString()),label:(MONTHS[x.getMonth()]||'').slice(0,3),y:x.getFullYear(),m:x.getMonth()}); } return a; }
+
 function vReports(){
+  let h=`<div class="sect"><h2>📊 ${lang==='ar'?'مركز التقارير و BI':'Reports & BI'}</h2></div>`;
+  const priv=(typeof seesAll==='function'&&seesAll())||(typeof isMgr==='function'&&isMgr());
+  const TABS=[['exec','🧭 '+(lang==='ar'?'تنفيذي':'Executive')],['sales','📈 '+(lang==='ar'?'المبيعات و Pipeline':'Sales & Pipeline')],['team','🏅 '+(lang==='ar'?'أداء الفريق':'Team KPIs')],['fin','💰 '+(lang==='ar'?'مالي':'Financial')],['custom','🧱 '+(lang==='ar'?'تقرير مخصّص':'Custom')]];
+  h+=`<div class="tabs" style="margin:8px 0">`+TABS.map(t=>`<button class="${repTab===t[0]?'active':''}" onclick="repTab='${t[0]}';render()">${t[1]}</button>`).join('')+`</div>`;
+  h+=`<div class="card" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+    <div class="fld" style="margin:0;min-width:160px"><label>${lang==='ar'?'الفترة':'Period'}</label><select onchange="repPeriod=this.value;render()">${REP_PERIODS.map(p=>`<option value="${p[0]}" ${repPeriod===p[0]?'selected':''}>${p[1]}</option>`).join('')}</select></div>
+    <div class="mini" style="flex:1;min-width:180px">${lang==='ar'?'الفرع بيتحكم فيه من فوق':'Branch is controlled from the top bar'} — <b>${esc(curBranch)}</b>. ${curBranch==='All'?(lang==='ar'?'المبالغ بالجنيه (أساسي).':'Amounts in EGP (base).'):''}</div>
+    ${repTab!=='custom'?`<button class="btn gh sm" onclick="repExportTab()">⬇ ${lang==='ar'?'تصدير Excel':'Export Excel'}</button>`:''}
+  </div>`;
+  if(repTab==='exec') h+=repExecTab(priv);
+  else if(repTab==='sales') h+=repSalesTab();
+  else if(repTab==='team') h+=repTeamTab(priv);
+  else if(repTab==='fin') h+=repFinTab();
+  else h+=repCustomTab();
+  return h;
+}
+function repExecTab(priv){
+  const L=repLeads(), Q=repQuotes(), IV=repInvoices(), EX=repExpenses();
+  const rev=repSum(IV,baseAmt), exp=repSum(EX,v=>v.amount), net=rev-exp;
+  const won=L.filter(l=>canonStage(l.stage)==='Won'), openL=L.filter(l=>['Won','Lost'].indexOf(canonStage(l.stage))<0);
+  const pipe=repSum(openL,l=>l.value);
+  const actProj=(projects||[]).filter(inBranch).filter(p=>!/complete|done|closed/i.test(p.status||'')).length;
+  let h=repKpiRow([
+    repKpi(repMoney(rev),lang==='ar'?'الإيراد':'Revenue','', 'var(--ok)'),
+    repKpi(repMoney(exp),lang==='ar'?'المصروفات':'Expenses','', 'var(--bad)'),
+    repKpi(repMoney(net),lang==='ar'?'صافي الربح':'Net profit','', net>=0?'var(--ok)':'var(--bad)'),
+    repKpi(repMoney(pipe),lang==='ar'?'قيمة الـ Pipeline':'Pipeline value'),
+    repKpi(L.length,lang==='ar'?'عملاء محتملون':'Leads'),
+    repKpi(won.length,lang==='ar'?'صفقات مكسوبة':'Won deals'),
+    repKpi(Q.length,lang==='ar'?'عروض أسعار':'Quotes'),
+    repKpi(actProj,lang==='ar'?'مشاريع نشطة':'Active projects')
+  ]);
+  // revenue vs expenses monthly
+  const mo=repMonthKeys(Math.min(12,Math.max(3,repMonthsN())));
+  const revBars=mo.map((m,i)=>({label:m.label,value:Math.round(repSum(IV.filter(v=>mKey(repD(v))===m.key),baseAmt)),color:'#1a7a4f'}));
+  const expBars=mo.map((m,i)=>({label:m.label,value:Math.round(repSum(EX.filter(v=>mKey(repD(v))===m.key),v=>v.amount)),color:'#c0392b'}));
+  h+=`<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-top:12px">
+    <div class="card"><div class="ch-t">${lang==='ar'?'الإيراد الشهري':'Monthly revenue'}</div>${revBars.some(b=>b.value)?svgBars(revBars):'<div class="empty">No data</div>'}</div>
+    <div class="card"><div class="ch-t">${lang==='ar'?'المصروفات الشهرية':'Monthly expenses'}</div>${expBars.some(b=>b.value)?svgBars(expBars):'<div class="empty">No data</div>'}</div></div>`;
+  // pipeline funnel
+  const fst=STAGES.filter(s=>s!=='Lost').map((s,i)=>({label:s,value:L.filter(l=>canonStage(l.stage)===s).length,color:STAGE_COL[s]||PALETTE[i%PALETTE.length]}));
+  h+=repChart(lang==='ar'?'قمع المبيعات (Pipeline)':'Sales funnel (pipeline)', fst.some(s=>s.value)?svgFunnel(fst):null);
+  // branch comparison when All
+  if(curBranch==='All'){
+    h+=`<div class="card" style="margin-top:12px"><div class="ch-t">${lang==='ar'?'مقارنة الفروع':'Branch comparison'}</div><div style="overflow-x:auto"><table><thead><tr><th>${lang==='ar'?'الفرع':'Branch'}</th><th class="r">${lang==='ar'?'الإيراد':'Revenue'}</th><th class="r">${lang==='ar'?'المصروفات':'Expenses'}</th><th class="r">${lang==='ar'?'الصافي':'Net'}</th><th class="r">Leads</th><th class="r">Won</th></tr></thead><tbody>`+
+    BRANCHES.map(function(b){ var iv=IV.filter(x=>x.branch===b), ex=EX.filter(x=>x.branch===b), ld=L.filter(x=>x.branch===b); var r=repSum(iv,baseAmt), e=repSum(ex,v=>v.amount); return `<tr><td><b>${FLAG[b]||''} ${esc(b)}</b></td><td class="r">${Math.round(r).toLocaleString()}</td><td class="r">${Math.round(e).toLocaleString()}</td><td class="r" style="color:${(r-e)>=0?'var(--ok)':'var(--bad)'}">${Math.round(r-e).toLocaleString()}</td><td class="r">${ld.length}</td><td class="r">${ld.filter(l=>canonStage(l.stage)==='Won').length}</td></tr>`; }).join('')+
+    `</tbody></table></div><div class="mini" style="margin-top:4px">${lang==='ar'?'المبالغ بالجنيه (أساسي).':'Amounts in EGP (base).'}</div></div>`;
+  }
+  return h;
+}
+function repSalesTab(){
+  const L=repLeads(), Q=repQuotes();
+  const won=L.filter(l=>canonStage(l.stage)==='Won'), lost=L.filter(l=>canonStage(l.stage)==='Lost');
+  const decided=won.length+lost.length;
+  const winRate=decided?Math.round(won.length/decided*100):0;
+  const wonVal=repSum(won,l=>l.value), avgDeal=won.length?Math.round(wonVal/won.length):0;
+  const openL=L.filter(l=>['Won','Lost'].indexOf(canonStage(l.stage))<0);
+  const qWon=Q.filter(repIsWonQuote).length, qWinRate=Q.length?Math.round(qWon/Q.length*100):0;
+  let h=repKpiRow([
+    repKpi(L.length,lang==='ar'?'إجمالي الـ Leads':'Total leads'),
+    repKpi(won.length,lang==='ar'?'مكسوبة':'Won','', 'var(--ok)'),
+    repKpi(lost.length,lang==='ar'?'خاسرة':'Lost','', 'var(--bad)'),
+    repKpi(winRate+'%',lang==='ar'?'معدل الكسب':'Win rate'),
+    repKpi(repMoney(avgDeal),lang==='ar'?'متوسط الصفقة':'Avg deal'),
+    repKpi(repMoney(repSum(openL,l=>l.value)),lang==='ar'?'قيمة الـ Pipeline':'Pipeline value'),
+    repKpi(Q.length,lang==='ar'?'عروض الأسعار':'Quotes'),
+    repKpi(qWinRate+'%',lang==='ar'?'كسب العروض':'Quote win rate')
+  ]);
+  // funnel value + count
+  const fst=STAGES.filter(s=>s!=='Lost').map((s,i)=>({label:s,value:L.filter(l=>canonStage(l.stage)===s).length,color:STAGE_COL[s]||PALETTE[i%PALETTE.length]}));
+  h+=repChart(lang==='ar'?'قمع المراحل':'Stage funnel', fst.some(s=>s.value)?svgFunnel(fst):null);
+  // leads by source donut + by owner bars
+  const bySrc={}; L.forEach(l=>{ var k=l.source||'—'; bySrc[k]=(bySrc[k]||0)+1; });
+  const srcSegs=Object.keys(bySrc).sort((a,b)=>bySrc[b]-bySrc[a]).slice(0,8).map((k,i)=>({label:k,value:bySrc[k],color:PALETTE[i%PALETTE.length]}));
+  const byOwn={}; L.forEach(l=>{ var k=l.owner||'—'; byOwn[k]=(byOwn[k]||{c:0,w:0}); byOwn[k].c++; if(canonStage(l.stage)==='Won')byOwn[k].w++; });
+  const ownBars=Object.keys(byOwn).sort((a,b)=>byOwn[b].c-byOwn[a].c).slice(0,10).map((k,i)=>({label:(k||'—').slice(0,10),value:byOwn[k].c,color:PALETTE[i%PALETTE.length]}));
+  h+=`<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-top:12px">
+    <div class="card"><div class="ch-t">${lang==='ar'?'المصدر / القناة':'By source / channel'}</div>${srcSegs.some(s=>s.value)?svgDonut(srcSegs):'<div class="empty">No data</div>'}</div>
+    <div class="card"><div class="ch-t">${lang==='ar'?'Leads حسب المندوب':'Leads by rep'}</div>${ownBars.some(b=>b.value)?svgBars(ownBars):'<div class="empty">No data</div>'}</div></div>`;
+  // monthly leads vs won trend
+  const mo=repMonthKeys(Math.min(12,Math.max(3,repMonthsN())));
+  const lTrend=mo.map(m=>({label:m.label,value:L.filter(l=>mKey(l.created||l.date)===m.key).length}));
+  h+=repChart(lang==='ar'?'اتجاه الـ Leads شهريًا':'Monthly leads trend', lTrend.some(p=>p.value)?svgLine(lTrend):null);
+  // source table with conversion
+  h+=`<div class="card" style="margin-top:12px"><div class="ch-t">${lang==='ar'?'تحليل المصادر':'Source analysis'}</div><div style="overflow-x:auto"><table><thead><tr><th>${lang==='ar'?'المصدر':'Source'}</th><th class="r">Leads</th><th class="r">Won</th><th class="r">${lang==='ar'?'التحويل':'Conv.'}</th></tr></thead><tbody>`+
+    Object.keys(bySrc).sort((a,b)=>bySrc[b]-bySrc[a]).map(function(k){ var tot=bySrc[k]; var w=L.filter(l=>(l.source||'—')===k&&canonStage(l.stage)==='Won').length; return `<tr><td><b>${esc(k)}</b></td><td class="r">${tot}</td><td class="r">${w}</td><td class="r">${tot?Math.round(w/tot*100):0}%</td></tr>`; }).join('')+`</tbody></table></div></div>`;
+  return h;
+}
+function repTeamTab(priv){
+  const ym=(new Date()).toISOString().slice(0,7);
+  const L=repLeads();
+  let people=(typeof hrPeople==='function'?hrPeople():(employees||[])).filter(e=>e.active!==false);
+  if(!priv){ people=people.filter(e=>(e.email||'').toLowerCase()===((me&&me.email||'').toLowerCase())); }
+  const rows=people.map(function(e){
+    var en=(e.name||''), ee=(e.email||'').toLowerCase();
+    var my=L.filter(l=>(l.ownerEmail||'').toLowerCase()===ee || (l.owner||'')===en);
+    var w=my.filter(l=>canonStage(l.stage)==='Won').length;
+    var conv=my.length?Math.round(w/my.length*100):0;
+    var pv=repSum(my.filter(l=>['Won','Lost'].indexOf(canonStage(l.stage))<0),l=>l.value);
+    var qp=(quotes||[]).filter(inBranch).filter(q=>repInPeriod(repD(q))).filter(q=>nameEq(q.preparedBy,en)||nameEq(q.requestedBy,en)).length;
+    var st=(typeof perfStats==='function')?perfStats(e,ym):{doneTasks:0,attDays:0,score:0};
+    return {e:e,leads:my.length,won:w,conv:conv,pipe:pv,quotes:qp,tasks:st.doneTasks||0,att:st.attDays||0,score:st.score||0};
+  }).sort((a,b)=>b.score-a.score);
+  let h='';
+  if(priv){
+    const board=rows.slice(0,8).map((r,i)=>({label:(r.e.name||'—').split(' ')[0],value:r.score,color:PALETTE[i%PALETTE.length]}));
+    h+=repChart(lang==='ar'?'ترتيب الأداء (Score)':'Performance leaderboard (score)', board.some(b=>b.value)?svgBars(board):null);
+  }
+  h+=`<div class="card" style="margin-top:12px"><div class="ch-t">${lang==='ar'?'مؤشرات أداء الفريق':'Team KPIs'}${priv?'':' — '+(lang==='ar'?'أرقامك':'your stats')}</div><div style="overflow-x:auto"><table><thead><tr><th>${lang==='ar'?'الموظف':'Employee'}</th><th>${lang==='ar'?'القسم':'Dept'}</th><th class="r">Leads</th><th class="r">Won</th><th class="r">${lang==='ar'?'التحويل':'Conv.'}</th><th class="r">${lang==='ar'?'Pipeline':'Pipeline'}</th><th class="r">${lang==='ar'?'عروض':'Quotes'}</th><th class="r">${lang==='ar'?'مهام':'Tasks'}</th><th class="r">${lang==='ar'?'حضور':'Att.'}</th><th class="r">Score</th></tr></thead><tbody>`+
+    (rows.length?rows.map(function(r){ return `<tr><td><b>${esc(r.e.name||'')}</b></td><td class="mini">${esc(r.e.dept||'')}</td><td class="r">${r.leads}</td><td class="r">${r.won}</td><td class="r">${r.conv}%</td><td class="r">${Math.round(r.pipe).toLocaleString()}</td><td class="r">${r.quotes}</td><td class="r">${r.tasks}</td><td class="r">${r.att}</td><td class="r"><b>${r.score}</b></td></tr>`; }).join(''):`<tr><td colspan="10" class="empty">No data</td></tr>`)+
+    `</tbody></table></div></div>`;
+  return h;
+}
+function repFinTab(){
+  const IV=repInvoices(), EX=repExpenses();
+  const rev=repSum(IV,baseAmt), exp=repSum(EX,v=>v.amount), net=rev-exp;
+  const margin=rev?Math.round(net/rev*100):0;
+  const avgInv=IV.length?Math.round(rev/IV.length):0;
+  let h=repKpiRow([
+    repKpi(repMoney(rev),lang==='ar'?'الإيراد':'Revenue','', 'var(--ok)'),
+    repKpi(repMoney(exp),lang==='ar'?'المصروفات':'Expenses','', 'var(--bad)'),
+    repKpi(repMoney(net),lang==='ar'?'صافي الربح':'Net profit','', net>=0?'var(--ok)':'var(--bad)'),
+    repKpi(margin+'%',lang==='ar'?'هامش الربح':'Net margin'),
+    repKpi(IV.length,lang==='ar'?'عدد الفواتير':'Invoices'),
+    repKpi(repMoney(avgInv),lang==='ar'?'متوسط الفاتورة':'Avg invoice')
+  ]);
+  const mo=repMonthKeys(Math.min(12,Math.max(3,repMonthsN())));
+  const netLine=mo.map(m=>({label:m.label,value:Math.round(repSum(IV.filter(v=>mKey(repD(v))===m.key),baseAmt)-repSum(EX.filter(v=>mKey(repD(v))===m.key),v=>v.amount))}));
+  h+=repChart(lang==='ar'?'صافي الربح الشهري':'Monthly net profit', netLine.some(p=>p.value)?svgLine(netLine):null);
+  // expenses by category donut + top clients by revenue
+  const byCat={}; EX.forEach(v=>{ var k=v.category||'—'; byCat[k]=(byCat[k]||0)+num(v.amount); });
+  const catSegs=Object.keys(byCat).sort((a,b)=>byCat[b]-byCat[a]).slice(0,8).map((k,i)=>({label:k,value:Math.round(byCat[k]),color:PALETTE[i%PALETTE.length]}));
+  const byCli={}; IV.forEach(v=>{ var k=v.client||'—'; byCli[k]=(byCli[k]||0)+num(baseAmt(v)); });
+  const cliBars=Object.keys(byCli).sort((a,b)=>byCli[b]-byCli[a]).slice(0,10).map((k,i)=>({label:(k||'—').slice(0,10),value:Math.round(byCli[k]),color:PALETTE[i%PALETTE.length]}));
+  h+=`<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-top:12px">
+    <div class="card"><div class="ch-t">${lang==='ar'?'المصروفات حسب البند':'Expenses by category'}</div>${catSegs.some(s=>s.value)?svgDonut(catSegs):'<div class="empty">No data</div>'}</div>
+    <div class="card"><div class="ch-t">${lang==='ar'?'أعلى العملاء إيرادًا':'Top clients by revenue'}</div>${cliBars.some(b=>b.value)?svgBars(cliBars):'<div class="empty">No data</div>'}</div></div>`;
+  if(curBranch==='All'){
+    h+=`<div class="card" style="margin-top:12px"><div class="ch-t">${lang==='ar'?'المالية حسب الفرع':'Financials by branch'}</div><div style="overflow-x:auto"><table><thead><tr><th>${lang==='ar'?'الفرع':'Branch'}</th><th class="r">${lang==='ar'?'الإيراد':'Revenue'}</th><th class="r">${lang==='ar'?'المصروفات':'Expenses'}</th><th class="r">${lang==='ar'?'الصافي':'Net'}</th><th class="r">${lang==='ar'?'الهامش':'Margin'}</th></tr></thead><tbody>`+
+    BRANCHES.map(function(b){ var r=repSum(IV.filter(x=>x.branch===b),baseAmt), e=repSum(EX.filter(x=>x.branch===b),v=>v.amount); var nt=r-e; return `<tr><td><b>${FLAG[b]||''} ${esc(b)}</b></td><td class="r">${Math.round(r).toLocaleString()}</td><td class="r">${Math.round(e).toLocaleString()}</td><td class="r" style="color:${nt>=0?'var(--ok)':'var(--bad)'}">${Math.round(nt).toLocaleString()}</td><td class="r">${r?Math.round(nt/r*100):0}%</td></tr>`; }).join('')+`</tbody></table></div><div class="mini" style="margin-top:4px">${lang==='ar'?'بالجنيه (أساسي).':'In EGP (base).'}</div></div>`;
+  }
+  return h;
+}
+function repCustomTab(){
   const ds=REP_DS[repDS]; const groupKeys=Object.keys(ds.groups); if(!repGroup||!ds.groups[repGroup])repGroup=groupKeys[0];
-  let h=`<div class="sect"><h2>📊 Reports & BI</h2></div>`;
-  h+=`<div class="card"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+  let h=`<div class="card" style="margin-top:12px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
     <div class="fld" style="margin:0;min-width:150px"><label>Dataset</label><select onchange="repDS=this.value;repGroup='';render()">${Object.keys(REP_DS).map(k=>`<option value="${k}" ${k===repDS?'selected':''}>${REP_DS[k].label}</option>`).join('')}</select></div>
     <div class="fld" style="margin:0;min-width:150px"><label>Group by</label><select onchange="repGroup=this.value;render()">${groupKeys.map(k=>`<option ${k===repGroup?'selected':''}>${k}</option>`).join('')}</select></div>
     <div class="fld" style="margin:0;min-width:150px"><label>Measure</label><select onchange="repMeasure=this.value;render()"><option value="sum" ${repMeasure==='sum'?'selected':''}>Sum of value</option><option value="count" ${repMeasure==='count'?'selected':''}>Count</option></select></div>
     <button class="btn gh sm" onclick="repExport('csv')">⬇ Excel</button> <button class="btn gh sm" onclick="repExport('pdf')">🖨 PDF</button>
-  </div><div class="mini" style="margin-top:6px">Build any breakdown: pick a dataset, group it, and choose count or total value. Money figures are shown in branch base currency.</div></div>`;
+  </div><div class="mini" style="margin-top:6px">${lang==='ar'?'ابني أي تقسيم: اختر مصدر بيانات، جمّعه، واختر عدد أو إجمالي القيمة.':'Build any breakdown: pick a dataset, group it, and choose count or total value.'}</div></div>`;
   const data=repCompute();
   const bars=data.slice(0,12).map((r,i)=>({label:(r.k||'—').toString().slice(0,14),value:Math.round(repMeasure==='sum'?r.sum:r.count),color:PALETTE[i%PALETTE.length]}));
   h+=`<div class="card" style="margin-top:14px"><div class="ch-t">${esc(ds.label)} by ${esc(repGroup)} — ${repMeasure==='sum'?'total value':'count'}</div>${bars.some(b=>b.value)?svgBars(bars):'<div class="empty">No data</div>'}</div>`;
@@ -5722,6 +5890,33 @@ function vReports(){
     r=>`<tr><td><b>${esc(r.k)}</b></td><td>${r.count}</td><td>${nfmt(r.sum)}</td></tr>`,
     {empty:'No data.', placeholder:'🔍 Search…', search:r=>(r.k||'').toString()});
   return h;
+}
+function repExportTab(){
+  if(typeof exportGuard==='function'&&!exportGuard())return;
+  var headers, rows, name;
+  if(repTab==='team'){
+    const ym=(new Date()).toISOString().slice(0,7); const L=repLeads();
+    const priv=(typeof seesAll==='function'&&seesAll())||(typeof isMgr==='function'&&isMgr());
+    let people=(typeof hrPeople==='function'?hrPeople():(employees||[])).filter(e=>e.active!==false); if(!priv)people=people.filter(e=>(e.email||'').toLowerCase()===((me&&me.email||'').toLowerCase()));
+    headers=['Employee','Dept','Leads','Won','Conv%','Pipeline','Quotes','Tasks','Attendance','Score'];
+    rows=people.map(function(e){ var en=e.name||'',ee=(e.email||'').toLowerCase(); var my=L.filter(l=>(l.ownerEmail||'').toLowerCase()===ee||(l.owner||'')===en); var w=my.filter(l=>canonStage(l.stage)==='Won').length; var st=perfStats(e,ym); return [en,e.dept||'',my.length,w,(my.length?Math.round(w/my.length*100):0),Math.round(repSum(my.filter(l=>['Won','Lost'].indexOf(canonStage(l.stage))<0),l=>l.value)),(quotes||[]).filter(inBranch).filter(q=>repInPeriod(repD(q))).filter(q=>nameEq(q.preparedBy,en)).length,st.doneTasks||0,st.attDays||0,st.score||0]; }).sort((a,b)=>b[9]-a[9]);
+    name='Team-KPIs';
+  } else if(repTab==='fin'){
+    const IV=repInvoices(),EX=repExpenses(); headers=['Branch','Revenue','Expenses','Net','Margin%'];
+    rows=BRANCHES.map(function(b){ var r=repSum(IV.filter(x=>x.branch===b),baseAmt),e=repSum(EX.filter(x=>x.branch===b),v=>v.amount); return [b,Math.round(r),Math.round(e),Math.round(r-e),(r?Math.round((r-e)/r*100):0)]; });
+    name='Financials-by-branch';
+  } else if(repTab==='sales'){
+    const L=repLeads(); const bySrc={}; L.forEach(l=>{var k=l.source||'—';bySrc[k]=(bySrc[k]||0)+1;});
+    headers=['Source','Leads','Won','Conv%'];
+    rows=Object.keys(bySrc).sort((a,b)=>bySrc[b]-bySrc[a]).map(function(k){ var w=L.filter(l=>(l.source||'—')===k&&canonStage(l.stage)==='Won').length; return [k,bySrc[k],w,(bySrc[k]?Math.round(w/bySrc[k]*100):0)]; });
+    name='Sales-by-source';
+  } else {
+    const L=repLeads(),Q=repQuotes(),IV=repInvoices(),EX=repExpenses(); const rev=repSum(IV,baseAmt),exp=repSum(EX,v=>v.amount);
+    headers=['Metric','Value']; rows=[['Revenue',Math.round(rev)],['Expenses',Math.round(exp)],['Net profit',Math.round(rev-exp)],['Leads',L.length],['Won',L.filter(l=>canonStage(l.stage)==='Won').length],['Quotes',Q.length]];
+    name='Executive-summary';
+  }
+  if(!rows.length){alert('Nothing to export.');return;}
+  if(typeof exportCSV==='function')exportCSV(name+'-'+repPeriod,headers,rows); else alert('Export unavailable');
 }
 function repExport(fmt){ if(!exportGuard())return; const ds=REP_DS[repDS]; const data=repCompute(); const headers=[repGroup,'Count','Total value']; const rows=data.map(r=>[r.k,r.count,Math.round(r.sum)]); if(!rows.length){alert('Nothing to export.');return;} if(fmt==='csv')exportCSV(ds.label+'-by-'+repGroup,headers,rows); else exportPDF(ds.label+' by '+repGroup,headers,rows); }
 
