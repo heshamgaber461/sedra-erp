@@ -211,6 +211,10 @@
   .modal{position:fixed;inset:0;background:rgba(14,47,75,.55);display:none;align-items:flex-start;justify-content:center;z-index:90;padding:30px 16px;overflow-y:auto}
   .modal.show{display:flex}
   .mc{background:#fff;border-radius:14px;padding:24px;width:100%;max-width:560px;box-shadow:0 18px 50px rgba(0,0,0,.3);position:relative}
+  .mc.wide{max-width:1060px;padding:28px 32px}
+  .mc.wide .row2{gap:16px}
+  .qsec-h{font-weight:800;color:var(--navy);font-size:14.5px;margin:18px 0 10px;padding-bottom:6px;border-bottom:2px solid #e3edf4;display:flex;align-items:center;gap:7px}
+  .qsec-h:first-child{margin-top:2px}
   .mc h3{color:var(--navy);font-size:18px;margin-bottom:14px;padding-right:34px}
   .modal-x{position:absolute;top:12px;right:12px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:#f0f3f7;border:1px solid #e2e8f0;border-radius:9px;font-size:17px;line-height:1;cursor:pointer;color:#5b6b7b;transition:.15s;z-index:2}
   .modal-x:hover{background:#e4351b;border-color:#e4351b;color:#fff;transform:rotate(90deg)}
@@ -535,7 +539,7 @@
     <button onclick="calcN('0')">0</button><button onclick="calcN('.')">.</button><button class="eq" style="grid-column:span 2" onclick="calcEq()">=</button>
   </div>
 </div></div>
-<div class="modal" id="modal"><div class="mc">
+<div class="modal" id="modal"><div class="mc" id="mCard">
   <button type="button" class="modal-x" onclick="closeModal()" aria-label="Close" title="Close (Esc)">✕</button>
   <h3 id="mTitle"></h3>
   <div id="mBody"></div>
@@ -957,6 +961,33 @@ async function importAdelOnce(){
     try{ alert(lang==='ar'?('تم استيراد قائمة Mohamed Adel:\n- تحديث '+updated+' عميل موجود وتحويلهم له\n- إضافة '+created+' عميل جديد'):('Mohamed Adel list imported:\n- '+updated+' existing reassigned\n- '+created+' new created')); }catch(e){}
   }catch(e){}
 }
+/* Product images: attach official product photos to inventory items. Reads product-images.json
+   (list of {find, image, all?, replace?}); matches inventory by name substring (case-insensitive),
+   applies the image via apiMerge. Runs as the app (admin only) so writes to the shared inventory
+   collection are allowed. Re-runs whenever PROD_IMG_REV is bumped (so new batches take effect). */
+var PROD_IMG_REV=1;
+async function importProductImagesOnce(){
+  try{
+    if(typeof isAdmin==='function'?!isAdmin():true) return;
+    if(settings && num(settings.productImagesRev)>=PROD_IMG_REV) return;
+    var list=null; try{ list=await fetch('/product-images.json?nc='+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}); }catch(e){ return; }
+    if(!list||!list.length) return;
+    var todo=[];
+    list.forEach(function(e){
+      if(!e||!e.find||!e.image) return;
+      var f=String(e.find).toLowerCase();
+      var ms=(inventory||[]).filter(function(p){ return String(p.name||'').toLowerCase().indexOf(f)>=0; });
+      if(!e.all) ms=ms.slice(0,1);
+      ms.forEach(function(p){ if(!e.replace && p.image && String(p.image).length>5) return; todo.push({id:p.id,image:e.image}); });
+    });
+    var done=0;
+    for(var i=0;i<todo.length;i++){ try{ await apiMerge('inventory',todo[i].id,{image:todo[i].image}); var pp=(inventory||[]).find(function(x){return x.id===todo[i].id;}); if(pp)pp.image=todo[i].image; done++; }catch(e){} }
+    try{ await apiMerge('meta','settings',{productImagesRev:PROD_IMG_REV}); }catch(e){} if(!settings)settings={}; settings.productImagesRev=PROD_IMG_REV;
+    try{ render(); }catch(e){}
+    window.__imgImport={done:done,todo:todo.length,rev:PROD_IMG_REV};
+    try{ if(typeof showToast==='function') showToast({title:'✓ Product images',body:done+' / '+todo.length+(lang==='ar'?' صورة اتضافت':' images added')}); }catch(e){}
+  }catch(e){ window.__imgImport={err:String(e&&e.message||e)}; }
+}
 /* Auto-update nudge: the app document is served network-first, so a reload always gets the
    latest deploy. This checks the deployed index.html's ETag periodically and on tab focus, and
    shows a one-click "Refresh" toast when a newer version is live — so nobody runs stale code. */
@@ -1160,7 +1191,7 @@ function ensureAdminDoc(u){
 function pickBranch(b){ curBranch=b; localStorage.setItem('sedra_branch',b); enterApp(); }
 function enterApp(){ appReady=true; lastSig=''; hideLoad(); hideGate(); g('app').classList.remove('hide'); buildNav();
   try{ var _dh=DEPT_HOME[me.dept]||'hub'; var _dm=MODULES.find(function(x){return x.id===_dh;}); curView=(_dm&&canSee(_dm))?_dh:'hub'; }catch(e){ curView='hub'; }
-  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); migrateStagesOnce(); importAdelOnce(); _setupUpdateCheck(); }
+  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); migrateStagesOnce(); importAdelOnce(); importProductImagesOnce(); _setupUpdateCheck(); }
 
 /* ---- "My Tasks" pop-up on first open each day (Phase 1) ---- */
 function maybeTasksPopup(){
@@ -3458,6 +3489,7 @@ function editQuote(id){
   _qsec=JSON.parse(JSON.stringify(quoteSections(r))); if(!_qsec.length)_qsec=[{title:'Smart Home System',items:[qBlankItem()]}];
   openModal(id?'Edit quotation':'New quotation',
     rfqSummaryHTML(r)+
+    `<div class="qsec-h">📋 ${lang==='ar'?'بيانات العرض':'Quote details'}</div>`+
     `<div class="row2">${fEl('Quotation No.','q_number',r.number)}${selEl('Type','q_type',['Quotation'],'Quotation')}</div>`+
     `<div class="row2">${fEl('Quote Subject (cover)','q_subject',r.subject||r.projectName||'')}${fEl('Presales Name (cover)','q_presales',r.presalesName||r.preparedBy||'')}</div>`+
     selEl('Main system / service (default cover)','q_service',QSYS_ALL,r.service||QSYS_ALL[0])+
@@ -3467,9 +3499,12 @@ function editQuote(id){
     `<div class="row2">${fEl('Consultant','q_consultant',r.consultant)}${fEl('Prepared by','q_prep',r.preparedBy||(me&&me.name)||'')}</div>`+
     `<div class="row2">${selEl('Branch','q_branch',branchOpts(),r.branch)}<div class="fld"><label>Currency</label><select id="q_cur" onchange="qCurChange()">${CURRENCIES.map(function(c){return '<option '+((r.currency||CUR[r.branch||defBranch()]||'EGP')===c?'selected':'')+'>'+c+'</option>';}).join('')}</select></div></div>`+
     `<div class="card" id="q_fxbox" style="background:#f6f9fc;padding:10px;margin-bottom:8px"><div class="mini" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span>💱 ${lang==='ar'?'سعر الصرف — 1 وحدة بالعملة = كام جنيه':'Exchange rate — 1 unit = how many EGP'}</span><label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="q_fxman" ${r.fxManual?'checked':''} onchange="qCurChange()"> ${lang==='ar'?'أحدّده يدويًا':'set manually'}</label><input id="q_fx" type="number" step="0.01" placeholder="${lang==='ar'?'مثال 53':'e.g. 53'}" value="${(r.fxManual&&num(r.fxEgp))?num(r.fxEgp):''}" style="width:100px" oninput="qRecalc()" onchange="qCurChange()" ${r.fxManual?'':'disabled'}><span id="q_fxinfo" class="mini" style="color:#157f96"></span></div><div class="mini" style="color:var(--muted);margin-top:4px">${lang==='ar'?'اكتب سعر الدولار/الدرهم بالجنيه اللي انت عايزه (مثلاً 1 دولار = 53 جنيه) والأسعار هتتحسب عليه.':'Type how many EGP one unit of the currency equals (e.g. 1 USD = 53 EGP); prices are computed from it.'}</div></div>`+
+    `<div class="qsec-h">🧩 ${lang==='ar'?'الأنظمة والبنود':'Systems & items'}</div>`+
     `<div class="fld"><label>Sections & line items (pick products from inventory in the Description field)</label><div id="qSec"></div></div>`+
+    `<div class="qsec-h">💰 ${lang==='ar'?'الحساب المالي':'Financials'}</div>`+
     `<div class="row2">${selEl('Status','q_status',QSTAT,r.status||'Draft')}${fEl('VAT %','q_vat',r.vat!=null?r.vat:vatForBranch(r.branch||defBranch()),'number','qRecalc()')}</div>`+
     `<div class="card" id="qTotals" style="background:#f6f9fc"></div>`+
+    `<div class="qsec-h">📄 ${lang==='ar'?'الشروط والملاحظات':'Terms & notes'}</div>`+
     fTa('Excluding (one per line)','q_excl',r.excluding||defQExcluding())+
     fTa('Features list (one per line — shown as a highlighted section in the quotation)','q_features',r.featuresList||'')+
     `<div class="row2">${fEl('Advance %','q_pa',r.payAdvance!=null?r.payAdvance:60,'number')}${fEl('Before delivery %','q_pb',r.payBefore!=null?r.payBefore:10,'number')}</div>`+
@@ -3485,7 +3520,7 @@ function editQuote(id){
       saveDoc('quotes',d,id);
       /* Update the in-memory quote immediately so Print / view reflect the edits at once
          (otherwise the change only appears after the next background sync). */
-      try{ if(id){ var _qq=quotes.find(function(x){return x.id===id;}); if(_qq) Object.assign(_qq,d); } }catch(e){} });
+      try{ if(id){ var _qq=quotes.find(function(x){return x.id===id;}); if(_qq) Object.assign(_qq,d); } }catch(e){} },{wide:true});
   qSecRender(); try{ qCurChange(); }catch(e){}
 }
 /* ---- Quote version history: snapshot on every save; restore any past version ---- */
@@ -3516,8 +3551,8 @@ function printQuote(id){
   const covmap={'Home Automation':'cover-home-automation.jpg','Smart Home':'cover-smart-home.jpg','Home Cinema':'cover-home-cinema.jpg','Indoor Sound System':'cover-indoor-sound.jpg','Outdoor Sound System':'cover-outdoor-sound.jpg','Security Camera':'cover-security-camera.jpg','Intrusion System':'cover-intrusion.jpg','Safety System':'cover-safety-system.jpg','Intercom System':'cover-intercom.jpg','Structured Cabling System':'cover-structured-cabling.jpg','MATV Satellite System':'cover-matv-satellite.jpg','Solar Energy':'cover-solar-energy.jpg','Smart Gates':'cover-smart-gates.jpg'};
   const coverURL=base+(covmap[q.service]||'cover-home-automation.jpg');
   const GENERAL_COVER=base+'cover-general.jpg';
-  const SYS_COVER={'knx':'cover-knx.jpg','wireless':'cover-wireless.jpg','light current':'cover-light-current.jpg','cctv':'cover-cctv.jpg','fire':'cover-safety-system.jpg','fire system':'cover-safety-system.jpg','safety system':'cover-safety-system.jpg','sound system':'cover-sound-system.jpg','sound':'cover-sound-system.jpg','indoor sound system':'cover-sound-system.jpg','outdoor sound system':'cover-sound-system.jpg'};
-  function sysCoverURL(title){ var k=String(title||'').trim().toLowerCase(); if(SYS_COVER.hasOwnProperty(k)) return SYS_COVER[k]?base+SYS_COVER[k]:''; if(covmap[title]) return base+covmap[title]; if(k.indexOf('sound')>=0) return base+'cover-sound-system.jpg'; return ''; }
+  const SYS_COVER={'knx':'cover-knx.jpg','wireless':'cover-wireless.jpg','light current':'cover-light-current.jpg','cctv':'cover-cctv.jpg','fire':'cover-safety-system.jpg','fire system':'cover-safety-system.jpg','safety system':'cover-safety-system.jpg','indoor sound system':'cover-indoor-sound.jpg','outdoor sound system':'cover-outdoor-sound.jpg','sound system':'cover-indoor-sound.jpg','sound':'cover-indoor-sound.jpg'};
+  function sysCoverURL(title){ var k=String(title||'').trim().toLowerCase(); if(SYS_COVER.hasOwnProperty(k)) return SYS_COVER[k]?base+SYS_COVER[k]:''; if(covmap[title]) return base+covmap[title]; if(k.indexOf('outdoor')>=0&&k.indexOf('sound')>=0) return base+'cover-outdoor-sound.jpg'; if(k.indexOf('sound')>=0) return base+'cover-indoor-sound.jpg'; return ''; }
   const partnersURL=base+'partners-logos.png';
   const MARK='<svg viewBox="22 30 132 140" fill="#0e2c49" style="height:58px"><path d="M70 34 L150 34 L128 70 L48 70 Z"/><path d="M48 82 L128 82 L106 118 L26 118 Z"/><rect x="116" y="82" width="30" height="30" rx="5"/><path d="M88 130 L150 130 L128 166 L66 166 Z"/><rect x="40" y="130" width="30" height="30" rx="5"/></svg>';
   const LOGO=base+'sedra-logo.png';
@@ -3547,7 +3582,7 @@ function printQuote(id){
   const payHTML=pay.length?`<div class="stitle" style="font-size:15px;margin-top:6px">Payment terms</div><div class="pay">${pay.map(pp=>`<div class="pc"><div class="k">${esc(pp[0].toUpperCase())}</div><div class="v">${num(pp[1])}%</div></div>`).join('')}</div>`:'';
   const notesHTML=(function(){var nl=lines(q.notes);return nl.length?`<div class="stitle" style="font-size:15px;margin-top:10px">📝 ${lang==='ar'?'ملاحظات':'Notes'}</div><div class="sec" style="page-break-inside:avoid;border-color:#37c0dc"><ul style="padding:14px 30px;margin:0;line-height:1.9;font-size:12.5px;color:#1c2b3a">${nl.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')}</ul></div>`:'';})();
   const WMARK=MARK.split('#0e2c49').join('#ffffff').replace('height:58px','height:82px');
-  const frontURL=(q.useGeneralCover)?GENERAL_COVER:(multi?GENERAL_COVER:(sysCoverURL((secs[0]&&secs[0].title))||GENERAL_COVER));
+  const frontURL=GENERAL_COVER; /* general Sedra cover (Powering the Future) as the front page */
   const coverHTML=`<div class="sheet A4 cover"><img src="${frontURL}">${ccardHTML}</div>`;
   const sysPages=secs.map((sc,i)=>{
     const sc_url=sysCoverURL(sc.title);
@@ -3558,14 +3593,11 @@ function printQuote(id){
   const summaryPage=`<div class="sheet pad">${theadHTML}<div class="stitle">Financial Summary</div>${metaHTML}<div class="sec"><table class="sumtbl"><thead><tr><th>System</th><th class="r">Total</th></tr></thead><tbody>${secs.map((sc,i)=>`<tr><td class="pn">${esc(sc.title||('System '+(i+1)))}</td><td class="r"><b>${M(t.secTotals[i])}</b></td></tr>`).join('')}</tbody></table></div>${finHTML}${featHTML}${payHTML}${ftHTML}</div>`;
   const singlePage=`<div class="sheet pad">${theadHTML}<div class="stitle">${esc((secs[0]&&secs[0].title)||q.service||'Quotation')} &mdash; Quotation</div>${metaHTML}${secs.map((sc,i)=>secTable(sc,i)).join('')}${finHTML}${featHTML}${payHTML}${ftHTML}</div>`;
   const termsPage=`<div class="sheet pad"><div class="stitle">Terms &amp; Conditions</div><div class="tc">${(function(){ var ls=terms.length?terms:lines(defQTerms()); return ls.map(function(x){ var s=x.replace(/\t/g,'    '); var tt=s.trim(); if(/^[-•]\s/.test(tt)){ return '<div class="tc-h">'+esc(tt.replace(/^[-•]\s*/,''))+'</div>'; } if(/^·/.test(tt)||/^\s{2,}·/.test(s)){ return '<div class="tc-b">'+esc(tt.replace(/^·\s*/,''))+'</div>'; } return '<div class="tc-p">'+esc(tt)+'</div>'; }).join(''); })()}</div>${excl.length?`<div class="stitle" style="font-size:15px;margin-top:12px">Offer excludes</div><ul style="padding-inline-start:18px;line-height:1.9;font-size:12.5px;color:#3a4a5a">${excl.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}<div class="tc" style="margin-top:12px"><div class="tc-b">This offer is valid for ${num(q.validity)||30} days (until ${esc(validTill||'')}).</div></div>${notesHTML}<div class="sign"><div class="s">Prepared by &mdash; ${esc(q.preparedBy||'-')}</div><div class="s">Client approval &mdash; signature &amp; date</div></div>${ftHTML}</div>`;
-  const aboutPage=`<div class="sheet A4 apage"><div class="ap-top"><span class="ap-mk"><img src="${LOGO}" style="height:62px;width:auto"></span><div class="ap-title">About Sedra</div><div class="ap-rule"></div></div><p class="ap-lead">Sedra Electric started in 2014 as an L.L.C company based in Cairo, Egypt. Our focus was consulting and training for solar energy and energy efficiency. With the growing demand for renewable energy, we rebranded with a more professional image to capitalise on our technical know-how and global business network, serving both the Egyptian and international markets with the latest innovative solutions.</p><div class="ap-pillars"><div class="ap-pill"><b>2014</b><span>Established in Cairo, Egypt</span></div><div class="ap-pill"><b>3</b><span>Branches &mdash; Egypt &middot; UAE &middot; KSA</span></div><div class="ap-pill"><b>Smart</b><span>&amp; Low-current systems</span></div></div><div class="ap-band"><div class="ap-band-t">Powering the Future, Simplifying Life</div><div class="ap-band-s">KNX &middot; Wireless &middot; Light Current &middot; Sound System &middot; CCTV &middot; Fire</div></div><div class="ap-foot">info@sedra-electric.com &nbsp;&middot;&nbsp; www.sedra-electric.com &nbsp;&middot;&nbsp; Tel: 0226783906</div></div>`;
-  const partnersPage=`<div class="sheet A4 apage"><div class="ap-top"><span class="ap-mk"><img src="${LOGO}" style="height:62px;width:auto"></span><div class="ap-title">Our Partners</div><div class="ap-rule"></div></div><div class="ap-partsub">Authorized integrator of leading global brands</div><div class="ap-logos"><img src="${base}partners-logos.png"></div><div class="ap-foot">info@sedra-electric.com &nbsp;&middot;&nbsp; www.sedra-electric.com &nbsp;&middot;&nbsp; Tel: 0226783906</div></div>`;
-  /* First-system cover page after the partners page — ONLY when that system actually has its
-     own cover image (no generic fallback), and only if the front page isn't already that image.
-     This respects the existing per-system covers (e.g. Sound System) instead of substituting one. */
-  const firstSysURL=sysCoverURL((secs[0]&&secs[0].title));
-  const firstSysCoverHTML=(!multi && firstSysURL && firstSysURL!==frontURL)?`<div class="sheet A4 cover"><img src="${firstSysURL}"></div>`:'';
-  const bodyHTML=coverHTML+aboutPage+partnersPage+(multi?(sysPages+summaryPage):(firstSysCoverHTML+singlePage))+termsPage;
+  /* About & Partners use Hesham's own uploaded full-page designs (page-about.jpg / page-partners.jpg). */
+  const aboutPage=`<div class="sheet A4 cover"><img src="${base}page-about.jpg"></div>`;
+  const partnersPage=`<div class="sheet A4 cover"><img src="${base}page-partners.jpg"></div>`;
+  /* Page order: general cover → About → Partners → (each system: its cover page then its details) → financial summary → terms. */
+  const bodyHTML=coverHTML+aboutPage+partnersPage+sysPages+summaryPage+termsPage;
   w.document.write(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=822, initial-scale=1"><title>${esc(q.number||'Quotation')} &mdash; Sedra</title>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,600;0,700;0,800;1,800&display=swap" rel="stylesheet">
   <style>
@@ -5477,7 +5509,7 @@ function val(id){ const e=g(id); return e?e.value:''; }
 /* ===================== MODAL + CRUD ===================== */
 let _onSave=null;
 function _mSaveClick(){ if(_onSave){ const r=_onSave(); if(r!==false)closeModal(); } else closeModal(); }
-function openModal(title,body,onSave){ const ro=(me&&me.role==='Viewer'); const sb=g('mSave'); if(sb){ if(ro){ sb.classList.add('hide'); } else { sb.classList.remove('hide'); sb.textContent='Save'; sb.onclick=_mSaveClick; } } g('mTitle').textContent=title; g('mBody').innerHTML=(ro?'<div class="card mini" style="background:#eef3f8;border-color:#ccd;color:#143F63;margin-bottom:8px">\u{1F441}\uFE0F '+(lang==='ar'?'\u0648\u0636\u0639 \u0627\u0644\u0645\u0634\u0627\u0647\u062F\u0629 \u2014 \u0644\u0644\u0639\u0631\u0636 \u0641\u0642\u0637':'Viewer mode \u2014 view only')+'</div>':'')+body; _onSave=onSave; g('modal').classList.add('show'); if(lang==='ar'){ try{translateDOM(g('modal'));}catch(e){} } }
+function openModal(title,body,onSave,opts){ const ro=(me&&me.role==='Viewer'); const sb=g('mSave'); if(sb){ if(ro){ sb.classList.add('hide'); } else { sb.classList.remove('hide'); sb.textContent='Save'; sb.onclick=_mSaveClick; } } var mc=g('mCard'); if(mc){ if(opts&&opts.wide){ mc.classList.add('wide'); } else { mc.classList.remove('wide'); } } g('mTitle').textContent=title; g('mBody').innerHTML=(ro?'<div class="card mini" style="background:#eef3f8;border-color:#ccd;color:#143F63;margin-bottom:8px">\u{1F441}\uFE0F '+(lang==='ar'?'\u0648\u0636\u0639 \u0627\u0644\u0645\u0634\u0627\u0647\u062F\u0629 \u2014 \u0644\u0644\u0639\u0631\u0636 \u0641\u0642\u0637':'Viewer mode \u2014 view only')+'</div>':'')+body; _onSave=onSave; g('modal').classList.add('show'); if(lang==='ar'){ try{translateDOM(g('modal'));}catch(e){} } }
 function closeModal(){ try{stopScan&&stopScan();}catch(e){} g('modal').classList.remove('show'); _onSave=null; }
 g('mSave').onclick=_mSaveClick;
 function logAudit(action,coll,id,label){ if(coll==='audit')return; try{ apiAdd('audit',{ts:Date.now(),user:(me&&me.name)||'',email:(me&&me.email||'').toLowerCase(),action:action,coll:coll,docId:id||'',label:(label||'').toString().slice(0,80)}); }catch(e){} }
