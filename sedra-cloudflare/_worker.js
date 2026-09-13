@@ -120,6 +120,52 @@ async function getEmployees(cred){
 }
 
 function b64urlToStr(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; return decodeURIComponent(escape(atob(s))); }
+function b64urlToU8(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; const bin=atob(s); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return u; }
+
+// ───────────────────────── Firebase ID-token VERIFICATION ───────────────────────
+// SECURITY: we must not trust the email inside a token we haven't verified. A Firebase
+// ID token is a JWT signed (RS256) with Google's rotating public keys. We verify the
+// signature against those keys and check aud / iss / exp before trusting any claim.
+const PROJECT_ID = 'sedra-crm';
+const JWK_URL = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
+let JWK_CACHE = null, JWK_EXP = 0;
+async function getGoogleJWKs(){
+  if (JWK_CACHE && Date.now() < JWK_EXP) return JWK_CACHE;
+  try{
+    const r = await fetch(JWK_URL);
+    if (!r.ok) return JWK_CACHE; // keep last-good cache if refresh fails
+    const j = await r.json();
+    const map = {}; (j.keys||[]).forEach(function(k){ if (k && k.kid) map[k.kid] = k; });
+    if (Object.keys(map).length){ JWK_CACHE = map; JWK_EXP = Date.now() + 3600*1000; }
+    return JWK_CACHE;
+  }catch(e){ return JWK_CACHE; }
+}
+// Returns the verified, lower-cased email, or '' when the token is missing/invalid/expired.
+async function verifyIdToken(token){
+  try{
+    if (!token) return '';
+    const parts = token.split('.'); if (parts.length !== 3) return '';
+    const header = JSON.parse(b64urlToStr(parts[0]));
+    if (header.alg !== 'RS256' || !header.kid) return '';
+    const jwks = await getGoogleJWKs(); if (!jwks) return '';
+    const jwk = jwks[header.kid]; if (!jwk) return '';
+    const key = await crypto.subtle.importKey('jwk',
+      { kty:jwk.kty, n:jwk.n, e:jwk.e, alg:'RS256', ext:true },
+      { name:'RSASSA-PKCS1-v1_5', hash:'SHA-256' }, false, ['verify']);
+    const data = new TextEncoder().encode(parts[0] + '.' + parts[1]);
+    const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64urlToU8(parts[2]), data);
+    if (!ok) return '';
+    const p = JSON.parse(b64urlToStr(parts[1]));
+    const now = Math.floor(Date.now()/1000), skew = 300;
+    if (p.aud !== PROJECT_ID) return '';
+    if (p.iss !== 'https://securetoken.google.com/' + PROJECT_ID) return '';
+    if (!p.sub) return '';
+    if (typeof p.exp !== 'number' || p.exp < now - skew) return '';
+    if (typeof p.iat === 'number' && p.iat > now + skew) return '';
+    return (p.email || '').toLowerCase();
+  }catch(e){ return ''; }
+}
+// (kept for reference; no longer used for authorization — verifyIdToken replaces it)
 function tokenEmail(token){
   try{ const p=token.split('.'); if(p.length<2) return ''; return (JSON.parse(b64urlToStr(p[1])).email||'').toLowerCase(); }
   catch(e){ return ''; }
@@ -200,8 +246,14 @@ export default {
     const pass = async (body) => { const r=await forward(body); const t=await r.text(); return new Response(t||'null',{status:r.status,headers:CORS}); };
     const deny = (m) => new Response(JSON.stringify({error:'forbidden: '+(m||'not allowed')}),{status:403,headers:CORS});
 
-    const email = tokenEmail(token);
-    if (!ENFORCE || !email) { try { return await pass(p.body); } catch(e){ return new Response(JSON.stringify({error:String(e&&e.message||e)}),{status:500,headers:CORS}); } }
+    // Kill switch: plain pass-through proxy (emergency only).
+    if (!ENFORCE) { try { return await pass(p.body); } catch(e){ return new Response(JSON.stringify({error:String(e&&e.message||e)}),{status:500,headers:CORS}); } }
+
+    // SECURITY: authenticate EVERY request. The email is taken from a CRYPTOGRAPHICALLY
+    // VERIFIED Firebase ID token — never from an unverified/decoded token, and never
+    // defaulting to service-account access when the token is missing. No valid token → denied.
+    const email = await verifyIdToken(token);
+    if (!email) return new Response(JSON.stringify({error:'forbidden: authentication required'}),{status:401,headers:CORS});
 
     const segs = segsOf(path);
     const coll = segs[0] || '';
