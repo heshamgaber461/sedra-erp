@@ -3536,7 +3536,16 @@ const QSYS_ALL=(function(){ var seen={},out=[]; QSYSTEMS.concat(QSERVICES).forEa
 const SYS_IMG={}; /* system name -> banner image URL/dataURL, added when Hesham sends the system images */
 function svcAbbr(k){ return ({'home-automation':'HA','smart-home':'SH','home-cinema':'HC','indoor-sound':'ISS','outdoor-sound':'OSS','security-camera':'SC','intrusion':'INT','safety-system':'SF','intercom':'IC','structured-cabling':'SCS','matv-satellite':'MATV','solar-energy':'SOL','smart-gates':'SG'})[k]||'GEN'; }
 function svcKey(name){ return ({'Home Automation':'home-automation','Smart Home':'smart-home','Home Cinema':'home-cinema','Indoor Sound System':'indoor-sound','Outdoor Sound System':'outdoor-sound','Security Camera':'security-camera','Intrusion System':'intrusion','Safety System':'safety-system','Intercom System':'intercom','Structured Cabling System':'structured-cabling','MATV Satellite System':'matv-satellite','Solar Energy':'solar-energy','Smart Gates':'smart-gates'})[name]||'home-automation'; }
-function genQuoteNo(k){ var d=new Date(); var ymd=(''+d.getFullYear()).slice(2)+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2); var n=quotes.filter(function(q){return (q.number||'').indexOf('SDR-')===0;}).length+1; return 'SDR-'+svcAbbr(k)+'-'+ymd+'-'+('00'+n).slice(-3); }
+/* Quotation numbering — Zoho CRM style: "Q - " + 9 digits, continuing from the last Zoho number.
+   Base = the last number used in Zoho (overridable via settings.quoteSeqBase). Each new quote takes
+   max(base, highest existing Q- number) + 1, so it always moves forward and never reuses a number. */
+var QUOTE_SEQ_BASE=92620671; /* last Zoho number 092620671 -> next new quote = 092620672 */
+function genQuoteNo(k){
+  var base=(settings&&num(settings.quoteSeqBase))||QUOTE_SEQ_BASE;
+  var maxN=base;
+  (quotes||[]).forEach(function(q){ var m=/^Q\s*-\s*0*(\d+)/.exec(q.number||''); if(m){ var v=parseInt(m[1],10); if(v>maxN)maxN=v; } });
+  return 'Q - '+('000000000'+(maxN+1)).slice(-9);
+}
 function newQuoteChoice(){ openModal('New quotation','<div class="mini" style="margin-bottom:12px">How do you want to create this quotation?</div><button class="btn cy" style="width:100%;margin-bottom:10px" onclick="closeModal();editQuote()">\uD83D\uDEE0\uFE0F Build it myself (choose products &amp; prices)</button><button class="btn" style="width:100%" onclick="closeModal();quoteToTech()">\uD83D\uDCE8 Send a request to the Technical Office</button>', null); }
 const RFQ_PTYPES=['Apartment','Villa','Duplex','Penthouse','Twin house','Townhouse','Administrative','Commercial','Clinic','Retail','Other'];
 const RFQ_DESIGN=['Plan','Qty by sales'];
