@@ -3562,12 +3562,12 @@ function qRecalc(){ qReadDOM(); const cur=(g('q_cur')&&val('q_cur'))||'EGP'; con
     grand+=ex.taxable;
     const st=g('qsecT'+si); if(st){ let parts=[(lang==='ar'?'الإجمالي ':'Subtotal ')+f(secSub)]; if(s.instOn)parts.push('+ '+(lang==='ar'?'تركيب ':'Install ')+f(ex.inst)); if(s.discOn)parts.push('− '+(lang==='ar'?'خصم ':'Disc ')+f(ex.disc)); parts.push('= '+f(ex.taxable)+' '+cur); st.textContent=(lang==='ar'?('سيستم '+(si+1)+': '):('System '+(si+1)+': '))+parts.join('  ·  '); } });
   const v=grand*vat/100; const grandTot=grand+v; const tot=g('qTotals');
-  const rw=(l,val)=>`<div style="display:flex;justify-content:space-between"><span>${l}</span><b>${val}</b></div>`;
+  const rw=(l,val)=>`<div style="display:flex;justify-content:space-between;gap:16px"><span>${l}</span><b style="white-space:nowrap">${val}</b></div>`;
   const baseNote=cur!=='EGP'?`<div class="mini" style="text-align:right;color:var(--muted)">≈ ${Math.round(rate>0?grandTot/rate:grandTot).toLocaleString()} EGP (base)</div>`:'';
   var _hasVat=num(vat)>0;
   let html=rw((lang==='ar'?(_hasVat?'إجمالي كل السيستمز (قبل الضريبة)':'إجمالي كل السيستمز'):(_hasVat?'All systems subtotal (excl. VAT)':'All systems subtotal')), f(grand)+' '+cur);
   if(_hasVat) html+=rw('VAT ('+vat+'%)', f(v)+' '+cur);
-  html+=`<div style="display:flex;justify-content:space-between;font-size:16px;color:var(--navy)"><span>${lang==='ar'?'الإجمالي النهائي':'Grand total'}</span><b>${f(grandTot)} ${cur}</b></div>`;
+  html+=`<div style="display:flex;justify-content:space-between;gap:16px;font-size:16px;color:var(--navy)"><span>${lang==='ar'?'الإجمالي النهائي':'Grand total'}</span><b style="white-space:nowrap">${f(grandTot)} ${cur}</b></div>`;
   if(tot)tot.innerHTML=html+baseNote;
 }
 const QSERVICES=['Home Automation','Smart Home','Home Cinema','Indoor Sound System','Outdoor Sound System','Security Camera','Intrusion System','Safety System','Intercom System','Structured Cabling System','MATV Satellite System','Solar Energy','Smart Gates'];
@@ -3748,7 +3748,7 @@ function printQuote(id,opts){
   /* Per-system financial rows: each system shows its own subtotal, installation, discount and total. */
   const secFinRows=(sc,i)=>{ var d=(t.secDetail&&t.secDetail[i])||{sub:t.secTotals[i],inst:0,disc:0,total:t.secTotals[i]}; var r='';
     if(sc.instOn||sc.discOn){ r+=`<div class="sect2"><span>${lang==='ar'?'الإجمالي':'Subtotal'}</span><span>${M(d.sub)}</span></div>`;
-      if(sc.instOn) r+=`<div class="sect2"><span>${lang==='ar'?'تركيب':'Installation'}${sc.instType!=='amount'?' ('+num(sc.instVal)+'%)':''}</span><span>+ ${M(d.inst)}</span></div>`;
+      if(sc.instOn) r+=`<div class="sect2"><span>${lang==='ar'?'تركيب':'Installation'}${sc.instType!=='amount'?' ('+num(sc.instVal)+'%)':''}</span><span>${M(d.inst)}</span></div>`;
       if(sc.discOn) r+=`<div class="sect2"><span>${lang==='ar'?'خصم':'Discount'}${sc.discType!=='amount'?' ('+num(sc.discVal)+'%)':''}</span><span>− ${M(d.disc)}</span></div>`; }
     r+=`<div class="sect"><span>Total &mdash; ${esc((sc.title||('System '+(i+1))).toUpperCase())}</span><span>${M(d.total)}</span></div>`;
     return r; };
@@ -3862,8 +3862,9 @@ function printQuote(id,opts){
   .c{text-align:center}.r{text-align:right}.br{color:#6c7c8c}.pn{font-weight:800;color:#0e2c49;font-size:12.5px}
   .pimg{width:58px;height:58px;object-fit:contain;background:#fff;border:1px solid #e6ebf0;border-radius:8px;display:block;margin:0 auto;padding:3px}
   td.pd{min-width:230px}.pd .ds{color:#33445a;line-height:1.5;margin-top:2px}.pd .pn+.ds{margin-top:3px}
-  .sect{background:#123a5f;color:#fff;font-weight:800;padding:9px 14px;display:flex;justify-content:space-between}
-  .sect2{display:flex;justify-content:space-between;padding:7px 14px;font-size:12.5px;color:#1c2b3a;border-top:1px solid #eef}
+  .sect{background:#123a5f;color:#fff;font-weight:800;padding:9px 14px;display:flex;justify-content:space-between;gap:16px}
+  .sect2{display:flex;justify-content:space-between;padding:7px 14px;font-size:12.5px;color:#1c2b3a;border-top:1px solid #eef;gap:16px}
+  .sect span:last-child,.sect2 span:last-child{white-space:nowrap}
   .fin{border:2px solid #0e2c49;border-radius:10px;overflow:hidden;max-width:420px;margin:16px 0 16px auto}
   .fin .r2{display:flex;justify-content:space-between;gap:24px;padding:10px 16px;font-size:13px;border-bottom:1px solid #eee}
   .fin .g{background:#0e2c49;color:#fff;display:flex;justify-content:space-between;gap:24px;padding:13px 16px;font-size:17px;font-weight:800}
