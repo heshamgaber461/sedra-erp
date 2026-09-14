@@ -3564,8 +3564,9 @@ function qRecalc(){ qReadDOM(); const cur=(g('q_cur')&&val('q_cur'))||'EGP'; con
   const v=grand*vat/100; const grandTot=grand+v; const tot=g('qTotals');
   const rw=(l,val)=>`<div style="display:flex;justify-content:space-between"><span>${l}</span><b>${val}</b></div>`;
   const baseNote=cur!=='EGP'?`<div class="mini" style="text-align:right;color:var(--muted)">≈ ${Math.round(rate>0?grandTot/rate:grandTot).toLocaleString()} EGP (base)</div>`:'';
-  let html=rw((lang==='ar'?'إجمالي كل السيستمز (قبل الضريبة)':'All systems subtotal (excl. VAT)'), f(grand)+' '+cur);
-  html+=rw('VAT ('+vat+'%)', f(v)+' '+cur);
+  var _hasVat=num(vat)>0;
+  let html=rw((lang==='ar'?(_hasVat?'إجمالي كل السيستمز (قبل الضريبة)':'إجمالي كل السيستمز'):(_hasVat?'All systems subtotal (excl. VAT)':'All systems subtotal')), f(grand)+' '+cur);
+  if(_hasVat) html+=rw('VAT ('+vat+'%)', f(v)+' '+cur);
   html+=`<div style="display:flex;justify-content:space-between;font-size:16px;color:var(--navy)"><span>${lang==='ar'?'الإجمالي النهائي':'Grand total'}</span><b>${f(grandTot)} ${cur}</b></div>`;
   if(tot)tot.innerHTML=html+baseNote;
 }
@@ -3672,7 +3673,6 @@ function editQuote(id){
     `<div class="qsec-h">📋 ${lang==='ar'?'بيانات العرض':'Quote details'}</div>`+
     `<div class="row2">${fEl('Quotation No.','q_number',r.number)}${selEl('Type','q_type',['Quotation'],'Quotation')}</div>`+
     `<div class="row2">${fEl('Quote Subject (cover)','q_subject',r.subject||r.projectName||'')}${fEl('Presales Name (cover)','q_presales',r.presalesName||r.preparedBy||'')}</div>`+
-    selEl('Main system / service (default cover)','q_service',QSYS_ALL,r.service||QSYS_ALL[0])+
     `<label class="fld" style="display:flex;align-items:center;gap:8px;background:#f6f9fc;border:1px solid #e3edf4;border-radius:8px;padding:9px 12px;cursor:pointer;font-weight:700;color:var(--navy)"><input type="checkbox" id="q_gencover" ${r.useGeneralCover?'checked':''} style="width:16px;height:16px"> ${lang==='ar'?'استخدم كافر سيدرا العام (Powering the Future) كصفحة رئيسية':'Use the Sedra general cover (Powering the Future) as the front page'}</label>`+
     `<label class="fld" style="display:flex;align-items:center;gap:8px;background:#f6f9fc;border:1px solid #e3edf4;border-radius:8px;padding:9px 12px;cursor:pointer;font-weight:700;color:var(--navy)"><input type="checkbox" id="q_showpn" ${(r.showPartNo!==false)?'checked':''} style="width:16px;height:16px"> ${lang==='ar'?'إظهار الـ Part Number (كود المنتج) في العرض المطبوع':'Show the Part Number (item code) in the printed quotation'}</label>`+
     `<div class="row2"><div class="fld"><label>Client name</label><input id="q_client" list="cust_dl" value="${esc(r.client||'')}">${custDatalist()}</div>${fEl('Date','q_date',r.date,'date')}</div>`+
@@ -3694,7 +3694,7 @@ function editQuote(id){
     fTa('Terms & conditions (one per line)','q_terms',r.terms||defQTerms())+
     fTa('Notes','q_notes',r.notes),
     ()=>{ qReadDOM(); const secs=_qsec.map(s=>({title:s.title||'Section',items:(s.items||[]).filter(i=>(i.desc||i.item)).map(i=>({item:i.item||'',desc:i.desc||'',brand:i.brand||'',qty:num(i.qty),price:num(i.price),image:i.image||''})),instOn:!!s.instOn,instType:s.instType||'percent',instVal:num(s.instVal),discOn:!!s.discOn,discType:s.discType||'percent',discVal:num(s.discVal),features:s.features||'',notes:s.notes||''})).filter(s=>s.items.length);
-      const d={number:val('q_number'),type:val('q_type'),subject:val('q_subject'),presalesName:val('q_presales'),client:val('q_client'),date:val('q_date'),dueDate:val('q_due'),buildingType:val('q_btype'),location:val('q_loc'),consultant:val('q_consultant'),preparedBy:val('q_prep'),service:val('q_service'),useGeneralCover:!!(g('q_gencover')&&g('q_gencover').checked),showPartNo:!!(g('q_showpn')&&g('q_showpn').checked),branch:val('q_branch'),dept:r.dept||'Operations',currency:val('q_cur'),fxManual:!!(g('q_fxman')&&g('q_fxman').checked),fxRate:(typeof qCurRate==='function'?qCurRate():1),fxEgp:num(val('q_fx'))||0,status:val('q_status'),vat:num(val('q_vat')),sections:secs,excluding:val('q_excl'),featuresList:val('q_features'),payAdvance:num(val('q_pa')),payBefore:num(val('q_pb')),payAfter:num(val('q_pc')),payTest:num(val('q_pd')),validity:num(val('q_valid')),terms:val('q_terms'),notes:val('q_notes')};
+      const d={number:val('q_number'),type:val('q_type'),subject:val('q_subject'),presalesName:val('q_presales'),client:val('q_client'),date:val('q_date'),dueDate:val('q_due'),buildingType:val('q_btype'),location:val('q_loc'),consultant:val('q_consultant'),preparedBy:val('q_prep'),service:(g('q_service')?val('q_service'):(r.service||'Home Automation')),useGeneralCover:!!(g('q_gencover')&&g('q_gencover').checked),showPartNo:!!(g('q_showpn')&&g('q_showpn').checked),branch:val('q_branch'),dept:r.dept||'Operations',currency:val('q_cur'),fxManual:!!(g('q_fxman')&&g('q_fxman').checked),fxRate:(typeof qCurRate==='function'?qCurRate():1),fxEgp:num(val('q_fx'))||0,status:val('q_status'),vat:num(val('q_vat')),sections:secs,excluding:val('q_excl'),featuresList:val('q_features'),payAdvance:num(val('q_pa')),payBefore:num(val('q_pb')),payAfter:num(val('q_pc')),payTest:num(val('q_pd')),validity:num(val('q_valid')),terms:val('q_terms'),notes:val('q_notes')};
       if(!d.client){alert('Client name required');return false;} if(!secs.length){alert('Add at least one line item with a description.');return false;} if(!id){d.created=new Date().toISOString(); d.number=genQuoteNo(svcKey(d.service));}
       /* Version history: append this saved state as a version so any past version can be restored later. */
       var _prevHist=Array.isArray(r.history)?r.history.slice(-40):[]; d.history=_prevHist.concat([qSnap(d)]);
@@ -3767,7 +3767,10 @@ function printQuote(id,opts){
   const ftHTML=`<div class="ft"><span>info@sedra-electric.com</span><span>www.sedra-electric.com</span><span>Tel: 0226783906</span></div>`;
   const rowsTbl=sc=>`<table>${qThead}<tbody>${qRows(sc)}</tbody></table>`;
   const sysLines=(secs.length>1)?secs.map((sc,i)=>`<div class="r2"><span>${esc(sc.title||('System '+(i+1)))}</span><b>${M(t.secTotals[i])}</b></div>`).join(''):'';
-  const finHTML=`${cur!=='EGP'?`<div class="mini" style="text-align:right;color:#5a6b7b;font-size:11px;margin-bottom:4px">${lang==='ar'?'كل المبالغ بعملة':'All amounts in'} ${cur}</div>`:''}<div class="fin">${sysLines}<div class="r2"><span>${lang==='ar'?'إجمالي كل السيستمز (قبل الضريبة)':'All systems subtotal (excl. VAT)'}</span><b>${M(t.sub)}</b></div><div class="r2"><span>VAT (${num(q.vat)}%)</span><b>${M(t.vat)}</b></div><div class="g"><span>Grand Total</span><span>${M(t.total)}</span></div></div>`;
+  const _hasVat=num(q.vat)>0;
+  const _subLabel=lang==='ar'?(_hasVat?'إجمالي كل السيستمز (قبل الضريبة)':'إجمالي كل السيستمز'):(_hasVat?'All systems subtotal (excl. VAT)':'All systems subtotal');
+  const _vatRow=_hasVat?`<div class="r2"><span>VAT (${num(q.vat)}%)</span><b>${M(t.vat)}</b></div>`:'';
+  const finHTML=`${cur!=='EGP'?`<div class="mini" style="text-align:right;color:#5a6b7b;font-size:11px;margin-bottom:4px">${lang==='ar'?'كل المبالغ بعملة':'All amounts in'} ${cur}</div>`:''}<div class="fin">${sysLines}<div class="r2"><span>${_subLabel}</span><b>${M(t.sub)}</b></div>${_vatRow}<div class="g"><span>Grand Total</span><span>${M(t.total)}</span></div></div>`;
   const featHTML=(function(){var fl=lines(q.featuresList);return fl.length?`<div class="stitle" style="font-size:15px;margin-top:10px">✨ Features list</div><div class="sec" style="page-break-inside:avoid;border-color:#37c0dc"><ul style="padding:14px 30px;margin:0;line-height:1.9;font-size:12.5px;color:#1c2b3a;columns:2;-webkit-columns:2;column-gap:30px">${fl.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')}</ul></div>`:'';})();
   const payHTML=pay.length?`<div class="stitle" style="font-size:15px;margin-top:6px">Payment terms</div><div class="pay">${pay.map(pp=>`<div class="pc"><div class="k">${esc(pp[0].toUpperCase())}</div><div class="v">${num(pp[1])}%</div></div>`).join('')}</div>`:'';
   const notesHTML=(function(){var nl=lines(q.notes);return nl.length?`<div class="stitle" style="font-size:15px;margin-top:10px">📝 ${lang==='ar'?'ملاحظات':'Notes'}</div><div class="sec" style="page-break-inside:avoid;border-color:#37c0dc"><ul style="padding:14px 30px;margin:0;line-height:1.9;font-size:12.5px;color:#1c2b3a">${nl.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')}</ul></div>`:'';})();
@@ -3876,7 +3879,38 @@ function printQuote(id,opts){
   @media screen and (max-width:840px){ .sheet{width:100%} }
   </style></head><body>
   <div class="bar"><b>Sedra Quotation &mdash; ${esc(q.number||'')} ${verTag}</b><button onclick="window.print()">Print / Save PDF</button></div>
-  <div class="doc">${bodyHTML}</div></body></html>`);
+  <div class="doc">${bodyHTML}</div>
+  <script>
+  (function(){
+    function clean(img){
+      if(img._cln) return; img._cln=1;
+      try{
+        var w=img.naturalWidth, h=img.naturalHeight; if(!w||!h) return;
+        var scale=Math.min(1, 260/Math.max(w,h)); var cw=Math.max(1,Math.round(w*scale)), ch=Math.max(1,Math.round(h*scale));
+        var cv=document.createElement('canvas'); cv.width=cw; cv.height=ch;
+        var ctx=cv.getContext('2d'); ctx.drawImage(img,0,0,cw,ch);
+        var id; try{ id=ctx.getImageData(0,0,cw,ch); }catch(e){ return; }
+        var d=id.data, N=cw*ch;
+        function px(x,y){ var i=(y*cw+x)*4; return [d[i],d[i+1],d[i+2]]; }
+        var corners=[px(0,0),px(cw-1,0),px(0,ch-1),px(cw-1,ch-1)];
+        function close(a,b,t){ return Math.abs(a[0]-b[0])<=t&&Math.abs(a[1]-b[1])<=t&&Math.abs(a[2]-b[2])<=t; }
+        var bg=corners[0]; var uni=corners.every(function(c){return close(c,bg,26);});
+        if(!uni) return;
+        var lum=0.299*bg[0]+0.587*bg[1]+0.114*bg[2];
+        if(lum>=235) return;
+        var tol=52; var visited=new Uint8Array(N); var stack=[0, cw-1, (ch-1)*cw, N-1]; var fill=0;
+        function match(i){ var o=i*4; return Math.abs(d[o]-bg[0])<=tol&&Math.abs(d[o+1]-bg[1])<=tol&&Math.abs(d[o+2]-bg[2])<=tol; }
+        while(stack.length){ var p=stack.pop(); if(p<0||p>=N||visited[p]) continue; visited[p]=1; if(!match(p)) continue; var o=p*4; d[o]=255;d[o+1]=255;d[o+2]=255; fill++; var x=p%cw, y=(p-x)/cw; if(x>0)stack.push(p-1); if(x<cw-1)stack.push(p+1); if(y>0)stack.push(p-cw); if(y<ch-1)stack.push(p+cw); }
+        if(fill<N*0.02 || fill>N*0.94) return;
+        ctx.putImageData(id,0,0);
+        img.src=cv.toDataURL('image/png');
+      }catch(e){}
+    }
+    function run(){ var imgs=document.querySelectorAll('img.pimg'); for(var i=0;i<imgs.length;i++){ (function(im){ if(im.complete&&im.naturalWidth){ clean(im); } else { im.addEventListener('load',function(){clean(im);}); } })(imgs[i]); } }
+    if(document.readyState!=='loading') run(); else document.addEventListener('DOMContentLoaded',run);
+  })();
+  <\/script>
+  </body></html>`);
   w.document.close();
 }
 function createProjectFromQuote(id){
