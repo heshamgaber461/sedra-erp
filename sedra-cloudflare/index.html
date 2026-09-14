@@ -3754,7 +3754,7 @@ function printQuote(id,opts){
     return r; };
   /* Show the Part Number (item code) only when enabled on the quote (default: shown). */
   const showPN = (q.showPartNo!==false);
-  const qThead = `<thead><tr><th class="c">Image</th><th>Item, Description</th><th>Brand</th><th class="c">Qty</th><th class="r">Unit Price</th><th class="r">Total</th></tr></thead>`;
+  const qThead = `<thead><tr><th class="c">Image</th><th>Item - Description</th><th>Brand</th><th class="c">Qty</th><th class="r">Unit Price</th><th class="r">Total</th></tr></thead>`;
   const qRows = sc => (sc.items||[]).map(it=>`<tr><td class="c">${it.image?`<img src="${esc(it.image)}" class="pimg">`:''}</td><td class="pd">${(showPN&&it.item)?`<div class="pn">${esc(it.item)}</div>`:''}<div class="ds">${esc(it.desc||'')}</div></td><td class="br">${esc(it.brand||'-')}</td><td class="c">${num(it.qty)}</td><td class="r">${M(it.price)}</td><td class="r"><b>${M(num(it.qty)*num(it.price))}</b></td></tr>`).join('');
   const secTable=(sc,i)=>`<div class="sec"><div class="sech">${esc(sc.title||'Section')}</div>
     <table>${qThead}<tbody>${qRows(sc)}</tbody></table>${secFinRows(sc,i)}</div>`;
