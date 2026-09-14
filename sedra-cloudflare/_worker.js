@@ -305,8 +305,9 @@ export default {
       else if (HR_WRITE[coll])    { if (!ctx.comp) return deny(coll+' is HR/payroll-only'); }
       else if (FIN_COLLS[coll])   { if (!ctx.fin) return deny(coll+' is finance-only'); }
       else if (coll === 'audit')  { if (method!=='POST' && !ctx.admin) return deny('audit is append-only'); }
-      else if (coll === 'quotes' && method === 'POST' && !id && ctx.dept === 'Sales' && ctx.rank < ROLE_RANK['Team Leader'] && !ctx.admin) {
-        return deny('quote creation is limited to Sales Team Leader/Manager');
+      else if (coll === 'quotes' && method === 'POST' && !id && ctx.dept === 'Sales' && ctx.rank < ROLE_RANK['Team Leader'] && !ctx.admin && !(p.body && p.body.isRFQ === true)) {
+        // Sales reps may REQUEST from the Technical Office (isRFQ) but not build a quote directly.
+        return deny('direct quote creation is limited to Sales Team Leader/Manager — send a request to the Technical Office');
       }
       else if (SALES_COLLS[coll] && method==='DELETE' && id) {
         if (!(ctx.admin || ctx.rank>=ROLE_RANK['Manager'] || ctx.scope==='all')) {
