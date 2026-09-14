@@ -3340,7 +3340,14 @@ function vQuotes(){
   const techAssignees=Object.keys(TECH_ROUTING).map(function(k){return TECH_ROUTING[k].name;});
   const isTechAssignee = techAssignees.indexOf(meName)>=0 || (me.dept==='Technical');
   const seesAllQuotes = me.role==='Super Admin'||me.dept==='Management'||isMgr();
-  const rows=quotes.filter(inBranch).filter(function(q){
+  const _myEmail=(me&&me.email||'').toLowerCase();
+  const rows=quotes.filter(function(q){
+    /* Incoming quote REQUESTS (pending RFQs) must reach the decision-makers (Super Admin,
+       Sales/Technical managers) and the assigned technical person regardless of which branch
+       is currently selected — otherwise a UAE request is hidden while viewing Egypt. */
+    if(q.isRFQ && !q.rfqDone && (seesAllQuotes || isTechAssignee || (q.assignedEmail&&String(q.assignedEmail).toLowerCase()===_myEmail))) return true;
+    return inBranch(q);
+  }).filter(function(q){
     if(seesAllQuotes) return true;
     if(isTechAssignee){ return (q.assignedTo||'')===meName || nameEq(q.preparedBy,meName) || nameEq(q.requestedBy,meName); }
     return !q.dept||q.dept===me.dept||nameEq(q.requestedBy,meName)||nameEq(q.preparedBy,meName)||(me.accessModules||[]).includes('quotes');
