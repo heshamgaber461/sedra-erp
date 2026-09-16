@@ -4474,9 +4474,9 @@ var FIN_MENU=[
   {g:'Dashboard', ar:'الرئيسية', ic:'📊', pages:[['dash','Dashboard','الرئيسية']]},
   {g:'Customers', ar:'العملاء', ic:'🧾', pages:[['c_inv','Invoices','الفواتير'],['c_cn','Credit Notes','إشعارات دائن'],['c_pay','Payments','المقبوضات'],['c_cust','Customers','العملاء'],['c_age','Aged Receivable','أعمار الذمم']]},
   {g:'Vendors', ar:'الموردين', ic:'📥', pages:[['v_bill','Bills','فواتير الموردين'],['v_dn','Refunds','إشعارات مدين'],['v_sup','Vendors','الموردين'],['v_age','Aged Payable','أعمار الدائنين']]},
-  {g:'Accounting', ar:'المحاسبة', ic:'📒', pages:[['a_je','Journal Entries','قيود اليومية'],['a_coa','Chart of Accounts','دليل الحسابات'],['a_trial','Trial Balance','ميزان المراجعة'],['a_tx','Transfers','التحويلات']]},
-  {g:'Reporting', ar:'التقارير', ic:'📈', pages:[['r_bs','Balance Sheet','الميزانية'],['r_pnl','Profit & Loss','الأرباح والخسائر'],['r_cash','Cash Flow','التدفقات النقدية'],['r_gl','General Ledger','دفتر الأستاذ'],['r_trial','Trial Balance','ميزان المراجعة'],['r_ar','Aged Receivable','أعمار الذمم'],['r_ap','Aged Payable','أعمار الدائنين'],['r_tax','Tax Report','تقرير الضريبة']]},
-  {g:'Configuration', ar:'الإعدادات', ic:'⚙️', pages:[['cf_coa','Chart of Accounts','دليل الحسابات'],['cf_tax','Taxes','الضرائب'],['cf_journal','Journals','دفاتر اليومية'],['cf_cur','Currencies','العملات'],['cf_fiscal','Fiscal Positions','الأوضاع الضريبية'],['cf_terms','Payment Terms','شروط الدفع'],['cf_deprec','Depreciation','الإهلاك']]}
+  {g:'Accounting', ar:'المحاسبة', ic:'📒', pages:[['a_je','Journal Entries','قيود اليومية'],['a_ji','Journal Items','بنود اليومية'],['a_coa','Chart of Accounts','دليل الحسابات'],['a_trial','Trial Balance','ميزان المراجعة'],['a_tx','Transfers','التحويلات']]},
+  {g:'Reporting', ar:'التقارير', ic:'📈', pages:[['r_bs','Balance Sheet','الميزانية'],['r_pnl','Profit & Loss','الأرباح والخسائر'],['r_cash','Cash Flow','التدفقات النقدية'],['r_exec','Executive Summary','ملخص تنفيذي'],['r_gl','General Ledger','دفتر الأستاذ'],['r_partner','Partner Ledger','دفتر الأطراف'],['r_trial','Trial Balance','ميزان المراجعة'],['r_ar','Aged Receivable','أعمار الذمم'],['r_ap','Aged Payable','أعمار الدائنين'],['r_tax','Tax Report','تقرير الضريبة']]},
+  {g:'Configuration', ar:'الإعدادات', ic:'⚙️', pages:[['cf_coa','Chart of Accounts','دليل الحسابات'],['cf_tax','Taxes','الضرائب'],['cf_journal','Journals','دفاتر اليومية'],['cf_bank','Bank Accounts','الحسابات البنكية'],['cf_cur','Currencies','العملات'],['cf_fiscal','Fiscal Positions','الأوضاع الضريبية'],['cf_terms','Payment Terms','شروط الدفع'],['cf_pm','Payment Methods','طرق الدفع'],['cf_cat','Product Categories','فئات المنتجات'],['cf_deprec','Depreciation','الإهلاك']]}
 ];
 function finGrpLbl(m){ return (lang==='ar'?m.ar:m.g); }
 function finPageValid(id){ for(var i=0;i<FIN_MENU.length;i++){ for(var j=0;j<FIN_MENU[i].pages.length;j++){ if(FIN_MENU[i].pages[j][0]===id) return true; } } return false; }
@@ -4496,13 +4496,16 @@ function finContent(){
     case 'v_sup': return invSuppliers();
     case 'v_age': return vAPAging();
     case 'a_je': return glJournal();
+    case 'a_ji': return finJournalItems();
     case 'a_coa': return glChart();
     case 'a_trial': return glTrial();
     case 'a_tx': return vTransfers();
     case 'r_bs': return glBS();
     case 'r_pnl': return glPnl();
     case 'r_cash': return finCashFlowOdoo();
+    case 'r_exec': return finExecSummary();
     case 'r_gl': return vGLReport();
+    case 'r_partner': return finPartnerLedger();
     case 'r_trial': return glTrial();
     case 'r_ar': return accAging(inv);
     case 'r_ap': return vAPAging();
@@ -4510,9 +4513,12 @@ function finContent(){
     case 'cf_coa': return glChart();
     case 'cf_tax': return vTaxCodes();
     case 'cf_journal': return finJournals();
+    case 'cf_bank': return finBankAccounts();
     case 'cf_cur': return vFXRates();
     case 'cf_fiscal': return finFiscalPositions();
     case 'cf_terms': return finPaymentTerms();
+    case 'cf_pm': return finPaymentMethods();
+    case 'cf_cat': return finProductCategories();
     case 'cf_deprec': return vDeprec();
     default: return finDashboard();
   }
@@ -4646,6 +4652,102 @@ function finAddTerm(){
 }
 function finDelTerm(i){ var arr=((settings&&settings.paymentTerms)||[]).slice(); arr.splice(i,1); saveSetting('paymentTerms',arr); }
 function finSeedTerms(){ saveSetting('paymentTerms',[{name:'Immediate',days:0},{name:'15 Days',days:15},{name:'30 Days',days:30},{name:'45 Days',days:45},{name:'60 Days',days:60}]); }
+
+/* ---- Journal Items: flat list of every posted debit/credit line ---- */
+function finJournalItems(){
+  var ar=(lang==='ar'); var am={}; (accounts||[]).forEach(function(a){am[a.code]=a;});
+  var rows=[]; (typeof journal!=='undefined'?journal:[]).filter(inBranch).forEach(function(e){ (e.lines||[]).forEach(function(l){ rows.push({date:e.date||'',ref:e.ref||'',memo:e.memo||'',account:l.account,debit:num(l.debit),credit:num(l.credit),auto:e.auto}); }); });
+  rows.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  var tdr=rows.reduce(function(s,r){return s+r.debit;},0), tcr=rows.reduce(function(s,r){return s+r.credit;},0);
+  var h='<div class="sect"><h2>🧾 '+(ar?'بنود اليومية':'Journal Items')+' '+(curBranch!=='All'?'— '+esc(curBranch):'')+'</h2><div class="sp"></div><span class="mini" style="color:var(--muted)">'+rows.length+' '+(ar?'بند':'items')+'</span></div>';
+  if(!rows.length) return h+'<div class="card empty">'+(ar?'لسه مفيش قيود مترحّلة.':'No posted journal lines yet.')+'</div>';
+  h+='<div style="overflow-x:auto"><table><thead><tr><th>'+(ar?'التاريخ':'Date')+'</th><th>'+(ar?'المرجع':'Ref')+'</th><th>'+(ar?'الحساب':'Account')+'</th><th>'+(ar?'البيان':'Label')+'</th><th class="r">'+(ar?'مدين':'Debit')+'</th><th class="r">'+(ar?'دائن':'Credit')+'</th></tr></thead><tbody>'
+   +rows.slice(0,400).map(function(r){ var a=am[r.account]; return '<tr><td>'+esc(r.date)+'</td><td><b>'+esc(r.ref)+'</b>'+(r.auto?' <span class="tag" style="background:#36C5E022;color:#1aa3c4">Auto</span>':'')+'</td><td>'+esc(r.account||'')+(a?' '+esc(a.name):'')+'</td><td>'+esc(r.memo)+'</td><td style="text-align:right">'+(r.debit?nfmt(r.debit):'—')+'</td><td style="text-align:right">'+(r.credit?nfmt(r.credit):'—')+'</td></tr>'; }).join('')
+   +'<tr style="font-weight:800;border-top:2px solid var(--navy)"><td colspan="4">'+(ar?'الإجمالي':'TOTAL')+'</td><td style="text-align:right">'+nfmt(tdr)+'</td><td style="text-align:right">'+nfmt(tcr)+'</td></tr></tbody></table></div>';
+  return h;
+}
+
+/* ---- Partner Ledger: per-customer statement (invoices vs receipts, running balance) ---- */
+var _plPartner='';
+function plPick(v){ _plPartner=v; render(); }
+function finPartnerLedger(){
+  var ar=(lang==='ar');
+  var custs=(customers||[]).filter(inBranch).map(function(c){return c.name;});
+  var fromInv={}; (invoices||[]).filter(inBranch).forEach(function(v){ if(v.client) fromInv[v.client]=1; });
+  Object.keys(fromInv).forEach(function(n){ if(custs.indexOf(n)<0) custs.push(n); });
+  custs.sort(function(a,b){return (a||'').localeCompare(b||'');});
+  var opts='<option value="">'+(ar?'— اختر عميل —':'— select a customer —')+'</option>'+custs.map(function(n){return '<option value="'+esc(n)+'" '+(n===_plPartner?'selected':'')+'>'+esc(n)+'</option>';}).join('');
+  var h='<div class="sect"><h2>📇 '+(ar?'دفتر الأطراف (العملاء)':'Partner Ledger (Customers)')+'</h2><div class="sp"></div><select onchange="plPick(this.value)" style="min-width:240px">'+opts+'</select></div>';
+  if(!_plPartner) return h+'<div class="card empty">'+(ar?'اختر عميل عشان تشوف كشف حسابه (الفواتير والمقبوضات والرصيد الجاري).':'Pick a customer to see their statement — invoices, receipts and running balance.')+'</div>';
+  var p=_plPartner; var ev=[];
+  (invoices||[]).filter(inBranch).forEach(function(v){ if(nameEq(v.client,p)){ ev.push({date:v.date||'',ref:v.number||'INV',debit:num(v.amount),credit:0,memo:ar?'فاتورة':'Invoice'}); if(num(v.paid)>0) ev.push({date:v.date||'',ref:(v.number||'INV')+' ·'+(ar?' دفعة':' pay'),debit:0,credit:num(v.paid),memo:ar?'تحصيل على الفاتورة':'Payment on invoice'}); } });
+  (typeof payments!=='undefined'?payments:[]).filter(inBranch).forEach(function(pm){ if(nameEq(pm.client,p)){ ev.push({date:pm.date||'',ref:pm.number||(ar?'سند قبض':'Receipt'),debit:0,credit:num(pm.amount),memo:ar?'مقبوضات':'Receipt'}); } });
+  (typeof creditnotes!=='undefined'?creditnotes:[]).filter(inBranch).forEach(function(cn){ if(nameEq(cn.client||cn.customer,p)){ ev.push({date:cn.date||'',ref:cn.number||(ar?'إشعار دائن':'Credit Note'),debit:0,credit:num(cn.amount),memo:ar?'إشعار دائن':'Credit note'}); } });
+  ev.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+  var bal=0, tdr=0, tcr=0;
+  var body=ev.map(function(e){ bal+=e.debit-e.credit; tdr+=e.debit; tcr+=e.credit; return '<tr><td>'+esc(e.date)+'</td><td><b>'+esc(e.ref)+'</b></td><td>'+esc(e.memo)+'</td><td style="text-align:right">'+(e.debit?nfmt(e.debit):'—')+'</td><td style="text-align:right">'+(e.credit?nfmt(e.credit):'—')+'</td><td style="text-align:right"><b>'+nfmt(bal)+'</b></td></tr>'; }).join('');
+  if(!ev.length) return h+'<div class="card empty">'+(ar?'مفيش حركات للعميل ده.':'No transactions for this customer.')+'</div>';
+  h+='<div style="overflow-x:auto"><table><thead><tr><th>'+(ar?'التاريخ':'Date')+'</th><th>'+(ar?'المستند':'Document')+'</th><th>'+(ar?'البيان':'Label')+'</th><th class="r">'+(ar?'مدين':'Debit')+'</th><th class="r">'+(ar?'دائن':'Credit')+'</th><th class="r">'+(ar?'الرصيد':'Balance')+'</th></tr></thead><tbody>'+body
+   +'<tr style="font-weight:800;border-top:2px solid var(--navy)"><td colspan="3">'+(ar?'الإجمالي / الرصيد':'TOTAL / Balance')+'</td><td style="text-align:right">'+nfmt(tdr)+'</td><td style="text-align:right">'+nfmt(tcr)+'</td><td style="text-align:right">'+nfmt(bal)+'</td></tr></tbody></table></div>';
+  h+='<div class="mini" style="margin-top:6px;color:var(--muted)">'+(ar?'مدين = فواتير على العميل · دائن = مقبوضات/إشعارات دائن · الرصيد = المستحق عليه.':'Debit = invoices · Credit = receipts/credit notes · Balance = amount owed.')+'</div>';
+  return h;
+}
+
+/* ---- Executive Summary: top financial KPIs ---- */
+function finExecSummary(){
+  var ar=(lang==='ar'); var b=(typeof glBalances==='function')?glBalances():{};
+  var income=0, expense=0;
+  (accounts||[]).forEach(function(a){ var x=b[a.code]||{dr:0,cr:0}; if(a.type==='Income') income+=(x.cr-x.dr); else if(a.type==='Expense') expense+=(x.dr-x.cr); });
+  var net=income-expense;
+  var inv=(invoices||[]).filter(inBranch), bl=(typeof bills!=='undefined'?bills:[]).filter(inBranch);
+  var ar_out=inv.reduce(function(s,v){return s+Math.max(0,num(v.amount)-num(v.paid));},0);
+  var ap_out=bl.reduce(function(s,v){return s+Math.max(0,num(v.amount)-num(v.paid));},0);
+  var pays=(typeof payments!=='undefined'?payments:[]).filter(inBranch);
+  var exps=(expenses||[]).filter(inBranch);
+  var cash=pays.reduce(function(s,v){return s+num(v.amount);},0)-exps.reduce(function(s,v){return s+num(v.amount);},0)-bl.reduce(function(s,v){return s+num(v.paid);},0);
+  var margin=income>0?Math.round(net/income*100):0;
+  function kpi(color,icon,val,lbl){ return '<div class="card kpi" style="text-align:center"><div style="font-size:22px">'+icon+'</div><div class="n" style="color:'+color+';font-size:22px;font-weight:800">'+val+'</div><div class="l" style="color:var(--muted);font-size:12px">'+lbl+'</div></div>'; }
+  var h='<div class="sect"><h2>🧭 '+(ar?'الملخص التنفيذي':'Executive Summary')+' '+(curBranch!=='All'?'— '+esc(curBranch):'')+'</h2></div>';
+  h+='<div class="grid kpis" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px">'
+    +kpi('#1a7a4f','💰',nfmt(income),ar?'الإيراد':'Income')
+    +kpi('#c0392b','🧾',nfmt(expense),ar?'المصروفات':'Expenses')
+    +kpi(net>=0?'#1a7a4f':'#c0392b','📈',nfmt(net),ar?(net>=0?'صافي ربح':'صافي خسارة'):(net>=0?'Net Profit':'Net Loss'))
+    +kpi('#0e2c49','🏦',nfmt(cash),ar?'المركز النقدي':'Cash position')
+    +kpi('#2C77B0','⏳',nfmt(ar_out),ar?'ذمم مدينة (عملاء)':'Receivables')
+    +kpi('#8a5a00','📥',nfmt(ap_out),ar?'ذمم دائنة (موردين)':'Payables')
+    +kpi('#7a4fa3','％',margin+'%',ar?'هامش صافي الربح':'Net margin')
+    +'</div>';
+  h+='<div class="mini" style="margin-top:10px;color:var(--muted)">'+(ar?'الإيراد والمصروفات من القيود المترحّلة · الذمم من الفواتير غير المسددة · المركز النقدي تقديري من المقبوضات والمصروفات.':'Income/Expenses from posted entries · Receivables/Payables from open invoices/bills · Cash is an estimate from receipts and spend.')+'</div>';
+  return h;
+}
+
+/* ---- Configuration: Bank Accounts / Payment Methods / Product Categories (stored in settings) ---- */
+function finCfgSimple(key, titleEn, titleAr, icon, fields, seed){
+  var ar=(lang==='ar'); var list=(settings&&settings[key])||[]; var canEdit=(isMgr()||me.dept==='Management');
+  var ths=fields.map(function(f){return '<th>'+(ar?f.ar:f.en)+'</th>';}).join('')+(canEdit?'<th></th>':'');
+  var rows=list.map(function(it,i){ return '<tr>'+fields.map(function(f){ return '<td>'+(f.key===fields[0].key?'<b>'+esc(it[f.key]||'')+'</b>':esc(String(it[f.key]!=null?it[f.key]:'')))+'</td>'; }).join('')+(canEdit?'<td style="text-align:right"><button class="btn dn sm" onclick="finCfgDel(\''+key+'\','+i+')">✕</button></td>':'')+'</tr>'; }).join('');
+  var body=list.length?('<div class="card"><table><thead><tr>'+ths+'</tr></thead><tbody>'+rows+'</tbody></table></div>')
+    :('<div class="card empty">'+(ar?'لسه فاضي.':'Nothing here yet.')+(canEdit&&seed?' <button class="btn gh sm" onclick="finCfgSeed(\''+key+'\')">'+(ar?'إضافة الجاهزة':'Seed defaults')+'</button>':'')+'</div>');
+  return '<div class="sect"><h2>'+icon+' '+(ar?titleAr:titleEn)+'</h2><div class="sp"></div>'+(canEdit?'<button class="btn cy" onclick="finCfgAdd(\''+key+'\')">+ '+(ar?'إضافة':'New')+'</button>':'')+'</div>'+body;
+}
+var FIN_CFG={
+  bankAccounts:{fields:[{key:'name',en:'Account name',ar:'اسم الحساب'},{key:'bank',en:'Bank',ar:'البنك'},{key:'number',en:'Account number',ar:'رقم الحساب'},{key:'currency',en:'Currency',ar:'العملة'}],
+    seed:[{name:'Main AED Operating Account',bank:'—',number:'',currency:'AED'},{name:'Main EGP Account',bank:'—',number:'',currency:'EGP'},{name:'Cash on hand',bank:'—',number:'',currency:''}]},
+  paymentMethods:{fields:[{key:'name',en:'Method',ar:'الطريقة'},{key:'type',en:'Type',ar:'النوع'}],
+    seed:[{name:'Cash',type:'Manual'},{name:'Bank Transfer',type:'Manual'},{name:'Cheque',type:'Manual'},{name:'Card',type:'Manual'},{name:'Online',type:'Electronic'}]},
+  productCategories:{fields:[{key:'name',en:'Category',ar:'الفئة'}],
+    seed:[{name:'Home Automation'},{name:'CCTV & Security'},{name:'Sound Systems'},{name:'Structured Cabling'},{name:'Accessories'}]}
+};
+function finBankAccounts(){ var c=FIN_CFG.bankAccounts; return finCfgSimple('bankAccounts','Bank Accounts','الحسابات البنكية','🏦',c.fields,c.seed); }
+function finPaymentMethods(){ var c=FIN_CFG.paymentMethods; return finCfgSimple('paymentMethods','Payment Methods','طرق الدفع','💳',c.fields,c.seed); }
+function finProductCategories(){ var c=FIN_CFG.productCategories; return finCfgSimple('productCategories','Product Categories','فئات المنتجات','🏷️',c.fields,c.seed); }
+function finCfgSeed(key){ saveSetting(key,(FIN_CFG[key]&&FIN_CFG[key].seed)||[]); }
+function finCfgDel(key,i){ var arr=((settings&&settings[key])||[]).slice(); arr.splice(i,1); saveSetting(key,arr); }
+function finCfgAdd(key){
+  var c=FIN_CFG[key]; if(!c)return; var ar=(lang==='ar');
+  openModal(ar?'إضافة':'New', c.fields.map(function(f){ return fEl(ar?f.ar:f.en,'fc_'+f.key,''); }).join(''),
+    function(){ var o={}; var first=c.fields[0].key; c.fields.forEach(function(f){ o[f.key]=val('fc_'+f.key); }); if(!o[first]){ alert(ar?'اكتب الاسم':'Name required'); return false; } var arr=((settings&&settings[key])||[]).slice(); arr.push(o); saveSetting(key,arr); });
+}
 
 function vAccounting(){
   const inv=invoices.filter(inBranch), exp=expenses.filter(inBranch);
