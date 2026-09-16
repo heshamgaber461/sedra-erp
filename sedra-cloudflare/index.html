@@ -4472,10 +4472,10 @@ function editBOM(id){ const r=id?boms.find(x=>x.id===id):{branch:defBranch()};
 var finGrp='Dashboard', finPg='dash';
 var FIN_MENU=[
   {g:'Dashboard', ar:'الرئيسية', ic:'📊', pages:[['dash','Dashboard','الرئيسية']]},
-  {g:'Customers', ar:'العملاء', ic:'🧾', pages:[['c_inv','Invoices','الفواتير'],['c_cn','Credit Notes','إشعارات دائن'],['c_pay','Payments','المقبوضات'],['c_cust','Customers','العملاء'],['c_age','Aged Receivable','أعمار الذمم']]},
+  {g:'Customers', ar:'العملاء', ic:'🧾', pages:[['c_inv','Invoices','الفواتير'],['c_cn','Credit Notes','إشعارات دائن'],['c_pay','Payments','المقبوضات'],['c_follow','Follow-ups','متابعة التحصيل'],['c_cust','Customers','العملاء'],['c_age','Aged Receivable','أعمار الذمم']]},
   {g:'Vendors', ar:'الموردين', ic:'📥', pages:[['v_bill','Bills','فواتير الموردين'],['v_dn','Refunds','إشعارات مدين'],['v_sup','Vendors','الموردين'],['v_age','Aged Payable','أعمار الدائنين']]},
-  {g:'Accounting', ar:'المحاسبة', ic:'📒', pages:[['a_je','Journal Entries','قيود اليومية'],['a_ji','Journal Items','بنود اليومية'],['a_coa','Chart of Accounts','دليل الحسابات'],['a_trial','Trial Balance','ميزان المراجعة'],['a_tx','Transfers','التحويلات']]},
-  {g:'Reporting', ar:'التقارير', ic:'📈', pages:[['r_bs','Balance Sheet','الميزانية'],['r_pnl','Profit & Loss','الأرباح والخسائر'],['r_cash','Cash Flow','التدفقات النقدية'],['r_exec','Executive Summary','ملخص تنفيذي'],['r_gl','General Ledger','دفتر الأستاذ'],['r_partner','Partner Ledger','دفتر الأطراف'],['r_trial','Trial Balance','ميزان المراجعة'],['r_ar','Aged Receivable','أعمار الذمم'],['r_ap','Aged Payable','أعمار الدائنين'],['r_tax','Tax Report','تقرير الضريبة']]},
+  {g:'Accounting', ar:'المحاسبة', ic:'📒', pages:[['a_je','Journal Entries','قيود اليومية'],['a_ji','Journal Items','بنود اليومية'],['a_coa','Chart of Accounts','دليل الحسابات'],['a_recon','Bank Reconciliation','التسوية البنكية'],['a_trial','Trial Balance','ميزان المراجعة'],['a_tx','Transfers','التحويلات']]},
+  {g:'Reporting', ar:'التقارير', ic:'📈', pages:[['r_bs','Balance Sheet','الميزانية'],['r_pnl','Profit & Loss','الأرباح والخسائر'],['r_cash','Cash Flow','التدفقات النقدية'],['r_exec','Executive Summary','ملخص تنفيذي'],['r_gl','General Ledger','دفتر الأستاذ'],['r_partner','Partner Ledger','دفتر الأطراف'],['r_trial','Trial Balance','ميزان المراجعة'],['r_ar','Aged Receivable','أعمار الذمم'],['r_ap','Aged Payable','أعمار الدائنين'],['r_budget','Budget vs Actual','الموازنة مقابل الفعلي'],['r_tax','Tax Report','تقرير الضريبة']]},
   {g:'Configuration', ar:'الإعدادات', ic:'⚙️', pages:[['cf_coa','Chart of Accounts','دليل الحسابات'],['cf_tax','Taxes','الضرائب'],['cf_journal','Journals','دفاتر اليومية'],['cf_bank','Bank Accounts','الحسابات البنكية'],['cf_cur','Currencies','العملات'],['cf_fiscal','Fiscal Positions','الأوضاع الضريبية'],['cf_terms','Payment Terms','شروط الدفع'],['cf_pm','Payment Methods','طرق الدفع'],['cf_cat','Product Categories','فئات المنتجات'],['cf_deprec','Depreciation','الإهلاك']]}
 ];
 function finGrpLbl(m){ return (lang==='ar'?m.ar:m.g); }
@@ -4498,8 +4498,11 @@ function finContent(){
     case 'a_je': return glJournal();
     case 'a_ji': return finJournalItems();
     case 'a_coa': return glChart();
+    case 'a_recon': return finBankRecon();
     case 'a_trial': return glTrial();
     case 'a_tx': return vTransfers();
+    case 'c_follow': return accCollections();
+    case 'r_budget': return finBudget();
     case 'r_bs': return glBS();
     case 'r_pnl': return glPnl();
     case 'r_cash': return finCashFlowOdoo();
@@ -4747,6 +4750,39 @@ function finCfgAdd(key){
   var c=FIN_CFG[key]; if(!c)return; var ar=(lang==='ar');
   openModal(ar?'إضافة':'New', c.fields.map(function(f){ return fEl(ar?f.ar:f.en,'fc_'+f.key,''); }).join(''),
     function(){ var o={}; var first=c.fields[0].key; c.fields.forEach(function(f){ o[f.key]=val('fc_'+f.key); }); if(!o[first]){ alert(ar?'اكتب الاسم':'Name required'); return false; } var arr=((settings&&settings[key])||[]).slice(); arr.push(o); saveSetting(key,arr); });
+}
+
+/* ---- Bank Reconciliation: tick cleared cash movements until the difference vs the statement = 0 ---- */
+var _recAcct='', _recStmt='', _recCleared={};
+function recPickAcct(v){ _recAcct=v; render(); }
+function recToggle(id){ _recCleared[id]=!_recCleared[id]; render(); }
+function recSave(diff,cnt){ var ar=(lang==='ar'); var log=((settings&&settings.reconLog)||[]).slice(); log.unshift({acct:_recAcct||'—',date:today(),branch:curBranch,statement:num(_recStmt),cleared:cnt,diff:diff,by:(me&&me.name)||''}); saveSetting('reconLog',log.slice(0,100)); alert(ar?'اتسجّلت التسوية ✔':'Reconciliation saved ✔'); }
+function finBankRecon(){
+  var ar=(lang==='ar');
+  var banks=(settings&&settings.bankAccounts)||[];
+  var acctOpts='<option value="">'+(ar?'— كل الحركات —':'— all movements —')+'</option>'+banks.map(function(b){return '<option value="'+esc(b.name)+'" '+(b.name===_recAcct?'selected':'')+'>'+esc(b.name)+(b.currency?(' ('+esc(b.currency)+')'):'')+'</option>';}).join('');
+  var mv=[];
+  (typeof payments!=='undefined'?payments:[]).filter(inBranch).forEach(function(p){ mv.push({id:'p_'+p.id, date:p.date||'', ref:p.number||(ar?'سند قبض':'Receipt'), party:p.client||'', dir:1, amount:num(p.amount)}); });
+  (expenses||[]).filter(inBranch).forEach(function(x){ mv.push({id:'e_'+x.id, date:x.date||'', ref:x.number||x.category||(ar?'مصروف':'Expense'), party:x.payee||x.vendor||'', dir:-1, amount:num(x.amount)}); });
+  mv.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  var clearedBal=0, clearedCnt=0;
+  mv.forEach(function(m){ if(_recCleared[m.id]){ clearedBal+=m.dir*m.amount; clearedCnt++; } });
+  var stmt=num(_recStmt); var diff=stmt-clearedBal; var ok=Math.abs(diff)<0.5;
+  var h='<div class="sect"><h2>🏦 '+(ar?'التسوية البنكية':'Bank Reconciliation')+' '+(curBranch!=='All'?'— '+esc(curBranch):'')+'</h2></div>';
+  h+='<div class="card" style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end">'
+    +'<div class="fld" style="margin:0"><label>'+(ar?'الحساب':'Account')+'</label><select onchange="recPickAcct(this.value)" style="min-width:200px">'+acctOpts+'</select></div>'
+    +'<div class="fld" style="margin:0"><label>'+(ar?'رصيد كشف الحساب':'Statement ending balance')+'</label><input id="recStmt" type="number" value="'+(_recStmt||'')+'" oninput="_recStmt=this.value" style="width:160px"></div>'
+    +'<div style="flex:1"></div>'
+    +'<div style="text-align:'+(ar?'left':'right')+'"><div class="mini" style="color:var(--muted)">'+(ar?'رصيد المسوّى':'Cleared balance')+': <b>'+nfmt(clearedBal)+'</b> · '+clearedCnt+' '+(ar?'حركة':'items')+'</div>'
+    +'<div style="font-size:16px;font-weight:800;color:'+(ok?'var(--ok)':'var(--bad)')+'">'+(ar?'الفرق':'Difference')+': '+nfmt(diff)+' '+(ok?'✓':'⚠')+'</div></div>'
+    +((isMgr()||me.dept==='Management')?'<button class="btn cy" onclick="recSave('+diff+','+clearedCnt+')">'+(ar?'حفظ التسوية':'Save reconciliation')+'</button>':'')
+    +'</div>';
+  h+='<div class="mini" style="margin:8px 0;color:var(--muted)">'+(ar?'علّم على الحركات اللي ظهرت في كشف البنك لحد ما «الفرق» يبقى صفر.':'Tick the movements that appear on your bank statement until the difference reaches zero.')+'</div>';
+  if(!mv.length) return h+'<div class="card empty">'+(ar?'مفيش حركات نقدية في الفرع ده.':'No cash movements in this branch.')+'</div>';
+  h+='<div style="overflow-x:auto"><table><thead><tr><th style="width:40px">'+(ar?'سُوّي':'Cleared')+'</th><th>'+(ar?'التاريخ':'Date')+'</th><th>'+(ar?'المرجع':'Ref')+'</th><th>'+(ar?'الطرف':'Party')+'</th><th class="r">'+(ar?'وارد':'In')+'</th><th class="r">'+(ar?'صادر':'Out')+'</th></tr></thead><tbody>'
+   +mv.slice(0,300).map(function(m){ return '<tr style="'+(_recCleared[m.id]?'background:#eaf7ef':'')+'"><td style="text-align:center"><input type="checkbox" '+(_recCleared[m.id]?'checked':'')+' onclick="recToggle(\''+m.id+'\')"></td><td>'+esc(m.date)+'</td><td><b>'+esc(m.ref)+'</b></td><td>'+esc(m.party)+'</td><td style="text-align:right;color:#1a7a4f">'+(m.dir>0?nfmt(m.amount):'—')+'</td><td style="text-align:right;color:#c0392b">'+(m.dir<0?nfmt(m.amount):'—')+'</td></tr>'; }).join('')
+   +'</tbody></table></div>';
+  return h;
 }
 
 function vAccounting(){
