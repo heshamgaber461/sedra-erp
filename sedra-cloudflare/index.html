@@ -737,6 +737,7 @@ const MODULES = [
   {id:'overtime',  label:'Overtime Log', icon:'⏱️', depts:['HR','Operations']},
   {id:'auditlog',  label:'Audit Log', icon:'🕵️', adminOnly:true},
   {id:'trash',     label:'Recycle Bin', icon:'🗑️', depts:['Sales','Marketing','Operations','Technical','Accounting','Inventory','HR','Management']},
+  {id:'findreplace',label:'Find & Replace', icon:'🔎', adminOnly:true},
   {id:'deprec',    label:'Asset Depreciation', icon:'📐', depts:['Accounting']},
   {id:'myhr',      label:'My HR', icon:'🙋', access:'all'},
   {id:'grn',       label:'Goods Received', icon:'📥', depts:['Inventory','Operations']},
@@ -2070,7 +2071,7 @@ function render(){
   if(!canSee(m)){ curView='hub'; m=MODULES.find(function(x){return x.id==='hub';})||MODULES[0]; }
   g('viewTitle').textContent=m.label;
   markNav();
-  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,trash:vTrash,admin:vAdmin,profile:vProfile}[curView];
+  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,trash:vTrash,findreplace:vFindReplace,admin:vAdmin,profile:vProfile}[curView];
   g('view').innerHTML = fn?fn():'';
   if(curView==='sales' && window._afterSales)window._afterSales();
   if(curView==='chat' && window._afterChat)window._afterChat();
@@ -6250,6 +6251,67 @@ function trashPurge(tid){ if(!(isMgr()||me.dept==='Management'||isAdmin())){ ale
   apiDelete('trash',tid).then(function(){ synced(); }).catch(function(e){ alert('Error: '+(e.message||e)); });
 }
 function purgeOldTrash(){ try{ if(window.__trashPurged)return; window.__trashPurged=true; var cut=Date.now()-TRASH_DAYS*86400000; (trash||[]).forEach(function(t){ var ts=Date.parse(t.at||''); if(ts && ts<cut){ apiDelete('trash',t.id).catch(function(){}); } }); }catch(e){} }
+
+/* ===== Global Find & Replace (real, writes data) — Super Admin only, preview before apply ===== */
+var _frMatches=[];
+var FR_SKIP={id:1,created:1,updated:1,createdAt:1,updatedAt:1,at:1,ts:1,file:1,image:1,img:1,photo:1,logo:1,data:1,history:1,lines:1,password:1,token:1,uid:1,by:1,byEmail:1,origId:1};
+function frCollections(){ return [
+  ['customers',typeof customers!=='undefined'?customers:null,'Customers'],['leads',typeof leads!=='undefined'?leads:null,'Leads'],['contacts',typeof contacts!=='undefined'?contacts:null,'Contacts'],
+  ['quotes',typeof quotes!=='undefined'?quotes:null,'Quotations'],['invoices',typeof invoices!=='undefined'?invoices:null,'Invoices'],['payments',typeof payments!=='undefined'?payments:null,'Payments'],
+  ['expenses',typeof expenses!=='undefined'?expenses:null,'Expenses'],['suppliers',typeof suppliers!=='undefined'?suppliers:null,'Suppliers'],['inventory',typeof inventory!=='undefined'?inventory:null,'Products'],
+  ['projects',typeof projects!=='undefined'?projects:null,'Projects'],['tasks',typeof tasks!=='undefined'?tasks:null,'Tasks'],['jobs',typeof jobs!=='undefined'?jobs:null,'Jobs'],['contracts',typeof contracts!=='undefined'?contracts:null,'Contracts'],
+  ['tickets',typeof tickets!=='undefined'?tickets:null,'Tickets'],['bills',typeof bills!=='undefined'?bills:null,'Vendor bills'],['pos',typeof pos!=='undefined'?pos:null,'Purchase orders'],
+  ['journal',typeof journal!=='undefined'?journal:null,'Journal'],['accounts',typeof accounts!=='undefined'?accounts:null,'Accounts'],['posts',typeof posts!=='undefined'?posts:null,'Content'],['campaigns',typeof campaigns!=='undefined'?campaigns:null,'Campaigns']
+].filter(function(x){return Array.isArray(x[1]);}).map(function(x){return {coll:x[0],arr:x[1],label:x[2]};}); }
+function frName(rec){ return String(rec.name||rec.number||rec.title||rec.client||rec.company||rec.subject||rec.ref||rec.projectName||rec.id||''); }
+function frReplaceAll(str,find,rep,cs){ if(cs){ return str.split(find).join(rep); } var re=new RegExp(find.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi'); return str.replace(re,rep); }
+function frScan(){
+  var find=val('fr_find'); if(!find){ alert(lang==='ar'?'اكتب النص اللي عايز تدوّر عليه':'Enter the text to find'); return; }
+  var rep=(g('fr_rep')&&g('fr_rep').value)||''; var cs=!!(g('fr_cs')&&g('fr_cs').checked); var collSel=val('fr_coll');
+  var SETS=frCollections(); if(collSel!=='__all') SETS=SETS.filter(function(s){return s.coll===collSel;});
+  _frMatches=[];
+  SETS.forEach(function(S){ (S.arr||[]).forEach(function(rec){ Object.keys(rec).forEach(function(k){
+    if(FR_SKIP[k]) return; var v=rec[k]; if(typeof v!=='string'||!v) return; if(v.length>1500 || v.slice(0,5)==='data:') return;
+    var hay=cs?v:v.toLowerCase(); if(hay.indexOf(cs?find:find.toLowerCase())<0) return;
+    var nv=frReplaceAll(v,find,rep,cs); if(nv===v) return;
+    _frMatches.push({coll:S.coll,label:S.label,id:rec.id,name:frName(rec),field:k,before:v,after:nv,on:true});
+  }); }); });
+  frRenderResults();
+}
+function frToggle(i,on){ if(_frMatches[i])_frMatches[i].on=on; var c=g('fr_cnt'); if(c)c.textContent=_frMatches.filter(function(m){return m.on;}).length; }
+function frRenderResults(){ var el=g('fr_res'); if(!el)return; var ar=(lang==='ar');
+  if(!_frMatches.length){ el.innerHTML='<div class="card empty">'+(ar?'مفيش نتائج مطابقة.':'No matches found.')+'</div>'; return; }
+  function hl(s){ return esc(s); }
+  el.innerHTML='<div class="sect"><h2 style="font-size:15px">'+(ar?'المعاينة':'Preview')+' — <span id="fr_cnt">'+_frMatches.length+'</span> '+(ar?'تغيير محدّد':'selected')+'</h2><div class="sp"></div><button class="btn dn" onclick="frApply()">⚠️ '+(ar?'نفّذ الاستبدال':'Replace selected')+'</button></div>'
+   +'<div class="card mini" style="background:#fff3f3;border-color:#f0c0c0;color:#8a2b2b">'+(ar?'ده بيغيّر البيانات فعليًا ومش بيترجع. راجع كل سطر قبل التنفيذ.':'This permanently changes your data. Review each row before applying.')+'</div>'
+   +'<div style="overflow-x:auto"><table><thead><tr><th></th><th>'+(ar?'النوع':'Type')+'</th><th>'+(ar?'السجل':'Record')+'</th><th>'+(ar?'الحقل':'Field')+'</th><th>'+(ar?'قبل':'Before')+'</th><th>'+(ar?'بعد':'After')+'</th></tr></thead><tbody>'
+   +_frMatches.map(function(m,i){ return '<tr><td class="c"><input type="checkbox" '+(m.on?'checked':'')+' onchange="frToggle('+i+',this.checked)"></td><td><span class="tag" style="background:#eef3f8;color:var(--navy)">'+esc(m.label)+'</span></td><td><b>'+esc(m.name)+'</b></td><td>'+esc(m.field)+'</td><td style="color:#8a2b2b;max-width:260px;white-space:normal">'+hl(m.before)+'</td><td style="color:#1a7a4f;max-width:260px;white-space:normal">'+hl(m.after)+'</td></tr>'; }).join('')
+   +'</tbody></table></div>';
+}
+function frApply(){
+  if(!isAdmin()){ alert('Super Admin only'); return; }
+  var sel=_frMatches.filter(function(m){return m.on;}); if(!sel.length){ alert(lang==='ar'?'مفيش حاجة محددة':'Nothing selected'); return; }
+  var recCount=new Set(sel.map(function(m){return m.coll+'|'+m.id;})).size;
+  if(!confirm((lang==='ar'?('هتغيّر '+sel.length+' حقل في '+recCount+' سجل. البيانات هتتعدّل فعليًا. متأكد؟'):('Replace '+sel.length+' field(s) across '+recCount+' record(s)? This changes your data permanently.')))) return;
+  var byRec={}; sel.forEach(function(m){ var key=m.coll+'|'+m.id; if(!byRec[key])byRec[key]={coll:m.coll,id:m.id,fields:{}}; byRec[key].fields[m.field]=m.after; });
+  var recs=Object.keys(byRec).map(function(k){return byRec[k];});
+  try{ showLoad(lang==='ar'?'بيستبدل…':'Replacing…'); }catch(e){}
+  (function go(i){ if(i>=recs.length){ try{hideLoad();}catch(e){} _frMatches=[]; try{logAudit('find-replace','',String(recs.length),'records');}catch(e){} synced(); alert('✔ '+(lang==='ar'?('اتغيّر '+recs.length+' سجل'):(recs.length+' record(s) updated'))); if(curView==='findreplace')render(); return; }
+    var r=recs[i]; apiMerge(r.coll,r.id,r.fields).then(function(){ go(i+1); }).catch(function(){ go(i+1); }); })(0);
+}
+function vFindReplace(){
+  var ar=(lang==='ar');
+  if(!isAdmin()) return '<div class="card empty">'+(ar?'الخاصية دي للـ Super Admin فقط.':'This tool is Super Admin only.')+'</div>';
+  var opts='<option value="__all">'+(ar?'كل الأقسام الرئيسية':'All main collections')+'</option>'+frCollections().map(function(s){return '<option value="'+s.coll+'">'+esc(s.label)+'</option>';}).join('');
+  var h='<div class="sect"><h2>🔎 '+(ar?'بحث واستبدال في كل النظام':'Find & Replace (whole system)')+'</h2></div>';
+  h+='<div class="card mini" style="background:#fff8e6;border-color:#e0c070">'+(ar?'⚠️ الأداة دي بتعدّل البيانات في كل السجلات فعليًا. اعمل «معاينة» الأول وراجع، وبعدين نفّذ. (بتتجاهل الملفات والصور والحقول الحساسة تلقائيًا.)':'⚠️ This edits real data across records. Preview first, review, then apply. (Files, images and system fields are skipped automatically.)')+'</div>';
+  h+='<div class="card"><div class="row2">'+fEl(ar?'دوّر على':'Find','fr_find','')+fEl(ar?'استبدل بـ':'Replace with','fr_rep','')+'</div>'
+   +'<div class="row2"><div class="fld"><label>'+(ar?'القسم':'Collection')+'</label><select id="fr_coll">'+opts+'</select></div><label class="fld" style="display:flex;align-items:center;gap:8px;margin-top:22px"><input type="checkbox" id="fr_cs"> '+(ar?'حساس لحالة الأحرف':'Case-sensitive')+'</label></div>'
+   +'<button class="btn cy" onclick="frScan()">🔎 '+(ar?'معاينة النتائج':'Preview matches')+'</button></div>';
+  h+='<div id="fr_res" style="margin-top:12px"></div>';
+  setTimeout(function(){ if(g('fr_res')&&_frMatches.length)frRenderResults(); },30);
+  return h;
+}
 function vTrash(){
   var ar=(lang==='ar'); var canAct=(isMgr()||me.dept==='Management'||isAdmin());
   var rows=(trash||[]).slice().sort(function(a,b){return (b.at||'').localeCompare(a.at||'');});
