@@ -3446,14 +3446,19 @@ function vQuotes(){
   const techAssignees=Object.keys(TECH_ROUTING).map(function(k){return TECH_ROUTING[k].name;});
   const isTechAssignee = techAssignees.indexOf(meName)>=0 || (me.dept==='Technical');
   const seesAllQuotes = me.role==='Super Admin'||me.dept==='Management'||isMgr();
+  const isSalesLead = me.dept==='Sales' && roleRank(me.role)>=ROLE_RANK['Team Leader'];
   const _myEmail=(me&&me.email||'').toLowerCase();
+  /* A submitted quote REQUEST (pending RFQ) is shown to EXACTLY: Super Admin / Management / any
+     Manager (covers the Sales Manager and the Technical Manager), the Sales Team Leader, the
+     assigned technical person, and the requester — regardless of which branch is selected. It is
+     NOT shown to other sales colleagues or to unassigned technicians. */
+  const isAssignedTech = function(q){ return (q.assignedEmail && String(q.assignedEmail).toLowerCase()===_myEmail) || (q.assignedTo && typeof nameEq==='function' && nameEq(q.assignedTo,meName)); };
+  const canSeeRequest = function(q){ return seesAllQuotes || isSalesLead || isAssignedTech(q) || (typeof nameEq==='function' && nameEq(q.requestedBy,meName)); };
   const rows=quotes.filter(function(q){
-    /* Incoming quote REQUESTS (pending RFQs) must reach the decision-makers (Super Admin,
-       Sales/Technical managers) and the assigned technical person regardless of which branch
-       is currently selected — otherwise a UAE request is hidden while viewing Egypt. */
-    if(q.isRFQ && !q.rfqDone && (seesAllQuotes || isTechAssignee || (q.assignedEmail&&String(q.assignedEmail).toLowerCase()===_myEmail))) return true;
+    if(q.isRFQ && !q.rfqDone) return canSeeRequest(q);   /* requests bypass branch, gated to the right people */
     return inBranch(q);
   }).filter(function(q){
+    if(q.isRFQ && !q.rfqDone) return true;               /* pending requests already gated above */
     if(seesAllQuotes) return true;
     if(isTechAssignee){ return (q.assignedTo||'')===meName || nameEq(q.preparedBy,meName) || nameEq(q.requestedBy,meName); }
     return !q.dept||q.dept===me.dept||nameEq(q.requestedBy,meName)||nameEq(q.preparedBy,meName)||(me.accessModules||[]).includes('quotes');
