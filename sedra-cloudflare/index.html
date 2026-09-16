@@ -608,6 +608,7 @@ const MODULES = [
   {id:'quotes',    label:'Quotations', icon:'📄', depts:['Operations','Technical']},
   {id:'variations',label:'Variation Orders', icon:'🔧', depts:['Operations','Technical']},
   {id:'inventory', label:'Inventory', icon:'📦', depts:['Inventory']},
+  {id:'quoterequests',label:'Quote Requests', icon:'📨', depts:['Sales','Technical','Management']},
   {id:'accounting',label:'Accounting', icon:'💰', depts:['Accounting']},
   {id:'ledger',    label:'General Ledger', icon:'📒', depts:['Accounting']},
   {id:'finance',   label:'Finance / FP&A', icon:'💹', depts:['Accounting']},
@@ -2071,7 +2072,7 @@ function render(){
   if(!canSee(m)){ curView='hub'; m=MODULES.find(function(x){return x.id==='hub';})||MODULES[0]; }
   g('viewTitle').textContent=m.label;
   markNav();
-  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,trash:vTrash,findreplace:vFindReplace,admin:vAdmin,profile:vProfile}[curView];
+  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,trash:vTrash,findreplace:vFindReplace,quoterequests:vQuoteRequests,admin:vAdmin,profile:vProfile}[curView];
   g('view').innerHTML = fn?fn():'';
   if(curView==='sales' && window._afterSales)window._afterSales();
   if(curView==='chat' && window._afterChat)window._afterChat();
@@ -3776,6 +3777,45 @@ function reopenRFQ(id){ var q=quotes.find(function(x){return x.id===id;}); if(!q
   var d={status:'Tech Office — Pending',rfqDone:false};
   apiMerge('quotes',id,d).then(function(){ Object.assign(q,d); logAudit('update','quotes',id,'RFQ reopened'); synced(); if(appReady)refreshAll(); }).catch(function(e){ alert('Error: '+(e.message||e)); });
 }
+/* ===== Quote Requests workspace: priority, status stages, stakeholder alerts ===== */
+var RFQ_PRIO=['Urgent','High','Normal','Low'];
+var RFQ_PRIO_COL={Urgent:'#c0392b',High:'#e0733a',Normal:'#2C77B0',Low:'#5A6B7B'};
+var RFQ_PRIO_AR={Urgent:'عاجل',High:'مرتفع',Normal:'عادي',Low:'منخفض'};
+var RFQ_STAGES=[['seen','Seen','تم الاطّلاع'],['inprogress','In Progress','قيد التنفيذ'],['done','Done','تم']];
+function rfqStageOf(q){ return q.rfqStage||(q.rfqDone?'delivered':'pending'); }
+function rfqStageLbl(stg){ var m={pending:lang==='ar'?'مع الأوفيس الفني':'Pending',seen:lang==='ar'?'تم الاطّلاع':'Seen',inprogress:lang==='ar'?'قيد التنفيذ':'In Progress',done:lang==='ar'?'تم':'Done',delivered:lang==='ar'?'اتسلّم':'Delivered'}; return m[stg]||stg; }
+function rfqCanManage(){ return !!(me&&(isAdmin()||me.dept==='Management'||roleRank(me.role)>=ROLE_RANK['Manager']||(me.dept==='Sales'&&roleRank(me.role)>=ROLE_RANK['Team Leader']))); }
+function rfqCanSee(q){ if(!me||!q||!q.isRFQ)return false;
+  var seesAll=me.role==='Super Admin'||me.dept==='Management'||isMgr();
+  var salesLead=me.dept==='Sales'&&roleRank(me.role)>=ROLE_RANK['Team Leader'];
+  var my=(me.email||'').toLowerCase();
+  var assigned=(q.assignedEmail&&String(q.assignedEmail).toLowerCase()===my)||(q.assignedTo&&nameEq(q.assignedTo,me.name));
+  var req=nameEq(q.requestedBy,me.name)||(q.requestedByEmail&&String(q.requestedByEmail).toLowerCase()===my);
+  return seesAll||salesLead||assigned||req; }
+function rfqPending(){ return (quotes||[]).filter(function(q){ return q.isRFQ && !q.rfqDone && rfqCanSee(q); }); }
+function setRfqPriority(id,p){ if(!rfqCanManage()){ alert(lang==='ar'?'تحديد الأولوية للمدير أو التيم ليدر فقط.':'Priority is set by a manager or team leader.'); return; } var q=quotes.find(function(x){return x.id===id;}); if(!q)return; apiMerge('quotes',id,{priority:p}).then(function(){ q.priority=p; logAudit('update','quotes',id,'priority '+p); synced(); }).catch(function(e){alert('Error: '+(e.message||e));}); }
+function setRfqStage(id,stage){ var q=quotes.find(function(x){return x.id===id;}); if(!q)return;
+  if(!(canDeliverRFQ(q)||rfqCanManage())){ alert(lang==='ar'?'تغيير الحالة للأوفيس الفني أو المدير فقط.':'Only the Technical Office or a manager can change the status.'); return; }
+  if(stage==='done'){ var built=(quoteSections(q)||[]).some(function(s){return (s.items||[]).some(function(i){return (i.desc||i.item);});}); if(!built){ alert(lang==='ar'?'مينفعش «تم» قبل ما تجهّز الكوتيشن (تضيف بنود). ابنِ الكوتيشن الأول.':'You can’t mark Done before the quotation is built — add line items first.'); return; } }
+  var statusMap={seen:'Tech Office — Seen',inprogress:'Tech Office — In Progress',done:'Tech Office — Done'};
+  var d={rfqStage:stage,status:statusMap[stage]||q.status}; d['stageTs_'+stage]=Date.now();
+  apiMerge('quotes',id,d).then(function(){ Object.assign(q,d); logAudit('update','quotes',id,'RFQ status → '+stage); synced(); }).catch(function(e){alert('Error: '+(e.message||e));}); }
+function vQuoteRequests(){
+  var ar=(lang==='ar'); var rows=rfqPending(); var pr=function(p){ var i=RFQ_PRIO.indexOf(p||'Normal'); return i<0?2:i; };
+  rows.sort(function(a,b){ var d=pr(a.priority)-pr(b.priority); if(d)return d; return (a.deadline||'zz').localeCompare(b.deadline||'zz'); });
+  var h='<div class="sect"><h2>📨 '+(ar?'طلبات الكوتيشن':'Quote Requests')+'</h2><div class="mini">'+(ar?'طلبات السيلز للأوفيس الفني — رتّبها بالأولوية وتابع حالتها.':'Sales requests to the Technical Office — prioritise and track them.')+'</div></div>';
+  if(!rows.length) return h+'<div class="card empty">'+(ar?'مفيش طلبات مفتوحة 🎉':'No open requests 🎉')+'</div>';
+  h+='<div style="overflow-x:auto"><table><thead><tr><th>'+(ar?'الأولوية':'Priority')+'</th><th>#</th><th>'+(ar?'العميل/المشروع':'Client / Project')+'</th><th>'+(ar?'المجال':'Scope')+'</th><th>'+(ar?'المسؤول':'Assignee')+'</th><th>'+(ar?'التسليم':'Due')+'</th><th>'+(ar?'الحالة':'Status')+'</th><th></th></tr></thead><tbody>';
+  h+=rows.map(function(q){ var stg=rfqStageOf(q); var col=RFQ_PRIO_COL[q.priority||'Normal'];
+    var prioSel=rfqCanManage()? ('<select onchange="setRfqPriority(\''+q.id+'\',this.value)" style="border:0;font-weight:800;color:'+col+';background:'+col+'18;border-radius:6px;padding:3px 6px">'+RFQ_PRIO.map(function(p){return '<option value="'+p+'" '+((q.priority||'Normal')===p?'selected':'')+'>'+(ar?RFQ_PRIO_AR[p]:p)+'</option>';}).join('')+'</select>') : ('<span class="tag" style="background:'+col+'22;color:'+col+';font-weight:800">'+(ar?RFQ_PRIO_AR[q.priority||'Normal']:(q.priority||'Normal'))+'</span>');
+    var ov=q.deadline&&q.deadline<today();
+    var stageBtns=(canDeliverRFQ(q)||rfqCanManage())? RFQ_STAGES.map(function(s){ var on=stg===s[0]; return '<button class="btn '+(on?'cy':'gh')+' sm" onclick="setRfqStage(\''+q.id+'\',\''+s[0]+'\')">'+(ar?s[2]:s[1])+'</button>'; }).join(' ') : '<span class="tag" style="background:#eef3f8;color:var(--navy)">'+esc(rfqStageLbl(stg))+'</span>';
+    var build=(canDeliverRFQ(q)||canCreateQuote())? '<button class="btn cy sm" onclick="editQuote(\''+q.id+'\')">🛠 '+(ar?'جهّز':'Build')+'</button> ':'';
+    var deliver=(canDeliverRFQ(q))? '<button class="btn cy sm" onclick="deliverRFQ(\''+q.id+'\')">✅ '+(ar?'سلّم':'Deliver')+'</button>':'';
+    return '<tr><td>'+prioSel+'</td><td><b>'+esc(q.number||q.id.slice(-5))+'</b></td><td><b>'+esc(q.client||'')+'</b><div class="mini">'+esc(q.projectName||'')+'</div></td><td>'+esc(q.service||'')+'</td><td>'+esc(q.assignedTo||'—')+'</td><td'+(ov?' style="color:var(--bad);font-weight:700"':'')+'>'+esc(q.deadline||'—')+(ov?' ⚠️':'')+'</td><td style="white-space:nowrap">'+stageBtns+'</td><td style="white-space:nowrap">'+build+'<button class="btn gh sm" onclick="attachOpen(\''+q.id+'\')">📎'+(attCount(q.id)?' '+attCount(q.id):'')+'</button> <button class="btn gh sm" onclick="recOpen(\''+q.id+'\')">👁</button> '+deliver+'</td></tr>';
+  }).join('')+'</tbody></table></div>';
+  return h;
+}
 function deliverRFQ(id){
   var q=quotes.find(function(x){return x.id===id;}); if(!q)return;
   if(!canDeliverRFQ(q)){ alert(lang==='ar'?'تسليم الكوتيشن من صلاحية الأوفيس الفني (أو المسؤول عن الطلب) فقط.':'Only the Technical Office (or the assignee) can deliver the quotation.'); return; }
@@ -3890,7 +3930,7 @@ function printQuote(id,opts){
   const ccardHTML=`<div class="ccard"><div class="cc-row"><span class="k">Quote Subject</span><span class="v">${esc(q.subject||q.projectName||q.client||'-')}</span></div><div class="cc-row"><span class="k">Quote Num.</span><span class="v">${esc(q.number||'')} · ${verTag}</span></div><div class="cc-row"><span class="k">Valid Till</span><span class="v">${esc(validTill||'')}</span></div><div class="cc-row"><span class="k">Presales Name</span><span class="v">${esc(q.presalesName||q.preparedBy||'-')}</span></div></div>`;
   const theadHTML=`<div class="thead"><div style="display:flex;align-items:center;gap:12px"><img src="${LOGO}" style="height:40px;width:auto"><div><div class="nm">SEDRA ELECTRIC</div><div class="sub">SMART &amp; LOW-CURRENT SYSTEMS &mdash; CAIRO, EGYPT</div></div></div><div style="text-align:right"><div class="qid">${esc(q.number||'')} <span style="font-size:12px;font-weight:800;color:#37c0dc;letter-spacing:1px">${verTag}</span></div><div class="sub" style="margin-top:4px">${esc(q.date||'')}</div></div></div>`;
   const metaHTML=`<div class="metabox"><span>Client: <b>${esc(q.client||'-')}</b></span><span>Location: <b>${esc(q.location||'-')}</b></span><span>Prepared by: <b>${esc(q.preparedBy||'-')}</b></span></div>`;
-  const ftHTML=`<div class="ft"><span>info@sedra-electric.com</span><span>www.sedra-electric.com</span><span>Tel: 0226783906</span></div>`;
+  const ftHTML=`<div class="ft"><span>info@sedra-electric.com</span><span>www.sedra-electric.com</span><span>Tel: 01125441197</span></div>`;
   const rowsTbl=sc=>`<table>${qThead}<tbody>${qRows(sc)}</tbody></table>`;
   const sysLines=(secs.length>1)?secs.map((sc,i)=>`<div class="r2"><span>${esc(sc.title||('System '+(i+1)))}</span><b>${M(t.secTotals[i])}</b></div>`).join(''):'';
   const _hasVat=num(q.vat)>0;
@@ -3932,14 +3972,14 @@ function printQuote(id,opts){
       <div class="ap-whyc"><div class="i">✧</div><b>Personalised Experience</b><span>Convenient, user-centric design</span></div>
       <div class="ap-whyc"><div class="i">✚</div><b>Safety &amp; Security</b><span>Standards-compliant &amp; future-proof</span></div>
     </div>
-    <div class="ap-foot">info@sedra-electric.com &nbsp;·&nbsp; www.sedra-electric.com &nbsp;·&nbsp; Tel: 0226783906</div>
+    <div class="ap-foot">info@sedra-electric.com &nbsp;·&nbsp; www.sedra-electric.com &nbsp;·&nbsp; Tel: 01125441197</div>
   </div>`;
   const partnersPage=`<div class="sheet A4 apage">
     <div class="ap-top"><img src="${LOGO}" style="height:56px;width:auto"><div class="ap-title">Our Partners</div><div class="ap-rule"></div>
     <div class="ap-lead">We deliver world-class results by partnering with the industry's most trusted global brands — so every system we design and install meets the highest standards of quality, reliability and innovation.</div></div>
     <div class="ap-logos"><div class="ap-logobox"><img src="${partnersURL}"></div></div>
     <div class="ap-band"><div class="ap-band-t">Trusted Technology, Delivered</div><div class="ap-band-s">Authorised solutions across smart automation, low-current, lighting, MEP &amp; renewable energy.</div></div>
-    <div class="ap-foot">info@sedra-electric.com &nbsp;·&nbsp; www.sedra-electric.com &nbsp;·&nbsp; Tel: 0226783906</div>
+    <div class="ap-foot">info@sedra-electric.com &nbsp;·&nbsp; www.sedra-electric.com &nbsp;·&nbsp; Tel: 01125441197</div>
   </div>`;
   /* Page order: general cover → About → Partners → (each system: its cover page then its details) → financial summary → terms. */
   const bodyHTML=coverHTML+aboutPage+partnersPage+sysPages+summaryPage+termsPage;
@@ -6373,7 +6413,8 @@ function setupNotif(){
 }
 var _nbCount=-1;
 function checkNotifSound(){ try{ var n=getNotifications().filter(function(x){return x.ico!=='💬';}).reduce(function(s,x){return s+(x.count||1);},0); if(_nbCount>=0 && n>_nbCount){ pingNotify(); try{ if(_wantDesktop && 'Notification' in window && Notification.permission==='granted'){ new Notification('Sedra Electric', {body:'You have a new notification', icon:'icon-192.png'}); } }catch(_){} } _nbCount=n; }catch(e){} }
-function updateBadges(){ try{ updateChatNavBadge(); updateBellBadge(); checkNotifSound(); }catch(e){} }
+function updateBadges(){ try{ updateChatNavBadge(); updateBellBadge(); checkNotifSound(); updateReqNavBadge(); }catch(e){} }
+function updateReqNavBadge(){ const nav=g('nav'); if(!nav)return; const btn=nav.querySelector('button[data-v="quoterequests"]'); if(!btn)return; let b=btn.querySelector('.navbadge'); const n=(typeof rfqPending==='function')?rfqPending().length:0; if(n>0){ if(!b){ b=document.createElement('span'); b.className='navbadge'; btn.appendChild(b);} b.textContent=n>99?'99+':n; } else if(b){ b.remove(); } }
 function chatUnreadTotal(){ const myEmail=(me&&me.email||'').toLowerCase(); if(!myEmail)return 0; let n=0; messages.forEach(m=>{ if(msgForMe(m,myEmail)&&(m.email||'').toLowerCase()!==myEmail&&num(m.ts)>chReadFor(m.channel))n++; }); return n; }
 function updateChatNavBadge(){ const nav=g('nav'); if(!nav)return; const btn=nav.querySelector('button[data-v="chat"]'); if(!btn)return; let b=btn.querySelector('.navbadge'); const n=chatUnreadTotal(); if(n>0){ if(!b){ b=document.createElement('span'); b.className='navbadge'; btn.appendChild(b);} b.textContent=n>99?'99+':n; } else if(b){ b.remove(); } }
 function updateBellBadge(){ const el=g('bellBadge'); if(!el)return; const n=bellUnseen(); if(n>0){ el.textContent=n>99?'99+':n; el.classList.remove('hide'); } else el.classList.add('hide'); }
@@ -6412,13 +6453,13 @@ function getNotifications(){
   leaves.forEach(function(l){ if((l.email||'').toLowerCase()===myEmail&&(l.status==='Approved'||l.status==='Rejected')&&num(l.decidedTs)>_seen) list.unshift({ico:l.status==='Approved'?'✅':'⛔',key:'leave:'+l.id,title:'Your leave was '+l.status,sub:(l.type||'')+' · '+(l.from||''),count:1,ts:num(l.decidedTs),act:function(){curView='hr';hrTab='leave';markNotifSeen();closeBell();render();}}); });
   expclaims.forEach(function(c){ if((c.email||'').toLowerCase()===myEmail&&(c.status==='Approved'||c.status==='Rejected'||c.status==='Paid')&&num(c.decidedTs)>_seen) list.unshift({ico:c.status==='Rejected'?'⛔':'🧾',key:'claim:'+c.id,title:'Expense claim '+c.status,sub:(c.category||'')+' · '+nfmt(c.amount),count:1,ts:num(c.decidedTs),act:function(){curView='claims';markNotifSeen();closeBell();render();}}); });
   approvals.forEach(function(a){ if((a.email||'').toLowerCase()===myEmail&&(a.status==='Approved'||a.status==='Rejected')&&num(a.decidedTs)>_seen) list.unshift({ico:a.status==='Approved'?'✅':'⛔',key:'appr:'+a.id,title:'Request '+a.status,sub:(a.title||''),count:1,ts:num(a.decidedTs),act:function(){curView='approvals';markNotifSeen();closeBell();render();}}); });
-  // ---- Technical Office: quotation requests assigned to me (with due date) ----
+  // ---- Quote Requests: notify every stakeholder (managers, team leader, tech manager, assignee, requester) ----
   try{
-    var _isPend=function(q){ return q.isRFQ && !q.rfqDone && String(q.status||'').indexOf('Tech Office')>=0; };
-    var _mineRFQ=(quotes||[]).filter(function(q){ return _isPend(q) && ((typeof nameEq==='function'&&nameEq(q.assignedTo,myName))||(q.assignedTo||'')===myName||(q.assignedEmail||'').toLowerCase()===myEmail); });
+    var _mineRFQ=(typeof rfqPending==='function')?rfqPending():[];
     if(_mineRFQ.length){ var _ov=_mineRFQ.filter(function(q){return q.deadline&&q.deadline<today();});
       var _nextDue=_mineRFQ.map(function(q){return q.deadline;}).filter(Boolean).sort()[0]||'';
-      list.unshift({ico:'📨',key:'rfq:assigned',title:(lang==='ar'?'كوتيشن مطلوب منك':'Quotation requests for you'),sub:_mineRFQ.length+' '+(lang==='ar'?'طلب':'request(s)')+(_ov.length?' · '+_ov.length+' '+(lang==='ar'?'متأخر':'overdue'):'')+(_nextDue?' · '+(lang==='ar'?'أقرب تسليم ':'due ')+_nextDue:''),count:_mineRFQ.length,act:function(){curView='sales';salesTab='quotes';closeBell();render();}}); }
+      var _stk=_mineRFQ.map(function(q){return q.id+':'+(q.rfqStage||'pending');}).sort().join(',');
+      list.unshift({ico:'📨',key:'rfq:pending:'+_stk,title:(lang==='ar'?'طلبات كوتيشن':'Quote requests'),sub:_mineRFQ.length+' '+(lang==='ar'?'طلب مفتوح':'open request(s)')+(_ov.length?' · '+_ov.length+' '+(lang==='ar'?'متأخر':'overdue'):'')+(_nextDue?' · '+(lang==='ar'?'أقرب تسليم ':'due ')+_nextDue:''),count:_mineRFQ.length,act:function(){curView='quoterequests';closeBell();render();}}); }
   }catch(e){}
   // ---- Sales: my requested quotation is now ready ----
   try{
