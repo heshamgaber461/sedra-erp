@@ -736,6 +736,7 @@ const MODULES = [
   {id:'suggestions',label:'Suggestion Box', icon:'💡', access:'all'},
   {id:'overtime',  label:'Overtime Log', icon:'⏱️', depts:['HR','Operations']},
   {id:'auditlog',  label:'Audit Log', icon:'🕵️', adminOnly:true},
+  {id:'trash',     label:'Recycle Bin', icon:'🗑️', depts:['Sales','Marketing','Operations','Technical','Accounting','Inventory','HR','Management']},
   {id:'deprec',    label:'Asset Depreciation', icon:'📐', depts:['Accounting']},
   {id:'myhr',      label:'My HR', icon:'🙋', access:'all'},
   {id:'grn',       label:'Goods Received', icon:'📥', depts:['Inventory','Operations']},
@@ -752,6 +753,7 @@ let invoices=[], expenses=[], leaves=[], posts=[], payments=[];
 let tasks=[], suppliers=[], pos=[];
 let messages=[], groups=[], events=[], todos=[];
 let customers=[], contracts=[], audit=[];
+let trash=[];
 let adcampaigns=[];
 let tickets=[], jobs=[], timelogs=[], rules=[];
 let siteLabor=[], workplan=[], weeklyReports=[], botKB=[], botChats=[];
@@ -1248,6 +1250,7 @@ function applyAll(all){
     events=listToArr(all.events);
     todos=listToArr(all.todos);
     customers=listToArr(all.customers).sort((x,y)=>(x.name||'').localeCompare(y.name||''));
+    trash=listToArr(all.trash).sort((x,y)=>(y.at||'').localeCompare(x.at||''));
     contracts=listToArr(all.contracts).sort((x,y)=>(x.nextDue||'').localeCompare(y.nextDue||''));
     audit=listToArr(all.audit).sort((x,y)=>num(y.ts)-num(x.ts));
     tickets=listToArr(all.tickets).sort((x,y)=>(y.created||'').localeCompare(x.created||''));
@@ -1331,7 +1334,7 @@ function ensureAdminDoc(u){
 function pickBranch(b){ curBranch=b; localStorage.setItem('sedra_branch',b); enterApp(); }
 function enterApp(){ appReady=true; lastSig=''; hideLoad(); hideGate(); g('app').classList.remove('hide'); buildNav();
   try{ var _dh=DEPT_HOME[me.dept]||'hub'; var _dm=MODULES.find(function(x){return x.id===_dh;}); curView=(_dm&&canSee(_dm))?_dh:'hub'; }catch(e){ curView='hub'; }
-  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); migrateStagesOnce(); importAdelOnce(); importProductImagesOnce(); cleanProductDashesOnce(); _setupUpdateCheck(); }
+  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); migrateStagesOnce(); importAdelOnce(); importProductImagesOnce(); cleanProductDashesOnce(); _setupUpdateCheck(); try{ purgeOldTrash(); }catch(e){} }
 
 /* ---- "My Tasks" pop-up on first open each day (Phase 1) ---- */
 function maybeTasksPopup(){
@@ -2067,7 +2070,7 @@ function render(){
   if(!canSee(m)){ curView='hub'; m=MODULES.find(function(x){return x.id==='hub';})||MODULES[0]; }
   g('viewTitle').textContent=m.label;
   markNav();
-  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,admin:vAdmin,profile:vProfile}[curView];
+  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,trash:vTrash,admin:vAdmin,profile:vProfile}[curView];
   g('view').innerHTML = fn?fn():'';
   if(curView==='sales' && window._afterSales)window._afterSales();
   if(curView==='chat' && window._afterChat)window._afterChat();
@@ -6224,7 +6227,42 @@ function saveDoc(coll,d,id){
   var p = id ? apiMerge(coll,id,d) : apiAdd(coll,d);
   p.then(function(r){ logAudit(id?'update':'create',coll,id||(r||''),(d&&(d.name||d.title||d.number||d.client||d.customer))||''); synced(); }).catch(function(e){ alert('Save error ['+coll+']: '+(e.message||e)); });
 }
-function delDoc(coll,id){ if(confirm('Delete this record?')) apiDelete(coll,id).then(function(){ logAudit('delete',coll,id,''); try{ if(ACC_SRC[coll]){ autoUnpost(coll+':'+id); if(coll==='bills')autoUnpost('billpay:'+id); } }catch(e){} synced(); }).catch(function(e){ alert('Delete error: '+(e.message||e)); }); }
+/* ===== Recycle Bin: soft-delete → 'trash' (auto-purged after 30 days) ===== */
+var TRASH_DAYS=30;
+function trashName(rec,id){ return String((rec&&(rec.name||rec.number||rec.title||rec.client||rec.company||rec.subject||rec.ref||rec.projectName))||id); }
+/* Move a record to the recycle bin instead of hard-deleting it. Falls back to a plain delete
+   if the record can't be read. The 'trash' collection itself is never re-trashed. */
+function toTrash(coll,id){
+  if(coll==='trash') return apiDelete(coll,id);
+  return apiCall('GET','/'+coll+'/'+id+'.json').then(function(rec){
+    if(!rec) return apiDelete(coll,id);
+    var t={coll:coll,origId:id,data:rec,name:trashName(rec,id),by:(me&&me.name)||'',byEmail:((me&&me.email)||'').toLowerCase(),branch:rec.branch||'',at:new Date().toISOString()};
+    return apiAdd('trash',t).then(function(){ return apiDelete(coll,id); });
+  }).catch(function(){ return apiDelete(coll,id); });
+}
+function delDoc(coll,id){ if(confirm(lang==='ar'?'يتنقل لسلة المحذوفات؟ (هيتمسح تلقائي بعد 30 يوم، وتقدر ترجّعه قبلها)':'Move to Recycle Bin? (auto-deleted after 30 days — you can restore it before then)')) toTrash(coll,id).then(function(){ logAudit('delete',coll,id,''); try{ if(ACC_SRC[coll]){ autoUnpost(coll+':'+id); if(coll==='bills')autoUnpost('billpay:'+id); } }catch(e){} synced(); }).catch(function(e){ alert('Delete error: '+(e.message||e)); }); }
+function trashRestore(tid){ var t=(trash||[]).find(function(x){return x.id===tid;}); if(!t){ alert('Not found'); return; }
+  if(!(isMgr()||me.dept==='Management'||isAdmin()||nameEq(t.by,(me&&me.name)))){ alert(lang==='ar'?'الاسترجاع للمدير أو صاحب الحذف فقط.':'Restore is limited to a manager or the person who deleted it.'); return; }
+  var d=Object.assign({},t.data); delete d.id;
+  apiCall('PUT','/'+t.coll+'/'+t.origId+'.json',d).then(function(){ return apiDelete('trash',tid); }).then(function(){ logAudit('restore',t.coll,t.origId,''); synced(); alert(lang==='ar'?'اترجّع ✔':'Restored ✔'); }).catch(function(e){ alert('Restore error: '+(e.message||e)); });
+}
+function trashPurge(tid){ if(!(isMgr()||me.dept==='Management'||isAdmin())){ alert(lang==='ar'?'الحذف النهائي للمدير فقط.':'Permanent delete is manager-only.'); return; }
+  if(!confirm(lang==='ar'?'حذف نهائي؟ مش هينفع يترجّع.':'Delete permanently? This cannot be undone.')) return;
+  apiDelete('trash',tid).then(function(){ synced(); }).catch(function(e){ alert('Error: '+(e.message||e)); });
+}
+function purgeOldTrash(){ try{ if(window.__trashPurged)return; window.__trashPurged=true; var cut=Date.now()-TRASH_DAYS*86400000; (trash||[]).forEach(function(t){ var ts=Date.parse(t.at||''); if(ts && ts<cut){ apiDelete('trash',t.id).catch(function(){}); } }); }catch(e){} }
+function vTrash(){
+  var ar=(lang==='ar'); var canAct=(isMgr()||me.dept==='Management'||isAdmin());
+  var rows=(trash||[]).slice().sort(function(a,b){return (b.at||'').localeCompare(a.at||'');});
+  var LBL={quotes:ar?'كوتيشن':'Quotation',invoices:ar?'فاتورة':'Invoice',customers:ar?'عميل':'Customer',leads:ar?'عميل محتمل':'Lead',attachments:ar?'مرفق/ملف':'Attachment/File',expenses:ar?'مصروف':'Expense',payments:ar?'دفعة':'Payment',projects:ar?'مشروع':'Project',inventory:ar?'منتج':'Product',suppliers:ar?'مورد':'Supplier',journal:ar?'قيد':'Journal',tasks:ar?'مهمة':'Task',jobs:ar?'أمر شغل':'Job',bills:ar?'فاتورة مورد':'Vendor bill'};
+  var h='<div class="sect"><h2>🗑️ '+(ar?'سلة المحذوفات':'Recycle Bin')+'</h2><div class="mini">'+(ar?'أي حاجة تتحذف بتيجي هنا وتتمسح تلقائي بعد 30 يوم — تقدر ترجّعها قبل كده.':'Deleted items land here and are auto-removed after 30 days — restore them before then.')+'</div></div>';
+  if(!rows.length) return h+'<div class="card empty">'+(ar?'السلة فاضية 🎉':'The bin is empty 🎉')+'</div>';
+  h+='<div style="overflow-x:auto"><table><thead><tr><th>'+(ar?'النوع':'Type')+'</th><th>'+(ar?'العنصر':'Item')+'</th><th>'+(ar?'اتحذف بواسطة':'Deleted by')+'</th><th>'+(ar?'تاريخ الحذف':'Deleted on')+'</th><th>'+(ar?'باقي على المسح':'Auto-delete in')+'</th><th></th></tr></thead><tbody>';
+  h+=rows.map(function(t){ var ts=Date.parse(t.at||'')||Date.now(); var left=Math.max(0,Math.ceil((ts+TRASH_DAYS*86400000-Date.now())/86400000));
+    return '<tr><td><span class="tag" style="background:#eef3f8;color:var(--navy)">'+esc(LBL[t.coll]||t.coll)+'</span></td><td><b>'+esc(t.name||t.origId)+'</b></td><td>'+esc(t.by||'—')+'</td><td>'+esc((t.at||'').slice(0,10))+'</td><td>'+(left<=3?'<span style="color:var(--bad);font-weight:700">'+left+' '+(ar?'يوم':'d')+'</span>':(left+' '+(ar?'يوم':'d')))+'</td><td style="white-space:nowrap"><button class="btn cy sm" onclick="trashRestore(\''+t.id+'\')">↩ '+(ar?'استرجاع':'Restore')+'</button> '+(canAct?'<button class="btn dn sm" onclick="trashPurge(\''+t.id+'\')">✕ '+(ar?'حذف نهائي':'Delete forever')+'</button>':'')+'</td></tr>';
+  }).join('')+'</tbody></table></div>';
+  return h;
+}
 
 /* ===================== NOTIFICATIONS · SEARCH · EXPORT (Phase 5) ===================== */
 let chatSeen={}, chatBase=0, notifyInit=false, notifyHigh=0, _notifSetup=false, _wantDesktop=false, _actx=null;
@@ -8879,7 +8917,7 @@ function bulkAll(coll,on){ var st=bulkSet(coll); if(!on){ st.clear(); } else { A
 function bulkCb(coll,id){ return '<input type="checkbox" data-bulk="'+coll+'" data-id="'+id+'" '+(bulkHas(coll,id)?'checked':'')+' onclick="event.stopPropagation();bulkToggle(\''+coll+'\',\''+id+'\')">'; }
 function bulkBar(coll){ var n=bulkCount(coll); return '<div id="bulkbar_'+coll+'" class="card" style="display:flex;gap:10px;align-items:center;padding:8px 10px;margin-bottom:8px;background:#f6f9fc"><label style="cursor:pointer;font-size:13px;font-weight:600"><input type="checkbox" '+(n?'checked':'')+' onclick="bulkAll(\''+coll+'\',this.checked)"> '+(lang==='ar'?'تحديد الكل':'Select all')+'</label><span class="mini">'+(n?(n+(lang==='ar'?' محدد':' selected')):(lang==='ar'?'لا شيء محدد':'none'))+'</span><div style="flex:1"></div>'+(n?'<button class="btn dn sm" onclick="bulkDelete(\''+coll+'\')">🗑 '+(lang==='ar'?'حذف المحدد':'Delete selected')+' ('+n+')</button>':'')+'</div>'; }
 function bulkDelete(coll){ var st=_bulk[coll]; if(!st||!st.size)return; if(!confirm((lang==='ar'?'حذف ':'Delete ')+st.size+(lang==='ar'?' عنصر؟ لا يمكن التراجع.':' items? This cannot be undone.')))return; var ids=Array.from(st);
-  (function go(i){ if(i>=ids.length){ _bulk[coll]=new Set(); logAudit('bulk-delete',coll,'',ids.length+' records'); synced(); return; } Promise.all(ids.slice(i,i+25).map(function(id){ return apiDelete(coll,id).then(function(){}).catch(function(){}); })).then(function(){ go(i+25); }); })(0);
+  (function go(i){ if(i>=ids.length){ _bulk[coll]=new Set(); logAudit('bulk-delete',coll,'',ids.length+' records'); synced(); return; } Promise.all(ids.slice(i,i+25).map(function(id){ return toTrash(coll,id).then(function(){}).catch(function(){}); })).then(function(){ go(i+25); }); })(0);
 }
 function _refRC(ref){ var m=/^([A-Z]+)(\d+)$/.exec(ref); if(!m)return null; var c=0; for(var i=0;i<m[1].length;i++)c=c*26+(m[1].charCodeAt(i)-64); return {c:c-1,r:parseInt(m[2],10)-1}; }
 function _rangeRefs(a,b){ var A=_refRC(a),B=_refRC(b); if(!A||!B)return []; var out=[]; for(var r=Math.min(A.r,B.r);r<=Math.max(A.r,B.r);r++) for(var c=Math.min(A.c,B.c);c<=Math.max(A.c,B.c);c++) out.push(colName(c)+(r+1)); return out; }
