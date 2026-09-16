@@ -3437,7 +3437,7 @@ function qCalcExtras(sub,cfg){ cfg=cfg||{};
   if(disc>base) disc=base;
   return {inst:inst, disc:disc, taxable:base-disc}; }
 function quoteTotal(q){ const secs=quoteSections(q); let grand=0; const secTotals=[]; const secDetail=[];
-  secs.forEach(s=>{ const secSub=(s.items||[]).reduce((a,i)=>a+num(i.qty)*num(i.price),0);
+  secs.forEach(s=>{ const secSub=(s.items||[]).reduce((a,i)=>a+(i.optional?0:num(i.qty)*num(i.price)),0);
     const ex=qCalcExtras(secSub,{instOn:s.instOn,instType:s.instType,instVal:s.instVal,discOn:s.discOn,discType:s.discType,discVal:s.discVal});
     secDetail.push({sub:secSub,inst:ex.inst,disc:ex.disc,total:ex.taxable}); secTotals.push(ex.taxable); grand+=ex.taxable; });
   const vat=grand*num(q.vat)/100; return {sub:grand,secTotals,secDetail,vat,total:grand+vat,secs}; }
@@ -3481,7 +3481,16 @@ const NL=String.fromCharCode(10);
 function qBlankItem(){ return {item:'',desc:'',brand:'',qty:1,price:0}; }
 function defQExcluding(){ return ['Lights supply','Sockets & switches supply','Sanitary supply','MEP Work (Conduits, Pulling Cables)'].join(NL); }
 function defQTerms(){ return ['- Prices don’t include VAT unless mentioned.','','- Offer Includes:','    · Supervision on the Contractor team in the cabling phase','    · Full Design for all systems','    · Full Installation','    Installation prices include works within Cairo or Giza.','    For any other location, additional charges will apply.','','- Offer Excludes:','    · Any piping or wiring works unless mentioned otherwise','    · Any pipes or cables unless mentioned otherwise','    · Any protection circuit breakers unless mentioned otherwise','','- Payment Terms:','    · Advance Payment: 80% of the total price','    · After Delivery: 10% of the total price','    · After system installation: 10% of the total price','','- Warranty:','    · Warranty against manufacturing defects is 12 Months','','- Delivery:','    · 2-8 Weeks'].join(NL); }
-function qReadDOM(){ _qsec.forEach((s,si)=>{ const t=g('qsT'+si); if(t)s.title=t.value; (s.items||[]).forEach((it,ii)=>{ const gv=f=>{const e=g('q_'+si+'_'+ii+'_'+f);return e?e.value:it[f];}; it.item=gv('item'); it.desc=gv('desc'); it.brand=gv('brand'); it.qty=num(gv('qty')); it.price=num(gv('price')); });
+var _qDrag=null;
+function qDragStart(e,si,ii){ qReadDOM(); _qDrag={si:si,ii:ii}; try{ e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain','row'); }catch(_e){} }
+function qDrop(e,si,ii){ try{ e.preventDefault(); }catch(_e){} qReadDOM(); var d=_qDrag; _qDrag=null; if(!d)return; if(d.si===si&&d.ii===ii)return;
+  var from=_qsec[d.si]&&_qsec[d.si].items; if(!from)return; var moved=from.splice(d.ii,1)[0]; if(!moved){ qSecRender(); return; }
+  var to=_qsec[si]&&_qsec[si].items; if(!to){ from.splice(d.ii,0,moved); qSecRender(); return; }
+  var idx=ii; if(d.si===si && d.ii<ii) idx=ii-1;
+  to.splice(idx,0,moved);
+  if(!from.length) from.push(qBlankItem());
+  qSecRender(); }
+function qReadDOM(){ _qsec.forEach((s,si)=>{ const t=g('qsT'+si); if(t)s.title=t.value; (s.items||[]).forEach((it,ii)=>{ const gv=f=>{const e=g('q_'+si+'_'+ii+'_'+f);return e?e.value:it[f];}; it.item=gv('item'); it.desc=gv('desc'); it.brand=gv('brand'); it.qty=num(gv('qty')); it.price=num(gv('price')); var _op=g('q_'+si+'_'+ii+'_opt'); if(_op)it.optional=_op.checked; });
   const io=g('qi_'+si+'_on'); if(io){ s.instOn=io.checked; s.instType=((g('qi_'+si+'_type')||{}).value)||'percent'; s.instVal=num((g('qi_'+si+'_val')||{}).value); }
   const dn=g('qd_'+si+'_on'); if(dn){ s.discOn=dn.checked; s.discType=((g('qd_'+si+'_type')||{}).value)||'percent'; s.discVal=num((g('qd_'+si+'_val')||{}).value); }
   const fe=g('qf_'+si); if(fe)s.features=fe.value; const ne=g('qn_'+si); if(ne)s.notes=ne.value;
@@ -3615,16 +3624,18 @@ function qNewProductSave(si){
 function qSecRender(){ const el=g('qSec'); if(!el)return;
   const dl=`<datalist id="prod_dl">${inventory.filter(inBranch).map(p=>`<option value="${esc((p.sku?p.sku+' — ':'')+(p.name||''))}">`).join('')}</datalist><datalist id="sys_dl">${QSYS_ALL.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>`;
   el.innerHTML=dl+_qsec.map((s,si)=>{
-    const rows=(s.items||[]).map((it,ii)=>`<tr>
+    const rows=(s.items||[]).map((it,ii)=>`<tr ondragover="event.preventDefault()" ondrop="qDrop(event,${si},${ii})">
+      <td class="draghandle" draggable="true" ondragstart="qDragStart(event,${si},${ii})" title="${lang==='ar'?'اسحب لإعادة الترتيب':'Drag to reorder'}" style="cursor:grab;color:#9aa;text-align:center;width:20px;user-select:none">⠿</td>
       <td><input id="q_${si}_${ii}_item" value="${esc(it.item||'')}" placeholder="Item" style="width:84px"></td>
       <td><div style="display:flex;gap:6px;align-items:center">${it.image?`<img src="${esc(it.image)}" title="${lang==='ar'?'صورة المنتج':'product image'}" style="width:34px;height:34px;object-fit:contain;border-radius:6px;background:#f4f8fb;flex-shrink:0">`:''}<input id="q_${si}_${ii}_desc" list="prod_dl" value="${esc(it.desc||'')}" placeholder="Description / pick product" onchange="qPickProduct(${si},${ii},this.value)" style="flex:1;min-width:130px"><button type="button" class="btn cy sm" title="${lang==='ar'?'اختر منتج من المخزون':'Pick product from inventory'}" onclick="qProductPicker(${si},${ii})" style="flex-shrink:0">📦</button>${(isAdmin()||isMgr())?`<button type="button" class="btn gh sm" title="${lang==='ar'?'تغيير/إضافة صورة المنتج (مدير/Super Admin)':'Change/add product image (Manager/Super Admin)'}" onclick="qEditProductImage(${si},${ii})" style="flex-shrink:0">🖼</button>`:''}</div></td>
       <td><input id="q_${si}_${ii}_brand" value="${esc(it.brand||'')}" placeholder="Brand" style="width:80px"></td>
       <td><input id="q_${si}_${ii}_qty" type="number" value="${num(it.qty)||1}" style="width:50px" oninput="qRecalc()"></td>
-      <td><input id="q_${si}_${ii}_price" type="number" value="${num(it.price)||0}" style="width:74px" oninput="qRecalc()"></td>
+      <td><input id="q_${si}_${ii}_price" type="number" value="${num(it.price)||0}" style="width:74px" oninput="qRecalc()" ${it.optional?'disabled':''}></td>
       <td class="mini" id="q_${si}_${ii}_sub" style="white-space:nowrap">0</td>
+      <td class="c" title="${lang==='ar'?'اختياري — يظهر في الكوتيشن بدون سعر ومش بيتحسب':'Optional — shown in the quote without price, not counted'}"><input type="checkbox" id="q_${si}_${ii}_opt" ${it.optional?'checked':''} onchange="qRecalc();qSecRender()"></td>
       <td><button class="btn dn sm" onclick="qItemDel(${si},${ii})">✕</button></td></tr>`).join('');
     return `<div class="card" style="margin-bottom:10px;padding:10px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><span class="mini" style="color:#157f96;font-weight:800">System ${si+1}</span><input id="qsT${si}" list="sys_dl" value="${esc(s.title||'')}" placeholder="Choose a system — KNX / Wireless / Light Current / Sound System / CCTV" style="font-weight:700;flex:1"><button class="btn gh sm" onclick="qSecDel(${si})">🗑 Remove system</button></div>
-      <div style="overflow-x:auto"><table class="items"><thead><tr><th>Item</th><th>Description</th><th>Brand</th><th>Qty</th><th>Unit</th><th>Sub</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div style="overflow-x:auto"><table class="items"><thead><tr><th></th><th>Item</th><th>Description</th><th>Brand</th><th>Qty</th><th>Unit</th><th>Sub</th><th title="${lang==='ar'?'اختياري':'Optional'}">Opt</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
       <button class="btn gh sm" style="margin-top:6px" onclick="qItemAdd(${si})">+ Add line</button>${(me&&me.role==='Viewer')?'':` <button class="btn cy sm" style="margin-top:6px" title="${lang==='ar'?'منتج جديد مش موجود في المخزون — أضفه هنا ويتسجّل في Products':'New product not in inventory — add it here & save to Products'}" onclick="qNewProduct(${si})">➕ ${lang==='ar'?'منتج جديد':'New product'}</button>`}
       <div style="margin-top:8px;border-top:1px dashed var(--mist);padding-top:8px;display:flex;gap:8px 14px;flex-wrap:wrap;align-items:center">
         <label style="display:flex;align-items:center;gap:5px;font-weight:700;color:var(--navy)"><input type="checkbox" id="qi_${si}_on" ${s.instOn?'checked':''} onchange="qRecalc()"> 🔧 ${lang==='ar'?'تركيب':'Installation'}</label>
@@ -3668,7 +3679,7 @@ function qCurChange(){ var sel=g('q_cur'); var cur=(sel&&sel.value)||'EGP'; var 
   qRecalc(); }
 function qRecalc(){ qReadDOM(); const cur=(g('q_cur')&&val('q_cur'))||'EGP'; const vat=num(val('q_vat')); const rate=qCurRate(); const f=n=>Number(num(n)).toLocaleString(undefined,{maximumFractionDigits:2});
   let grand=0;
-  _qsec.forEach((s,si)=>{ let secSub=0; (s.items||[]).forEach((it,ii)=>{ const t=num(it.qty)*num(it.price); secSub+=t; const c=g('q_'+si+'_'+ii+'_sub'); if(c)c.textContent=f(t)+' '+cur; });
+  _qsec.forEach((s,si)=>{ let secSub=0; (s.items||[]).forEach((it,ii)=>{ const opt=!!it.optional; const t=opt?0:num(it.qty)*num(it.price); secSub+=t; const c=g('q_'+si+'_'+ii+'_sub'); if(c)c.textContent=opt?(lang==='ar'?'اختياري':'Optional'):f(t)+' '+cur; });
     const ex=qCalcExtras(secSub,{instOn:s.instOn,instType:s.instType,instVal:s.instVal,discOn:s.discOn,discType:s.discType,discVal:s.discVal});
     grand+=ex.taxable;
     const st=g('qsecT'+si); if(st){ let parts=[(lang==='ar'?'الإجمالي ':'Subtotal ')+f(secSub)]; if(s.instOn)parts.push('+ '+(lang==='ar'?'تركيب ':'Install ')+f(ex.inst)); if(s.discOn)parts.push('− '+(lang==='ar'?'خصم ':'Disc ')+f(ex.disc)); parts.push('= '+f(ex.taxable)+' '+cur); st.textContent=(lang==='ar'?('سيستم '+(si+1)+': '):('System '+(si+1)+': '))+parts.join('  ·  '); } });
@@ -3684,6 +3695,7 @@ function qRecalc(){ qReadDOM(); const cur=(g('q_cur')&&val('q_cur'))||'EGP'; con
 const QSERVICES=['Home Automation','Smart Home','Home Cinema','Indoor Sound System','Outdoor Sound System','Security Camera','Intrusion System','Safety System','Intercom System','Structured Cabling System','MATV Satellite System','Solar Energy','Smart Gates'];
 /* Systems that can each become a page inside one quotation (Hesham: choose one or more, each system prints on its own page with its own title). Images per system are wired via SYS_IMG when supplied. */
 const QSYSTEMS=['KNX','Wireless','Light Current','Sound System','CCTV'];
+const SCOPE_SYSTEMS=['KNX','Wireless','Light Current'];
 /* One unified systems list — new systems + the older service names — so every system (new or old) is picked from the same place. */
 const QSYS_ALL=(function(){ var seen={},out=[]; QSYSTEMS.concat(QSERVICES).forEach(function(s){ var k=String(s).toLowerCase(); if(!seen[k]){ seen[k]=1; out.push(s); } }); return out; })();
 const SYS_IMG={}; /* system name -> banner image URL/dataURL, added when Hesham sends the system images */
@@ -3710,12 +3722,12 @@ function quoteToTech(){ openModal('Request quotation from Technical Office',
     '<div class="fld" style="background:#fff7ed;border:1px solid #f0c98a;border-radius:8px;padding:10px"><label>\ud83c\udfe2 '+(lang==='ar'?'\u0646\u0648\u0639 \u0627\u0644\u0645\u0634\u0631\u0648\u0639 (\u0628\u064a\u062d\u062f\u0651\u062f \u0645\u064a\u0646 \u064a\u0633\u062a\u0644\u0645 \u0627\u0644\u0637\u0644\u0628)':'Project category (decides who receives it)')+'</label><select id="tq_route" onchange="tqRouteHint()"><option value="Residential">'+(lang==='ar'?'\u0633\u0643\u0646\u064a Residential':'Residential')+'</option><option value="Commercial">'+(lang==='ar'?'\u062a\u062c\u0627\u0631\u064a Commercial':'Commercial')+'</option></select><div id="tq_routeHint" class="mini" style="margin-top:4px;color:#157f96"></div></div>'+
     '<div class="row2">'+fEl('Project name','tq_project','')+'<div class="fld"><label>Client name</label><input id="tq_client" list="cust_dl" value="">'+custDatalist()+'</div></div>'+
     '<div class="row2">'+fEl('Project location','tq_loc','')+selEl('Project type','tq_ptype',RFQ_PTYPES,'Apartment')+'</div>'+
-    '<div class="row2">'+selEl('Scope of work (service \u2014 sets the cover)','tq_service',QSERVICES,'Home Automation')+selEl('Category','tq_cat',RFQ_CATS,'Mid-range')+'</div>'+
+    '<div class="row2">'+selEl('Scope of work (KNX / Wireless / Light Current)','tq_service',SCOPE_SYSTEMS,'KNX')+selEl('Category','tq_cat',RFQ_CATS,'Mid-range')+'</div>'+
     '<div class="row2">'+selEl('Design based on','tq_design',RFQ_DESIGN,'Plan')+fEl('Deadline (min 3 days)','tq_deadline','','date')+'</div>'+
     '<div class="row2">'+fEl('Sales person','tq_sales',(me&&me.name)||'')+fEl('Quotation code (by Pre-sales)','tq_code','')+'</div>'+
     fTa('KNX requirements','tq_knx','')+
-    fTa('Low Current (LC) requirements','tq_lc','')+
-    fTa('Network requirements','tq_net','')+
+    fTa('Wireless requirements','tq_net','')+
+    fTa('Light Current requirements','tq_lc','')+
     fTa('Notes','tq_notes','')+
     fTa(lang==='ar'?'لينكات مرجعية (لينك في كل سطر)':'Reference links (one per line)','tq_links','')+
     fTa('Revisions','tq_rev','')+
@@ -3740,7 +3752,7 @@ function rfqSummaryHTML(r){
     row(ar?'\u0627\u0644\u0645\u0634\u0631\u0648\u0639':'Project', r.projectName)+row(ar?'\u0627\u0644\u0639\u0645\u064a\u0644':'Client', r.client)+row(ar?'\u0627\u0644\u0645\u0648\u0642\u0639':'Location', r.location)+
     row(ar?'\u0627\u0644\u0646\u0648\u0639':'Type', r.projectType||r.buildingType)+row(ar?'\u0627\u0644\u0645\u062c\u0627\u0644':'Scope', r.service)+row(ar?'\u0627\u0644\u0641\u0626\u0629':'Category', r.category)+
     row(ar?'\u0627\u0644\u062a\u0635\u0645\u064a\u0645 \u0639\u0644\u0649':'Design based on', r.designBasedOn)+row('Deadline', r.deadline)+row(ar?'\u0627\u0644\u0633\u064a\u0644\u0632':'Sales person', r.salesPerson||r.requestedBy)+row(ar?'\u0643\u0648\u062f \u0627\u0644\u0639\u0631\u0636':'Quote code', r.quotationCode)+
-    blk('KNX', r.reqKNX)+blk('Low Current (LC)', r.reqLC)+blk('Network', r.reqNetwork)+blk(ar?'\u0645\u0644\u0627\u062d\u0638\u0627\u062a':'Notes', r.notes)+blk('Revisions', r.revisions)+
+    blk('KNX', r.reqKNX)+blk('Wireless', r.reqNetwork)+blk('Light Current', r.reqLC)+blk(ar?'\u0645\u0644\u0627\u062d\u0638\u0627\u062a':'Notes', r.notes)+blk('Revisions', r.revisions)+
     (function(){ var ls=(r.refLinks||'').split(String.fromCharCode(10)).map(function(x){return x.trim();}).filter(Boolean); if(!ls.length)return ''; return '<div style="margin-top:6px"><div style="color:#0e2c49;font-weight:700">'+(ar?'\u0644\u064a\u0646\u0643\u0627\u062a \u0645\u0631\u062c\u0639\u064a\u0629':'Reference links')+'</div>'+ls.map(function(u){ var href=/^https?:\/\//i.test(u)?u:('http://'+u); return '<div><a href="'+esc(href)+'" target="_blank" rel="noopener" style="color:#157f96;word-break:break-all">\ud83d\udd17 '+esc(u)+'</a></div>'; }).join('')+'</div>'; })()+
     (function(){ try{ var n=(typeof attCount==='function')?attCount(r.id):0; return n?('<div style="margin-top:8px"><button class="btn gh sm" type="button" onclick="attachOpen(\''+r.id+'\')">\ud83d\udcce '+(ar?('\u0627\u0644\u0645\u0631\u0641\u0642\u0627\u062a ('+n+')'):(n+' attachment'+(n>1?'s':'')))+'</button></div>'):''; }catch(e){ return ''; } })()+
     '</div>';
@@ -3866,7 +3878,7 @@ function printQuote(id,opts){
   /* Show the Part Number (item code) only when enabled on the quote (default: shown). */
   const showPN = (q.showPartNo!==false);
   const qThead = `<thead><tr><th class="c">Image</th><th>Item - Description</th><th>Brand</th><th class="c">Qty</th><th class="r">Unit Price</th><th class="r">Total</th></tr></thead>`;
-  const qRows = sc => (sc.items||[]).map(it=>`<tr><td class="c">${it.image?`<img src="${esc(it.image)}" class="pimg">`:''}</td><td class="pd">${(showPN&&it.item)?`<div class="pn">${esc(it.item)}</div>`:''}<div class="ds">${esc(it.desc||'')}</div></td><td class="br">${esc(it.brand||'-')}</td><td class="c">${num(it.qty)}</td><td class="r">${M(it.price)}</td><td class="r"><b>${M(num(it.qty)*num(it.price))}</b></td></tr>`).join('');
+  const qRows = sc => (sc.items||[]).map(it=>`<tr><td class="c">${it.image?`<img src="${esc(it.image)}" class="pimg">`:''}</td><td class="pd">${(showPN&&it.item)?`<div class="pn">${esc(it.item)}</div>`:''}<div class="ds">${esc(it.desc||'')}${it.optional?` <span style="display:inline-block;font-size:9.5px;font-weight:800;color:#8a5a00;background:#f6e7c8;border-radius:4px;padding:1px 6px;vertical-align:middle">${lang==='ar'?'اختياري':'OPTIONAL'}</span>`:''}</div></td><td class="br">${esc(it.brand||'-')}</td><td class="c">${num(it.qty)}</td><td class="r">${it.optional?(lang==='ar'?'اختياري':'Optional'):M(it.price)}</td><td class="r">${it.optional?'—':`<b>${M(num(it.qty)*num(it.price))}</b>`}</td></tr>`).join('');
   const secTable=(sc,i)=>`<div class="sec"><div class="sech">${esc(sc.title||'Section')}</div>
     <table>${qThead}<tbody>${qRows(sc)}</tbody></table>${secFinRows(sc,i)}</div>`;
   const pay=[['Advance',q.payAdvance],['Before delivery',q.payBefore],['After delivery',q.payAfter],['Testing & commissioning',q.payTest]].filter(pp=>num(pp[1]));
