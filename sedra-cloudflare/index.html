@@ -1044,24 +1044,120 @@ function initBackend(){
 }
 function showLoad(t){ const L=g('loading'); if(!L)return; if(t)L.querySelector('.ltxt').textContent=t; L.classList.add('show'); }
 function hideLoad(){ const L=g('loading'); if(L)L.classList.remove('show'); }
-function setPill(on){ const p=g('statusPill'); p.textContent=on?'🟢 Online · shared':'🟡 Connecting…'; p.className='pill'+(on?' on':''); }
+function setPill(on){ if(on&&typeof OFF!=='undefined')OFF.offline=false; if(typeof OFF!=='undefined'&&OFF.renderPill){ OFF.renderPill(); return; } const p=g('statusPill'); if(p){ p.textContent=on?'🟢 Online · shared':'🟡 Connecting…'; p.className='pill'+(on?' on':''); } }
 
 /* ===== Data layer: every read/write goes through the server proxy, so a blocked database connection on the client side no longer matters ===== */
 const DBPROXY='/db';
 async function tok(){ try{ var u=auth&&auth.currentUser; return u? await u.getIdToken() : ''; }catch(e){ return ''; } }
-async function apiCall(method,path,body){
-  if(me&&me.role==='Viewer'&&['POST','PATCH','PUT','DELETE'].indexOf((method||'').toUpperCase())>=0){ viewerBlock(); return null; }
+async function apiCallRaw(method,path,body){
   var t=await tok();
-  var res=await fetch(DBPROXY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:t,method:method,path:path,body:body})});
+  var res;
+  try{ res=await fetch(DBPROXY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:t,method:method,path:path,body:body})}); }
+  catch(netErr){ var e=new Error('offline'); e.__net=true; throw e; }
   var txt=await res.text();
   if(!res.ok) throw new Error('('+res.status+') '+txt);
   return txt?JSON.parse(txt):null;
+}
+async function apiCall(method,path,body){
+  var M=(method||'').toUpperCase();
+  if(me&&me.role==='Viewer'&&['POST','PATCH','PUT','DELETE'].indexOf(M)>=0){ viewerBlock(); return null; }
+  var isWrite=['POST','PATCH','PUT','DELETE'].indexOf(M)>=0;
+  if(isWrite && OFF.offline){ return OFF.enqueue(M,path,body); }
+  try{ var r=await apiCallRaw(method,path,body); if(OFF.offline){ OFF.markOnline(); OFF.tryFlush(); } return r; }
+  catch(e){ if(e&&e.__net){ OFF.markOffline(); if(isWrite){ return OFF.enqueue(M,path,body); } } throw e; }
 }
 function listToArr(o){ var a=[]; if(o){ for(var k in o){ if(o[k]&&typeof o[k]==='object') a.push(Object.assign({id:k},o[k])); } } return a; }
 async function apiList(coll){ return listToArr(await apiCall('GET','/'+coll+'.json')); }
 async function apiAdd(coll,d){ var r=await apiCall('POST','/'+coll+'.json',d); return r&&r.name; }
 async function apiMerge(coll,id,d){ return apiCall('PATCH','/'+coll+'/'+id+'.json',d); }
 async function apiDelete(coll,id){ return apiCall('DELETE','/'+coll+'/'+id+'.json'); }
+
+/* ===== Offline mode: work with no internet; queue writes locally; auto-sync on reconnect =====
+   - Reads: the last full snapshot is cached in IndexedDB, so the app opens & shows data offline.
+   - Writes: while offline, each add/edit/delete is applied to the local snapshot AND queued.
+   - Reconnect: the queue is replayed to the server in order; temp ids from offline "create"s are
+     mapped to real ids; offline-created quotes get a fresh unique number at upload time. */
+var _snap=null;
+var OFF={
+  offline:false, flushing:false, queue:[], failed:[], _savedSig:'', _inited:false, _toastCd:0,
+  renderPill:function(){ var p=g('statusPill'); if(!p)return; var n=OFF.queue.length; var ar=(typeof lang!=='undefined'&&lang==='ar');
+    if(OFF.flushing){ p.textContent='⏳ '+(ar?'بيرفع شغلك':'Syncing')+(n?(' — '+n):'')+'…'; p.className='pill'; return; }
+    if(OFF.offline){ p.textContent='🟡 '+(ar?'أوفلاين — بيشتغل محليًا':'Offline — working locally')+(n?(' · '+n+' '+(ar?'معلّقة':'pending')):''); p.className='pill'; return; }
+    if(n){ p.textContent='⏳ '+n+' '+(ar?'معلّقة':'pending'); p.className='pill'; return; }
+    p.textContent=(ar?'🟢 أونلاين · مشترك':'🟢 Online · shared'); p.className='pill on';
+  },
+  markOnline:function(){ OFF.offline=false; OFF.renderPill(); },
+  markOffline:function(){ OFF.offline=true; OFF.renderPill(); },
+  _db:function(){ return new Promise(function(res,rej){ try{ var r=indexedDB.open('sedra-offline',1); r.onupgradeneeded=function(){ try{ r.result.createObjectStore('kv'); }catch(e){} }; r.onsuccess=function(){ res(r.result); }; r.onerror=function(){ rej(r.error); }; }catch(e){ rej(e); } }); },
+  _get:function(k){ return OFF._db().then(function(db){ return new Promise(function(res,rej){ try{ var t=db.transaction('kv','readonly').objectStore('kv').get(k); t.onsuccess=function(){res(t.result);}; t.onerror=function(){rej(t.error);}; }catch(e){ rej(e); } }); }).catch(function(){ return null; }); },
+  _put:function(k,v){ return OFF._db().then(function(db){ return new Promise(function(res){ try{ var t=db.transaction('kv','readwrite').objectStore('kv').put(v,k); t.onsuccess=function(){res(true);}; t.onerror=function(){res(false);}; }catch(e){ res(false); } }); }).catch(function(){ return false; }); },
+  saveSnapshot:function(all){ try{ OFF._put('snapshot', all); }catch(e){} },
+  loadSnapshot:function(){ return OFF._get('snapshot'); },
+  persistQueue:function(){ try{ OFF._put('queue', OFF.queue); }catch(e){} },
+  _segs:function(path){ var p=String(path||'').replace(/^\//,'').replace(/\.json$/,''); return p?p.split('/'):[]; },
+  _tempId:function(){ return 'local-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8); },
+  _applyLocal:function(method,segs,body,tempId){
+    if(!_snap)_snap={};
+    var o=_snap;
+    if(method==='POST'){ var coll=segs[0]; if(typeof o[coll]!=='object'||!o[coll])o[coll]={}; o[coll][tempId]=body||{}; return; }
+    for(var i=0;i<segs.length-1;i++){ if(typeof o[segs[i]]!=='object'||!o[segs[i]])o[segs[i]]={}; o=o[segs[i]]; }
+    var key=segs[segs.length-1];
+    if(method==='DELETE'){ if(o&&typeof o==='object') delete o[key]; }
+    else if(method==='PUT'){ o[key]=body; }
+    else { o[key]=Object.assign({}, (o[key]&&typeof o[key]==='object')?o[key]:{}, body||{}); }
+  },
+  enqueue:function(method,path,body){
+    var segs=OFF._segs(path); var tempId=null, fixup=null;
+    if(method==='POST'){ tempId=OFF._tempId(); if(segs[0]==='quotes') fixup='quoteNumber'; }
+    try{ OFF._applyLocal(method,segs,body,tempId); }catch(e){}
+    OFF.queue.push({id:OFF._tempId(), method:method, path:path, body:body, tempId:tempId, fixup:fixup});
+    OFF.persistQueue(); try{ OFF.saveSnapshot(_snap); }catch(e){}
+    OFF.renderPill();
+    try{ if(!OFF._toastCd){ OFF._toastCd=1; setTimeout(function(){OFF._toastCd=0;},4000); var ar=(lang==='ar'); showToast({title:(ar?'📴 اتسجّل على الجهاز':'📴 Saved on device'), body:(ar?'مفيش نت دلوقتي — شغلك محفوظ وهيترفع تلقائي أول ما النت يرجع':'No internet right now — saved locally and will sync automatically when you are back online')}); } }catch(e){}
+    if(method==='POST') return {name:tempId};
+    if(method==='DELETE') return null;
+    return body||{};
+  },
+  _remapPath:function(path, idmap){ var segs=OFF._segs(path); var changed=false; for(var i=0;i<segs.length;i++){ if(idmap[segs[i]]){ segs[i]=idmap[segs[i]]; changed=true; } } return changed?('/'+segs.join('/')+'.json'):path; },
+  _remapBody:function(v, idmap){ if(v==null)return v; if(typeof v==='string'){ return idmap[v]||v; } if(Array.isArray(v)){ return v.map(function(x){return OFF._remapBody(x,idmap);}); } if(typeof v==='object'){ var o={}; for(var k in v){ o[k]=OFF._remapBody(v[k],idmap); } return o; } return v; },
+  tryFlush:function(){ if(OFF.flushing||OFF.offline||!OFF.queue.length)return; OFF._flush(); },
+  _flush:async function(){
+    if(OFF.flushing||OFF.offline||!OFF.queue.length)return;
+    OFF.flushing=true; OFF.renderPill();
+    var idmap={}, done=0;
+    try{
+      while(OFF.queue.length){
+        var op=OFF.queue[0];
+        var path=OFF._remapPath(op.path, idmap);
+        var body=OFF._remapBody(op.body, idmap);
+        if(op.fixup==='quoteNumber' && body){ try{ body=Object.assign({},body,{number:genQuoteNo(svcKey(body.service||'home-automation'))}); }catch(e){} }
+        try{
+          var r=await apiCallRaw(op.method, path, body);
+          if(op.method==='POST' && op.tempId && r && r.name){ idmap[op.tempId]=r.name; }
+          OFF.queue.shift(); OFF.persistQueue(); done++; OFF.renderPill();
+        }catch(e){
+          if(e&&e.__net){ OFF.markOffline(); break; }
+          OFF.failed.push({path:op.path, err:String(e&&e.message||e)}); OFF.queue.shift(); OFF.persistQueue(); OFF.renderPill();
+        }
+      }
+    }finally{
+      OFF.flushing=false; OFF.renderPill();
+      if(!OFF.offline){ try{ await refreshAll(); }catch(e){} }
+      var ar=(lang==='ar');
+      if(done>0 && !OFF.queue.length && !OFF.offline){ try{ showToast({title:(ar?'✅ اترفع كل شغلك':'✅ Synced'), body:(ar?('النت رجع واترفع '+done+' تعديل كانوا محفوظين offline'):('Back online — '+done+' offline change(s) synced'))}); }catch(e){} }
+      if(OFF.failed.length){ var f=OFF.failed.length; OFF.failed=[]; try{ showToast({title:(ar?'⚠️ تعديلات مرفوضة':'⚠️ Some changes rejected'), body:(ar?(f+' تعديل اترفض من السيرفر (صلاحية أو تعارض)'):(f+' change(s) were rejected by the server (permission/conflict)'))}); }catch(e){} }
+    }
+  },
+  init:function(){ if(OFF._inited)return; OFF._inited=true;
+    try{ OFF.offline=(navigator.onLine===false); }catch(e){}
+    OFF._get('queue').then(function(q){ if(Array.isArray(q)&&q.length){ OFF.queue=q; OFF.renderPill(); } });
+    OFF._get('snapshot').then(function(s){ if(s&&!_snap)_snap=s; });
+    try{ window.addEventListener('online', function(){ OFF.markOnline(); OFF.tryFlush(); try{ if(typeof synced==='function') synced(); }catch(e){} }); }catch(e){}
+    try{ window.addEventListener('offline', function(){ OFF.markOffline(); }); }catch(e){}
+    setInterval(function(){ if(!OFF.offline && OFF.queue.length && !OFF.flushing) OFF.tryFlush(); }, 20000);
+  }
+};
+try{ OFF.init(); }catch(e){}
 
 let appReady=false, lastSig='', polling=false, lastRefresh=0;
 var _lastRawSig='';
@@ -1084,10 +1180,11 @@ function startData(){ if(started)return; started=true;
 }
 var _lightSig='';
 async function refreshLight(){
-  if(polling)return; polling=true; lastRefresh=Date.now();
+  if(polling)return; if(OFF.offline)return; polling=true; lastRefresh=Date.now();
   try{
     var KEYS=['leads','tasks','todos','messages','groups','leaves','approvals','prs','expclaims','workorders','events','tickets','invoices','payments','siteLabor','schedules','botChats','feedbacks'];
     var res=await Promise.all(KEYS.map(function(k){ return apiCall('GET','/'+k+'.json').catch(function(){return undefined;}); }));
+    if(res.every(function(x){return x===undefined;})){ OFF.markOffline(); polling=false; return; }
     var m={}; KEYS.forEach(function(k,i){ m[k]=res[i]; });
     var sig=''; try{ sig=String(JSON.stringify(m).length); }catch(e){}
     if(sig && sig===_lightSig){ polling=false; return; }
@@ -1116,6 +1213,18 @@ async function refreshAll(quiet){
     var _rs=''; try{ _rs=String(JSON.stringify(all).length); }catch(e){}
     if(quiet && _rs && _rs===_lastRawSig && appReady && employeesLoaded){ polling=false; return; }
     _lastRawSig=_rs;
+    applyAll(all);
+    _snap=all; try{ if(_rs!==OFF._savedSig){ OFF._savedSig=_rs; OFF.saveSnapshot(all); } }catch(_e){}
+    OFF.markOnline(); afterData(); OFF.tryFlush();
+  }catch(e){
+    if(e&&e.__net){ OFF.markOffline();
+      var snap=_snap; if(!snap){ try{ snap=await OFF.loadSnapshot(); }catch(_e2){} }
+      if(snap){ _snap=snap; try{ applyAll(snap); }catch(_e3){} afterData(); }
+    } else { setPill(false); }
+  }
+  finally{ polling=false; }
+}
+function applyAll(all){
     employees=listToArr(all.employees); employeesLoaded=true;
     leads=listToArr(all.leads).sort((x,y)=>(y.created||'').localeCompare(x.created||''));
     campaigns=listToArr(all.campaigns);
@@ -1180,9 +1289,6 @@ async function refreshAll(quiet){
     courses=listToArr(all.courses);
     stockcounts=listToArr(all.stockcounts);
     settings=Object.assign({loc:{},social:{}},(all.meta&&all.meta.settings)||{});
-    setPill(true); afterData();
-  }catch(e){ setPill(false); }
-  finally{ polling=false; }
 }
 function afterData(){
   if(!appReady){ resolveMe(); return; }
