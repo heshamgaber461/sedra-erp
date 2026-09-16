@@ -2067,7 +2067,7 @@ function render(){
   if(!canSee(m)){ curView='hub'; m=MODULES.find(function(x){return x.id==='hub';})||MODULES[0]; }
   g('viewTitle').textContent=m.label;
   markNav();
-  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vAccounting,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,admin:vAdmin,profile:vProfile}[curView];
+  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,admin:vAdmin,profile:vProfile}[curView];
   g('view').innerHTML = fn?fn():'';
   if(curView==='sales' && window._afterSales)window._afterSales();
   if(curView==='chat' && window._afterChat)window._afterChat();
@@ -4464,6 +4464,189 @@ function editBOM(id){ const r=id?boms.find(x=>x.id===id):{branch:defBranch()};
    ()=>{ const components=_bom.filter(c=>c.name).map(c=>({name:c.name,qty:num(c.qty)})); const d={product:val('bm_product'),branch:val('bm_branch'),components,notes:val('bm_notes')}; if(!d.product){alert('Product name required');return false;} if(!components.length){alert('Add at least one component');return false;} if(!id)d.created=new Date().toISOString(); saveDoc('boms',d,id); });
   bomRender();
 }
+
+/* ===================== ODOO-STYLE ACCOUNTING & FINANCE WORKSPACE =====================
+   A unified Odoo-like menu (Dashboard · Customers · Vendors · Accounting · Reporting ·
+   Configuration) that organises the ERP's existing finance pages into one clean workspace.
+   Structure + design only — it runs on the ERP's own data, multi-branch, no external data. */
+var finGrp='Dashboard', finPg='dash';
+var FIN_MENU=[
+  {g:'Dashboard', ar:'الرئيسية', ic:'📊', pages:[['dash','Dashboard','الرئيسية']]},
+  {g:'Customers', ar:'العملاء', ic:'🧾', pages:[['c_inv','Invoices','الفواتير'],['c_cn','Credit Notes','إشعارات دائن'],['c_pay','Payments','المقبوضات'],['c_cust','Customers','العملاء'],['c_age','Aged Receivable','أعمار الذمم']]},
+  {g:'Vendors', ar:'الموردين', ic:'📥', pages:[['v_bill','Bills','فواتير الموردين'],['v_dn','Refunds','إشعارات مدين'],['v_sup','Vendors','الموردين'],['v_age','Aged Payable','أعمار الدائنين']]},
+  {g:'Accounting', ar:'المحاسبة', ic:'📒', pages:[['a_je','Journal Entries','قيود اليومية'],['a_coa','Chart of Accounts','دليل الحسابات'],['a_trial','Trial Balance','ميزان المراجعة'],['a_tx','Transfers','التحويلات']]},
+  {g:'Reporting', ar:'التقارير', ic:'📈', pages:[['r_bs','Balance Sheet','الميزانية'],['r_pnl','Profit & Loss','الأرباح والخسائر'],['r_cash','Cash Flow','التدفقات النقدية'],['r_gl','General Ledger','دفتر الأستاذ'],['r_trial','Trial Balance','ميزان المراجعة'],['r_ar','Aged Receivable','أعمار الذمم'],['r_ap','Aged Payable','أعمار الدائنين'],['r_tax','Tax Report','تقرير الضريبة']]},
+  {g:'Configuration', ar:'الإعدادات', ic:'⚙️', pages:[['cf_coa','Chart of Accounts','دليل الحسابات'],['cf_tax','Taxes','الضرائب'],['cf_journal','Journals','دفاتر اليومية'],['cf_cur','Currencies','العملات'],['cf_fiscal','Fiscal Positions','الأوضاع الضريبية'],['cf_terms','Payment Terms','شروط الدفع'],['cf_deprec','Depreciation','الإهلاك']]}
+];
+function finGrpLbl(m){ return (lang==='ar'?m.ar:m.g); }
+function finPageValid(id){ for(var i=0;i<FIN_MENU.length;i++){ for(var j=0;j<FIN_MENU[i].pages.length;j++){ if(FIN_MENU[i].pages[j][0]===id) return true; } } return false; }
+function finSetGrp(g){ finGrp=g; var m=FIN_MENU.find(function(x){return x.g===g;}); if(m&&m.pages.length) finPg=m.pages[0][0]; render(); }
+function finGo(pg){ finPg=pg; render(); }
+function finContent(){
+  var inv=invoices.filter(inBranch), exp=expenses.filter(inBranch);
+  switch(finPg){
+    case 'dash': return finDashboard();
+    case 'c_inv': return accInvoices(inv);
+    case 'c_cn': return vCreditNotes();
+    case 'c_pay': return accReceipts();
+    case 'c_cust': return vCustomers();
+    case 'c_age': return accAging(inv);
+    case 'v_bill': return accBills();
+    case 'v_dn': return vDebitNotes();
+    case 'v_sup': return invSuppliers();
+    case 'v_age': return vAPAging();
+    case 'a_je': return glJournal();
+    case 'a_coa': return glChart();
+    case 'a_trial': return glTrial();
+    case 'a_tx': return vTransfers();
+    case 'r_bs': return glBS();
+    case 'r_pnl': return glPnl();
+    case 'r_cash': return finCashFlow();
+    case 'r_gl': return vGLReport();
+    case 'r_trial': return glTrial();
+    case 'r_ar': return accAging(inv);
+    case 'r_ap': return vAPAging();
+    case 'r_tax': return vTaxSummary();
+    case 'cf_coa': return glChart();
+    case 'cf_tax': return vTaxCodes();
+    case 'cf_journal': return finJournals();
+    case 'cf_cur': return vFXRates();
+    case 'cf_fiscal': return finFiscalPositions();
+    case 'cf_terms': return finPaymentTerms();
+    case 'cf_deprec': return vDeprec();
+    default: return finDashboard();
+  }
+}
+function vFinanceHub(){
+  if(!finPageValid(finPg)){ finGrp='Dashboard'; finPg='dash'; }
+  var css='<style>'
+   +'.odoo-wrap{margin-top:-4px}'
+   +'.odoo-appbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}'
+   +'.odoo-appbar h2{font-size:20px;color:var(--navy);margin:0}'
+   +'.odoo-top{display:flex;gap:2px;flex-wrap:wrap;border-bottom:2px solid #e3edf4;margin-bottom:2px}'
+   +'.odoo-tab{background:none;border:none;padding:11px 15px;font-weight:800;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;font-size:13.5px;border-radius:8px 8px 0 0}'
+   +'.odoo-tab:hover{background:#f4f8fb;color:var(--navy)}'
+   +'.odoo-tab.on{color:var(--navy);border-bottom-color:var(--cyan);background:#f4f8fb}'
+   +'.odoo-sub{display:flex;gap:6px;flex-wrap:wrap;padding:12px 0 8px}'
+   +'.odoo-pill{background:#f2f6fa;border:1px solid #e3edf4;border-radius:20px;padding:6px 14px;font-weight:700;color:var(--navy);cursor:pointer;font-size:12.5px}'
+   +'.odoo-pill:hover{border-color:var(--cyan)}'
+   +'.odoo-pill.on{background:var(--navy);color:#fff;border-color:var(--navy)}'
+   +'.jgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-top:6px}'
+   +'.jcard{background:var(--card,#fff);border:1px solid #e3edf4;border-radius:14px;overflow:hidden;box-shadow:0 4px 14px rgba(20,63,99,.06)}'
+   +'.jcard .jh{padding:12px 16px;color:#fff;font-weight:800;display:flex;align-items:center;justify-content:space-between;font-size:14px}'
+   +'.jcard .jb{padding:14px 16px}'
+   +'.jcard .jn{font-size:26px;font-weight:800;color:var(--navy);line-height:1}'
+   +'.jcard .jl{font-size:12px;color:var(--muted);margin-top:3px}'
+   +'.jcard .jr{display:flex;justify-content:space-between;font-size:12.5px;color:#33445a;padding:3px 0;border-top:1px dashed #eef}'
+   +'.jcard .jf{display:flex;gap:8px;padding:10px 16px;border-top:1px solid #eef;background:#fafcfe}'
+   +'.odoo-report{max-width:760px;margin:6px auto;background:var(--card,#fff);border:1px solid #e3edf4;border-radius:12px;overflow:hidden}'
+   +'.odoo-report .rr{display:flex;justify-content:space-between;padding:9px 18px;font-size:13px;border-bottom:1px solid #f0f4f8}'
+   +'.odoo-report .rr.h{background:#eef3f8;font-weight:800;color:var(--navy)}'
+   +'.odoo-report .rr.sub{padding-inline-start:36px;color:#4a5b6b}'
+   +'.odoo-report .rr.tot{font-weight:800;color:var(--navy);border-top:2px solid var(--navy)}'
+   +'</style>';
+  var bar='<div class="odoo-top">'+FIN_MENU.map(function(m){ return '<button class="odoo-tab'+(m.g===finGrp?' on':'')+'" onclick="finSetGrp(\''+m.g+'\')">'+m.ic+' '+esc(finGrpLbl(m))+'</button>'; }).join('')+'</div>';
+  var grp=FIN_MENU.find(function(x){return x.g===finGrp;}); var sub='';
+  if(grp && grp.pages.length>1){ sub='<div class="odoo-sub">'+grp.pages.map(function(p){ return '<button class="odoo-pill'+(p[0]===finPg?' on':'')+'" onclick="finGo(\''+p[0]+'\')">'+esc(lang==='ar'?p[2]:p[1])+'</button>'; }).join('')+'</div>'; }
+  var head='<div class="odoo-appbar"><h2>💰 '+(lang==='ar'?'المحاسبة والماليات':'Accounting &amp; Finance')+'</h2><span class="tag" style="background:#eef3f8;color:var(--navy)">'+(curBranch==='All'?(lang==='ar'?'كل الفروع':'All branches'):(FLAG[curBranch]||'')+' '+esc(curBranch))+'</span></div>';
+  return css+'<div class="odoo-wrap">'+head+bar+sub+'<div class="odoo-body">'+finContent()+'</div></div>';
+}
+function finDashboard(){
+  var ar=(lang==='ar');
+  var inv=(invoices||[]).filter(inBranch), bl=(typeof bills!=='undefined'?bills:[]).filter(inBranch);
+  var pays=(typeof payments!=='undefined'?payments:[]).filter(inBranch), exps=(expenses||[]).filter(inBranch);
+  var jrnl=(typeof journal!=='undefined'?journal:[]).filter(inBranch);
+  var invOut=inv.reduce(function(s,v){ return s+Math.max(0,num(v.amount)-num(v.paid)); },0);
+  var invCnt=inv.length, invUnpaid=inv.filter(function(v){return num(v.paid)<num(v.amount);}).length;
+  var billOut=bl.reduce(function(s,v){ return s+Math.max(0,num(v.amount)-num(v.paid)); },0);
+  var recIn=pays.reduce(function(s,v){ return s+num(v.amount); },0);
+  var expOut=exps.reduce(function(s,v){ return s+num(v.amount); },0);
+  var cashPos=recIn-expOut-bl.reduce(function(s,v){return s+num(v.paid);},0);
+  function card(color,title,type,big,lbl,rows,acts){
+    return '<div class="jcard"><div class="jh" style="background:'+color+'"><span>'+title+'</span><span style="font-size:11px;opacity:.85;font-weight:700">'+type+'</span></div>'
+     +'<div class="jb"><div class="jn">'+big+'</div><div class="jl">'+lbl+'</div>'+(rows||'')+'</div>'
+     +'<div class="jf">'+acts+'</div></div>';
+  }
+  var g=finGo;
+  var cards=[
+    card('#1a7a4f', ar?'فواتير العملاء':'Customer Invoices', ar?'مبيعات':'Sale', nfmt(invOut), ar?'مستحق التحصيل':'To collect',
+      '<div class="jr"><span>'+(ar?'عدد الفواتير':'Invoices')+'</span><b>'+invCnt+'</b></div><div class="jr"><span>'+(ar?'غير مدفوعة':'Unpaid')+'</span><b>'+invUnpaid+'</b></div>',
+      '<button class="btn cy sm" onclick="editInvoice()">+ '+(ar?'فاتورة':'New')+'</button><button class="btn gh sm" onclick="finGo(\'c_inv\')">'+(ar?'عرض':'View')+'</button>'),
+    card('#2C77B0', ar?'فواتير الموردين':'Vendor Bills', ar?'مشتريات':'Purchase', nfmt(billOut), ar?'مستحق الدفع':'To pay',
+      '<div class="jr"><span>'+(ar?'عدد الفواتير':'Bills')+'</span><b>'+bl.length+'</b></div>',
+      '<button class="btn cy sm" onclick="editBill()">+ '+(ar?'فاتورة':'New')+'</button><button class="btn gh sm" onclick="finGo(\'v_bill\')">'+(ar?'عرض':'View')+'</button>'),
+    card('#0e2c49', ar?'البنك والنقدية':'Bank & Cash', ar?'نقدية':'Cash', nfmt(cashPos), ar?'صافي المركز النقدي':'Net cash position',
+      '<div class="jr"><span>'+(ar?'مقبوضات':'Received')+'</span><b>'+nfmt(recIn)+'</b></div><div class="jr"><span>'+(ar?'مصروفات':'Spent')+'</span><b>'+nfmt(expOut)+'</b></div>',
+      '<button class="btn gh sm" onclick="finGo(\'r_cash\')">'+(ar?'التدفقات':'Cash Flow')+'</button><button class="btn gh sm" onclick="finSetGrp(\'Accounting\');finGo(\'a_tx\')">'+(ar?'تحويل':'Transfer')+'</button>'),
+    card('#8a5a00', ar?'قيود متنوعة':'Miscellaneous', ar?'يومية':'Misc', String(jrnl.length), ar?'عدد القيود':'Journal entries',
+      '<div class="jr"><span>'+(ar?'مصروفات':'Expenses')+'</span><b>'+exps.length+'</b></div>',
+      '<button class="btn gh sm" onclick="finGo(\'a_je\')">'+(ar?'اليومية':'Entries')+'</button><button class="btn gh sm" onclick="finGo(\'a_coa\')">'+(ar?'الحسابات':'Accounts')+'</button>')
+  ].join('');
+  var reports='<div class="sect" style="margin-top:18px"><h2>📈 '+(ar?'تقارير سريعة':'Quick reports')+'</h2></div>'
+   +'<div class="odoo-sub">'
+   +'<button class="odoo-pill" onclick="finSetGrp(\'Reporting\');finGo(\'r_bs\')">'+(ar?'الميزانية':'Balance Sheet')+'</button>'
+   +'<button class="odoo-pill" onclick="finSetGrp(\'Reporting\');finGo(\'r_pnl\')">'+(ar?'الأرباح والخسائر':'Profit & Loss')+'</button>'
+   +'<button class="odoo-pill" onclick="finSetGrp(\'Reporting\');finGo(\'r_cash\')">'+(ar?'التدفقات النقدية':'Cash Flow')+'</button>'
+   +'<button class="odoo-pill" onclick="finSetGrp(\'Reporting\');finGo(\'r_tax\')">'+(ar?'تقرير الضريبة':'Tax Report')+'</button>'
+   +'</div>';
+  return '<div class="jgrid">'+cards+'</div>'+reports;
+}
+function finCashFlow(){
+  var ar=(lang==='ar');
+  var pays=(typeof payments!=='undefined'?payments:[]).filter(inBranch);
+  var exps=(expenses||[]).filter(inBranch);
+  var bl=(typeof bills!=='undefined'?bills:[]).filter(inBranch);
+  var cashIn=pays.reduce(function(s,v){return s+num(v.amount);},0);
+  var cashOut=exps.reduce(function(s,v){return s+num(v.amount);},0)+bl.reduce(function(s,v){return s+num(v.paid);},0);
+  var net=cashIn-cashOut;
+  function rr(l,v,cls){ return '<div class="rr'+(cls?(' '+cls):'')+'"><span>'+l+'</span><b>'+nfmt(v)+'</b></div>'; }
+  var h='<div class="sect"><h2>💸 '+(ar?'قائمة التدفقات النقدية':'Cash Flow Statement')+' '+(curBranch!=='All'?'— '+esc(curBranch):'')+'</h2><div class="sp"></div><button class="btn gh sm" onclick="window.print()">🖨 '+(ar?'طباعة':'Print')+'</button></div>';
+  h+='<div class="odoo-report">'
+    +rr(ar?'النقدية أول المدة':'Cash and cash equivalents, beginning of period',0,'h')
+    +rr(ar?'صافي الزيادة في النقدية':'Net increase in cash and cash equivalents',net,'h')
+    +rr(ar?'التدفقات من الأنشطة التشغيلية':'Cash flows from operating activities',net,'sub')
+    +rr(ar?'نقدية محصّلة من العملاء':'Cash received from operating activities',cashIn,'sub')
+    +rr(ar?'نقدية مدفوعة للتشغيل':'Cash paid for operating activities',-cashOut,'sub')
+    +rr(ar?'التدفقات من الأنشطة الاستثمارية':'Cash flows from investing & extraordinary activities',0,'sub')
+    +rr(ar?'التدفقات من الأنشطة التمويلية':'Cash flows from financing activities',0,'sub')
+    +rr(ar?'النقدية آخر المدة':'Cash and cash equivalents, closing balance',net,'tot')
+    +'</div><div class="mini" style="text-align:center;color:var(--muted);margin-top:8px">'+(ar?'محسوبة من المقبوضات والمصروفات وفواتير الموردين المدفوعة في الفرع المختار.':'Computed from the selected branch\'s receipts, expenses and paid vendor bills.')+'</div>';
+  return h;
+}
+function finJournals(){
+  var ar=(lang==='ar'); var cur=curBranch==='All'?'—':(CUR[curBranch]||'');
+  var J=[['Customer Invoices','فواتير العملاء','Sale','مبيعات','INV',cur],
+        ['Vendor Bills','فواتير الموردين','Purchase','مشتريات','BILL',cur],
+        ['Bank','البنك','Bank','بنك','BNK',cur],
+        ['Cash','النقدية','Cash','نقدية','CSH',cur],
+        ['Miscellaneous Operations','عمليات متنوعة','Miscellaneous','يومية','MISC',cur]];
+  var rows=J.map(function(j){ return '<tr><td><b>'+(ar?j[1]:j[0])+'</b></td><td>'+(ar?j[3]:j[2])+'</td><td>'+j[4]+'</td><td>'+j[5]+'</td></tr>'; }).join('');
+  return '<div class="sect"><h2>📓 '+(ar?'دفاتر اليومية':'Journals')+'</h2></div>'
+    +'<div class="card"><table><thead><tr><th>'+(ar?'الاسم':'Name')+'</th><th>'+(ar?'النوع':'Type')+'</th><th>'+(ar?'الكود':'Code')+'</th><th>'+(ar?'العملة':'Currency')+'</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+    +'<div class="mini" style="color:var(--muted);margin-top:8px">'+(ar?'الدفاتر القياسية اللي بتترحّل عليها الحركات (مبيعات · مشتريات · بنك · نقدية · متنوعة).':'Standard journals your transactions post to (Sales · Purchase · Bank · Cash · Misc).')+'</div>';
+}
+function finFiscalPositions(){
+  var ar=(lang==='ar');
+  var F=[['Egypt','مصر','EGP',14],['UAE','الإمارات','AED',5],['KSA','السعودية','SAR',15]];
+  var rows=F.map(function(f){ return '<tr><td><b>'+(FLAG[f[0]]||'')+' '+(ar?f[1]:f[0])+'</b></td><td>'+f[2]+'</td><td>VAT '+f[3]+'%</td></tr>'; }).join('');
+  return '<div class="sect"><h2>🗺️ '+(ar?'الأوضاع الضريبية':'Fiscal Positions')+'</h2></div>'
+    +'<div class="card"><table><thead><tr><th>'+(ar?'الفرع / الوضع':'Branch / Position')+'</th><th>'+(ar?'العملة':'Currency')+'</th><th>'+(ar?'الضريبة المطبقة':'Applied tax')+'</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+    +'<div class="mini" style="color:var(--muted);margin-top:8px">'+(ar?'بتحدد نسبة الضريبة المطبّقة حسب فرع/دولة العميل (مصر 14% · الإمارات 5% · السعودية 15%).':'Map the tax applied by the customer\'s branch/country (Egypt 14% · UAE 5% · KSA 15%).')+'</div>';
+}
+function finPaymentTerms(){
+  var ar=(lang==='ar'); var list=(settings&&settings.paymentTerms)||[];
+  var rows=list.map(function(t,i){ return '<tr><td><b>'+esc(t.name)+'</b></td><td>'+num(t.days)+' '+(ar?'يوم':'days')+'</td><td style="text-align:right">'+(isMgr()||me.dept==='Management'?'<button class="btn dn sm" onclick="finDelTerm('+i+')">✕</button>':'')+'</td></tr>'; }).join('');
+  var body=list.length?('<div class="card"><table><thead><tr><th>'+(ar?'الاسم':'Name')+'</th><th>'+(ar?'المدة':'Due')+'</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>')
+    :('<div class="card empty">'+(ar?'مفيش شروط دفع لسه.':'No payment terms yet.')+(isMgr()||me.dept==='Management'?' <button class="btn gh sm" onclick="finSeedTerms()">'+(ar?'إضافة الجاهزة':'Seed defaults')+'</button>':'')+'</div>');
+  return '<div class="sect"><h2>🗓️ '+(ar?'شروط الدفع':'Payment Terms')+'</h2><div class="sp"></div>'+((isMgr()||me.dept==='Management')?'<button class="btn cy" onclick="finAddTerm()">+ '+(ar?'شرط دفع':'New term')+'</button>':'')+'</div>'+body;
+}
+function finAddTerm(){
+  openModal(lang==='ar'?'شرط دفع جديد':'New payment term', fEl(lang==='ar'?'الاسم':'Name','ft_name','')+fEl(lang==='ar'?'المدة (أيام)':'Due (days)','ft_days',30,'number'),
+    function(){ var n=val('ft_name'); if(!n){ alert(lang==='ar'?'اكتب الاسم':'Name required'); return false; } var arr=((settings&&settings.paymentTerms)||[]).slice(); arr.push({name:n,days:num(val('ft_days'))}); saveSetting('paymentTerms',arr); });
+}
+function finDelTerm(i){ var arr=((settings&&settings.paymentTerms)||[]).slice(); arr.splice(i,1); saveSetting('paymentTerms',arr); }
+function finSeedTerms(){ saveSetting('paymentTerms',[{name:'Immediate',days:0},{name:'15 Days',days:15},{name:'30 Days',days:30},{name:'45 Days',days:45},{name:'60 Days',days:60}]); }
+
 function vAccounting(){
   const inv=invoices.filter(inBranch), exp=expenses.filter(inBranch);
   let h=`<div class="tabs">
