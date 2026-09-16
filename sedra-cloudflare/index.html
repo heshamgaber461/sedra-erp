@@ -3900,9 +3900,32 @@ function printQuote(id,opts){
   const summaryPage=`<div class="sheet pad">${theadHTML}<div class="stitle">Financial Summary</div>${metaHTML}<div class="sec"><table class="sumtbl"><thead><tr><th>System</th><th class="r">Total</th></tr></thead><tbody>${secs.map((sc,i)=>`<tr><td class="pn">${esc(sc.title||('System '+(i+1)))}</td><td class="r"><b>${M(t.secTotals[i])}</b></td></tr>`).join('')}</tbody></table></div>${finHTML}${featHTML}${payHTML}${ftHTML}</div>`;
   const singlePage=`<div class="sheet pad">${theadHTML}<div class="stitle">${esc((secs[0]&&secs[0].title)||q.service||'Quotation')} &mdash; Quotation</div>${metaHTML}${secs.map((sc,i)=>secTable(sc,i)).join('')}${finHTML}${featHTML}${payHTML}${ftHTML}</div>`;
   const termsPage=`<div class="sheet pad"><div class="stitle">Terms &amp; Conditions</div><div class="tc">${(function(){ var ls=terms.length?terms:lines(defQTerms()); return ls.map(function(x){ var s=x.replace(/\t/g,'    '); var tt=s.trim(); if(/^[-•]\s/.test(tt)){ return '<div class="tc-h">'+esc(tt.replace(/^[-•]\s*/,''))+'</div>'; } if(/^·/.test(tt)||/^\s{2,}·/.test(s)){ return '<div class="tc-b">'+esc(tt.replace(/^·\s*/,''))+'</div>'; } return '<div class="tc-p">'+esc(tt)+'</div>'; }).join(''); })()}</div>${excl.length?`<div class="stitle" style="font-size:15px;margin-top:12px">Offer excludes</div><ul style="padding-inline-start:18px;line-height:1.9;font-size:12.5px;color:#3a4a5a">${excl.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}<div class="tc" style="margin-top:12px"><div class="tc-b">This offer is valid for ${num(q.validity)||30} days (until ${esc(validTill||'')}).</div></div>${notesHTML}<div class="sign"><div class="s">Prepared by &mdash; ${esc(q.preparedBy||'-')}</div><div class="s">Client approval &mdash; signature &amp; date</div></div>${ftHTML}</div>`;
-  /* About & Partners use Hesham's own uploaded full-page designs (page-about.jpg / page-partners.jpg). */
-  const aboutPage=`<div class="sheet A4 cover"><img src="${base}page-about.jpg"></div>`;
-  const partnersPage=`<div class="sheet A4 cover"><img src="${base}page-partners.jpg"></div>`;
+  /* About & Partners — full-page designed layouts that fill the A4 with real Sedra content. */
+  const aboutPage=`<div class="sheet A4 apage">
+    <div class="ap-top"><img src="${LOGO}" style="height:56px;width:auto"><div class="ap-title">Who We Are</div><div class="ap-rule"></div>
+    <div class="ap-lead">Sedra Electric is a leader in smart automation, low-current systems and renewable energy — driving positive change across Egypt, the UAE and Saudi Arabia with innovative, reliable solutions that maximise efficiency and elevate everyday living.</div></div>
+    <div class="ap-pillars">
+      <div class="ap-pill"><b>2013</b><span>Established in Egypt</span></div>
+      <div class="ap-pill"><b>3</b><span>Branches · Egypt · UAE · KSA</span></div>
+      <div class="ap-pill"><b>KNX</b><span>Global smart-home standards</span></div>
+      <div class="ap-pill"><b>1</b><span>One-stop · MEP to smart luxury</span></div>
+    </div>
+    <div class="ap-band"><div class="ap-band-t">Our Mission</div><div class="ap-band-s" style="font-size:13.5px;color:#dbeaf5;margin-top:10px;line-height:1.85;letter-spacing:0">To provide high-quality electrical and smart-technology solutions that are efficient, safe and cost-effective — through technical excellence, innovative design and a steadfast commitment to reliability and customer satisfaction.</div></div>
+    <div class="ap-partsub" style="font-weight:800;color:#0e2c49;font-size:15px;margin:0 0 10px">Why Sedra</div>
+    <div class="ap-why">
+      <div class="ap-whyc"><div class="i">✦</div><b>Luxurious &amp; Premium</b><span>Best-in-class products &amp; finishes</span></div>
+      <div class="ap-whyc"><div class="i">✧</div><b>Personalised Experience</b><span>Convenient, user-centric design</span></div>
+      <div class="ap-whyc"><div class="i">✚</div><b>Safety &amp; Security</b><span>Standards-compliant &amp; future-proof</span></div>
+    </div>
+    <div class="ap-foot">info@sedra-electric.com &nbsp;·&nbsp; www.sedra-electric.com &nbsp;·&nbsp; Tel: 0226783906</div>
+  </div>`;
+  const partnersPage=`<div class="sheet A4 apage">
+    <div class="ap-top"><img src="${LOGO}" style="height:56px;width:auto"><div class="ap-title">Our Partners</div><div class="ap-rule"></div>
+    <div class="ap-lead">We deliver world-class results by partnering with the industry's most trusted global brands — so every system we design and install meets the highest standards of quality, reliability and innovation.</div></div>
+    <div class="ap-logos"><div class="ap-logobox"><img src="${partnersURL}"></div></div>
+    <div class="ap-band"><div class="ap-band-t">Trusted Technology, Delivered</div><div class="ap-band-s">Authorised solutions across smart automation, low-current, lighting, MEP &amp; renewable energy.</div></div>
+    <div class="ap-foot">info@sedra-electric.com &nbsp;·&nbsp; www.sedra-electric.com &nbsp;·&nbsp; Tel: 0226783906</div>
+  </div>`;
   /* Page order: general cover → About → Partners → (each system: its cover page then its details) → financial summary → terms. */
   const bodyHTML=coverHTML+aboutPage+partnersPage+sysPages+summaryPage+termsPage;
   w.document.write(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=822, initial-scale=1"><title>${esc(q.number||'Quotation')} ${verTag} &mdash; Sedra</title>
@@ -3937,8 +3960,14 @@ function printQuote(id,opts){
   .apage .ap-band-s{font-size:12.5px;color:#bcd8ea;margin-top:8px;letter-spacing:1px}
   .apage .ap-foot{border-top:1px solid #e3e9ef;padding:16px 0;text-align:center;font-size:12px;color:#5a6b7b}
   .apage .ap-partsub{text-align:center;color:#5a6b7b;font-size:14px;margin-top:14px}
-  .apage .ap-logos{flex:1;display:flex;align-items:center;justify-content:center;padding:20px 0}
-  .apage .ap-logos img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
+  .apage .ap-logos{flex:1;display:flex;align-items:center;justify-content:center;padding:16px 0}
+  .apage .ap-logobox{width:100%;background:#fff;border:1px solid #e8eef4;border-radius:16px;padding:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 22px rgba(20,63,99,.06)}
+  .apage .ap-logos img{max-width:100%;max-height:360px;width:auto;height:auto;object-fit:contain}
+  .apage .ap-why{display:flex;gap:14px;margin-bottom:22px}
+  .apage .ap-whyc{flex:1;background:#f4f8fb;border:1px solid #e3edf4;border-radius:14px;padding:18px 14px;text-align:center}
+  .apage .ap-whyc .i{font-size:22px;color:#37c0dc;line-height:1}
+  .apage .ap-whyc b{display:block;margin-top:8px;font-size:14px;color:#0e2c49}
+  .apage .ap-whyc span{display:block;margin-top:5px;font-size:11.5px;color:#5a6b7b;line-height:1.5}
   .ccard{position:absolute;right:30px;bottom:30px;z-index:3;background:rgba(8,22,38,.74);border:1px solid rgba(255,255,255,.16);border-radius:14px;padding:14px 20px;color:#fff;min-width:250px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
   .ccard .cc-row{display:flex;justify-content:space-between;align-items:baseline;gap:24px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.1)}
   .ccard .cc-row:last-child{border-bottom:0}
