@@ -4501,7 +4501,7 @@ function finContent(){
     case 'a_tx': return vTransfers();
     case 'r_bs': return glBS();
     case 'r_pnl': return glPnl();
-    case 'r_cash': return finCashFlow();
+    case 'r_cash': return finCashFlowOdoo();
     case 'r_gl': return vGLReport();
     case 'r_trial': return glTrial();
     case 'r_ar': return accAging(inv);
@@ -4591,7 +4591,7 @@ function finDashboard(){
    +'</div>';
   return '<div class="jgrid">'+cards+'</div>'+reports;
 }
-function finCashFlow(){
+function finCashFlowOdoo(){
   var ar=(lang==='ar');
   var pays=(typeof payments!=='undefined'?payments:[]).filter(inBranch);
   var exps=(expenses||[]).filter(inBranch);
