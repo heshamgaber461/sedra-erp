@@ -3556,7 +3556,7 @@ function qItemDel(si,ii){ qUndoSnap(); _qsec[si].items.splice(ii,1); if(!_qsec[s
 function qPickProduct(si,ii,val){ qUndoSnap(); var v=String(val||'').trim(); var lv=v.toLowerCase();
   const p=inventory.find(x=>((x.name||'')+(x.sku?' — '+x.sku:''))===v) || inventory.find(x=>((x.sku?x.sku+' — ':'')+(x.name||''))===v) || inventory.find(x=>(x.name||'')===v) || inventory.find(x=>(x.sku||'')===v) || inventory.find(x=>String(x.sku||'').toLowerCase()===lv || String(x.name||'').toLowerCase()===lv);
   qReadDOM(); const it=_qsec[si].items[ii];
-  if(p){ it.item=p.name||it.item||''; it.code=p.sku||p.code||''; it.desc=p.desc||p.description||''; if(p.brand)it.brand=p.brand; const pr=num(p.price)||num(p.cost); if(pr){ var _rt=qCurRate(); it.price=(_rt&&_rt!==1)?Math.round(pr*_rt*100)/100:pr; } if(p.image)it.image=p.image; it._pid=p.id; }
+  if(p){ it.item=p.name||it.item||''; it.code=p.sku||p.code||''; if(it.desc==null)it.desc=''; if(p.brand)it.brand=p.brand; const pr=num(p.price)||num(p.cost); if(pr){ var _rt=qCurRate(); it.price=(_rt&&_rt!==1)?Math.round(pr*_rt*100)/100:pr; } if(p.image)it.image=p.image; it._pid=p.id; }
   qSecRender(); }
 /* Rich product picker — a searchable overlay (above the quote modal) that shows each product's
    photo, name, brand, SKU and price; click one to fill the line. Much clearer than the native
@@ -3590,7 +3590,7 @@ function qpickRender(si,ii){
   }).join('')+(total>list.length?('<div class="mini" style="padding:10px;text-align:center;color:var(--muted)">'+(lang==='ar'?('أول 60 من '+total+' نتيجة — اكتب أكتر للتضييق'):('Showing 60 of '+total+' — type to narrow'))+'</div>'):'');
 }
 function qpickChoose(si,ii,pid){ var p=(inventory||[]).find(function(x){return x.id===pid;}); if(!p){ qpickClose(); return; } qReadDOM(); var it=_qsec[si].items[ii];
-  it.item=p.name||it.item||''; it.code=p.sku||p.code||''; it.desc=p.desc||p.description||''; if(p.brand)it.brand=p.brand; var pr=num(p.price)||num(p.cost); if(pr){ var rt=qCurRate(); it.price=(rt&&rt!==1)?Math.round(pr*rt*100)/100:pr; } if(p.image)it.image=p.image; it._pid=p.id;
+  it.item=p.name||it.item||''; it.code=p.sku||p.code||''; if(it.desc==null)it.desc=''; if(p.brand)it.brand=p.brand; var pr=num(p.price)||num(p.cost); if(pr){ var rt=qCurRate(); it.price=(rt&&rt!==1)?Math.round(pr*rt*100)/100:pr; } if(p.image)it.image=p.image; it._pid=p.id;
   qpickClose(); qSecRender(); }
 /* Resolve the inventory product a quote line points at (by stored id, else by SKU/name). */
 function qLineProduct(it){ if(!it)return null; if(it._pid){ var byId=(inventory||[]).find(function(x){return x.id===it._pid;}); if(byId)return byId; }
