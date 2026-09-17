@@ -1219,7 +1219,10 @@ async function loadAllExceptBlobs(){
   try{ keys=await apiCall('GET','/.json?shallow=true'); }catch(e){ if(e&&e.__net) throw e; keys=null; }
   if(!keys||typeof keys!=='object'){ return await apiCall('GET','/.json') || {}; }
   var names=Object.keys(keys).filter(function(k){ return k!=='blobs'; });
-  var res=await Promise.all(names.map(function(k){ return apiCall('GET','/'+k+'.json').catch(function(e){ if(e&&e.__net) throw e; return undefined; }); }));
+  // ATOMIC: every collection must load. If any fetch fails, reject the whole batch so
+  // refreshAll keeps the last-good data instead of applying a partial DB (which would make
+  // products/images intermittently disappear). Promise.all rejects on the first failure.
+  var res=await Promise.all(names.map(function(k){ return apiCall('GET','/'+k+'.json'); }));
   var all={}; names.forEach(function(k,i){ if(res[i]!==undefined&&res[i]!==null) all[k]=res[i]; });
   return all;
 }
@@ -3472,16 +3475,18 @@ function vQuotes(){
      NOT shown to other sales colleagues or to unassigned technicians. */
   const isAssignedTech = function(q){ return (q.assignedEmail && String(q.assignedEmail).toLowerCase()===_myEmail) || (q.assignedTo && typeof nameEq==='function' && nameEq(q.assignedTo,meName)); };
   const canSeeRequest = function(q){ return seesAllQuotes || isSalesLead || isAssignedTech(q) || (typeof nameEq==='function' && nameEq(q.requestedBy,meName)); };
+  /* Pending quote REQUESTS (RFQs not yet delivered) do NOT appear here — they live only in the
+     dedicated "Quote Requests" view. This page shows finished/actual quotations only. */
   const rows=quotes.filter(function(q){
-    if(q.isRFQ && !q.rfqDone) return canSeeRequest(q);   /* requests bypass branch, gated to the right people */
+    if(q.isRFQ && !q.rfqDone) return false;
     return inBranch(q);
   }).filter(function(q){
-    if(q.isRFQ && !q.rfqDone) return true;               /* pending requests already gated above */
     if(seesAllQuotes) return true;
     if(isTechAssignee){ return (q.assignedTo||'')===meName || nameEq(q.preparedBy,meName) || nameEq(q.requestedBy,meName); }
     return !q.dept||q.dept===me.dept||nameEq(q.requestedBy,meName)||nameEq(q.preparedBy,meName)||(me.accessModules||[]).includes('quotes');
   });
-  let h=`<div class="sect"><h2>Quotations & Proposals</h2><div class="sp"></div>${canRequestQuote()?`<button class="btn cy" onclick="newQuoteChoice()">+ ${canCreateQuote()?'New quotation':(lang==='ar'?'طلب كوتيشن':'Request quotation')}</button>`:''}</div>`;
+  const _openReq=(typeof rfqPending==='function')?rfqPending().length:0;
+  let h=`<div class="sect"><h2>${lang==='ar'?'الكوتيشنات':'Quotations & Proposals'}</h2><div class="sp"></div>${_openReq?`<button class="btn gh" onclick="curView='quoterequests';render()" title="${lang==='ar'?'طلبات الكوتيشن الجديدة':'New quote requests'}">📨 ${lang==='ar'?'طلبات الكوتيشن':'Quote requests'} <span class="tag" style="background:var(--cyan);color:#fff">${_openReq}</span></button> `:''}${canRequestQuote()?`<button class="btn cy" onclick="newQuoteChoice()">+ ${canCreateQuote()?(lang==='ar'?'كوتيشن جديد':'New quotation'):(lang==='ar'?'طلب كوتيشن':'Request quotation')}</button>`:''}</div>`;
   h+=tableView('quotes', rows,
     `<th>#</th><th>Type</th><th>Client</th><th>Branch</th><th>Dept</th><th>Total</th><th>Status</th><th></th>`,
     q=>{const t=quoteTotal(q);return `<tr>
@@ -3502,7 +3507,17 @@ function qRedo(){ if(!_qRedo.length)return; try{ qReadDOM(); }catch(e){} _qUndo.
 function qUndoBtns(){ var u=g('qUndoBtn'),r=g('qRedoBtn'); if(u)u.disabled=!_qUndo.length; if(r)r.disabled=!_qRedo.length; }
 document.addEventListener('keydown',function(e){ if(!g('qSec'))return; var k=(e.key||'').toLowerCase(); if((e.ctrlKey||e.metaKey)&&k==='z'){ e.preventDefault(); if(e.shiftKey)qRedo(); else qUndo(); } else if((e.ctrlKey||e.metaKey)&&k==='y'){ e.preventDefault(); qRedo(); } });
 const NL=String.fromCharCode(10);
-function qBlankItem(){ return {item:'',desc:'',brand:'',qty:1,price:0}; }
+function qBlankItem(){ return {item:'',code:'',desc:'',brand:'',qty:1,price:0}; }
+/* Line schema: it.item = product NAME, it.code = product code (part number),
+   it.desc = description. LEGACY items (before this change) stored item=code, desc=name
+   and have no `code` field — qMigrateItem converts them, qLineDisp renders either. */
+function qMigrateItem(it){ if(!it||typeof it!=='object')return it;
+  if(it.code===undefined){ if(it.desc){ it.code=it.item||''; it.item=it.desc; it.desc=''; } else { it.code=''; } }
+  return it; }
+function qMigrateSecs(secs){ (secs||[]).forEach(function(s){ (s&&s.items||[]).forEach(qMigrateItem); }); return secs; }
+function qLineDisp(it){ if(!it)return {name:'',code:'',desc:''};
+  if(it.code!==undefined) return {name:it.item||'',code:it.code||'',desc:it.desc||''};
+  return {name:it.desc||it.item||'',code:(it.desc?(it.item||''):''),desc:''}; }
 function defQExcluding(){ return ['Lights supply','Sockets & switches supply','Sanitary supply','MEP Work (Conduits, Pulling Cables)'].join(NL); }
 function defQTerms(){ return ['- Prices don’t include VAT unless mentioned.','','- Offer Includes:','    · Supervision on the Contractor team in the cabling phase','    · Full Design for all systems','    · Full Installation','    Installation prices include works within Cairo or Giza.','    For any other location, additional charges will apply.','','- Offer Excludes:','    · Any piping or wiring works unless mentioned otherwise','    · Any pipes or cables unless mentioned otherwise','    · Any protection circuit breakers unless mentioned otherwise','','- Payment Terms:','    · Advance Payment: 80% of the total price','    · After Delivery: 10% of the total price','    · After system installation: 10% of the total price','','- Warranty:','    · Warranty against manufacturing defects is 12 Months','','- Delivery:','    · 2-8 Weeks'].join(NL); }
 var _qDrag=null;
@@ -3514,7 +3529,7 @@ function qDrop(e,si,ii){ try{ e.preventDefault(); }catch(_e){} qUndoSnap(); var 
   to.splice(idx,0,moved);
   if(!from.length) from.push(qBlankItem());
   qSecRender(); }
-function qReadDOM(){ _qsec.forEach((s,si)=>{ const t=g('qsT'+si); if(t)s.title=t.value; (s.items||[]).forEach((it,ii)=>{ const gv=f=>{const e=g('q_'+si+'_'+ii+'_'+f);return e?e.value:it[f];}; it.item=gv('item'); it.desc=gv('desc'); it.brand=gv('brand'); it.qty=num(gv('qty')); it.price=num(gv('price')); var _op=g('q_'+si+'_'+ii+'_opt'); if(_op)it.optional=_op.checked; });
+function qReadDOM(){ _qsec.forEach((s,si)=>{ const t=g('qsT'+si); if(t)s.title=t.value; (s.items||[]).forEach((it,ii)=>{ const gv=f=>{const e=g('q_'+si+'_'+ii+'_'+f);return e?e.value:it[f];}; it.item=gv('item'); it.code=gv('code'); it.desc=gv('desc'); it.brand=gv('brand'); it.qty=num(gv('qty')); it.price=num(gv('price')); var _op=g('q_'+si+'_'+ii+'_opt'); if(_op)it.optional=_op.checked; });
   const io=g('qi_'+si+'_on'); if(io){ s.instOn=io.checked; s.instType=((g('qi_'+si+'_type')||{}).value)||'percent'; s.instVal=num((g('qi_'+si+'_val')||{}).value); }
   const dn=g('qd_'+si+'_on'); if(dn){ s.discOn=dn.checked; s.discType=((g('qd_'+si+'_type')||{}).value)||'percent'; s.discVal=num((g('qd_'+si+'_val')||{}).value); }
   const fe=g('qf_'+si); if(fe)s.features=fe.value; const ne=g('qn_'+si); if(ne)s.notes=ne.value;
@@ -3526,7 +3541,7 @@ function qItemDel(si,ii){ qUndoSnap(); _qsec[si].items.splice(ii,1); if(!_qsec[s
 function qPickProduct(si,ii,val){ qUndoSnap(); var v=String(val||'').trim(); var lv=v.toLowerCase();
   const p=inventory.find(x=>((x.sku?x.sku+' — ':'')+(x.name||''))===v) || inventory.find(x=>(x.name||'')===v) || inventory.find(x=>(x.sku||'')===v) || inventory.find(x=>String(x.sku||'').toLowerCase()===lv || String(x.name||'').toLowerCase()===lv);
   qReadDOM(); const it=_qsec[si].items[ii];
-  if(p){ it.item=p.sku||p.code||it.item||''; it.desc=p.name||p.desc||it.desc||''; if(p.brand)it.brand=p.brand; const pr=num(p.price)||num(p.cost); if(pr){ var _rt=qCurRate(); it.price=(_rt&&_rt!==1)?Math.round(pr*_rt*100)/100:pr; } if(p.image)it.image=p.image; it._pid=p.id; }
+  if(p){ it.item=p.name||it.item||''; it.code=p.sku||p.code||''; it.desc=p.desc||p.description||''; if(p.brand)it.brand=p.brand; const pr=num(p.price)||num(p.cost); if(pr){ var _rt=qCurRate(); it.price=(_rt&&_rt!==1)?Math.round(pr*_rt*100)/100:pr; } if(p.image)it.image=p.image; it._pid=p.id; }
   qSecRender(); }
 /* Rich product picker — a searchable overlay (above the quote modal) that shows each product's
    photo, name, brand, SKU and price; click one to fill the line. Much clearer than the native
@@ -3560,12 +3575,14 @@ function qpickRender(si,ii){
   }).join('')+(total>list.length?('<div class="mini" style="padding:10px;text-align:center;color:var(--muted)">'+(lang==='ar'?('أول 60 من '+total+' نتيجة — اكتب أكتر للتضييق'):('Showing 60 of '+total+' — type to narrow'))+'</div>'):'');
 }
 function qpickChoose(si,ii,pid){ var p=(inventory||[]).find(function(x){return x.id===pid;}); if(!p){ qpickClose(); return; } qReadDOM(); var it=_qsec[si].items[ii];
-  it.item=p.sku||p.code||it.item||''; it.desc=p.name||p.desc||''; if(p.brand)it.brand=p.brand; var pr=num(p.price)||num(p.cost); if(pr){ var rt=qCurRate(); it.price=(rt&&rt!==1)?Math.round(pr*rt*100)/100:pr; } if(p.image)it.image=p.image; it._pid=p.id;
+  it.item=p.name||it.item||''; it.code=p.sku||p.code||''; it.desc=p.desc||p.description||''; if(p.brand)it.brand=p.brand; var pr=num(p.price)||num(p.cost); if(pr){ var rt=qCurRate(); it.price=(rt&&rt!==1)?Math.round(pr*rt*100)/100:pr; } if(p.image)it.image=p.image; it._pid=p.id;
   qpickClose(); qSecRender(); }
 /* Resolve the inventory product a quote line points at (by stored id, else by SKU/name). */
 function qLineProduct(it){ if(!it)return null; if(it._pid){ var byId=(inventory||[]).find(function(x){return x.id===it._pid;}); if(byId)return byId; }
-  if(it.item){ var bySku=(inventory||[]).find(function(x){return (x.sku===it.item)||(x.code===it.item);}); if(bySku)return bySku; }
-  if(it.desc){ var byName=(inventory||[]).find(function(x){return x.name===it.desc;}); if(byName)return byName; }
+  if(it.code){ var byCode=(inventory||[]).find(function(x){return (x.sku===it.code)||(x.code===it.code);}); if(byCode)return byCode; }
+  if(it.item){ var byName=(inventory||[]).find(function(x){return x.name===it.item;}); if(byName)return byName;
+    var bySku=(inventory||[]).find(function(x){return (x.sku===it.item)||(x.code===it.item);}); if(bySku)return bySku; }
+  if(it.desc){ var byName2=(inventory||[]).find(function(x){return x.name===it.desc;}); if(byName2)return byName2; }
   return null; }
 /* Change / add the IMAGE of an EXISTING product from inside the quote. Managers & Super Admin only.
    Only the image is editable here — price, description and code stay locked. */
@@ -3580,26 +3597,56 @@ function qEditProductImage(si,ii){
    +'<div style="padding:14px 18px;border-bottom:1px solid var(--mist,#e3edf4);display:flex;align-items:center;gap:8px"><b style="color:var(--navy);font-size:15px">🖼 '+(lang==='ar'?'تغيير صورة المنتج':'Change product image')+'</b><span style="flex:1"></span><button onclick="qCloseImg()" style="border:0;background:#eef3f8;border-radius:8px;padding:6px 12px;cursor:pointer;font-weight:800">✕</button></div>'
    +'<div style="padding:16px 18px">'
    +'<div class="mini" style="color:var(--muted);margin-bottom:8px">'+esc(p.name||'')+(p.sku?(' · '+esc(p.sku)):'')+'</div>'
-   +(p.image?('<div class="fld"><label>'+(lang==='ar'?'الصورة الحالية':'Current image')+'</label><div><img src="'+esc(p.image)+'" style="max-height:120px;border:1px solid var(--mist,#e3edf4);border-radius:8px;background:#fff;padding:2px"></div></div>'):'')
-   +fileField('qi_img',(lang==='ar'?'الصورة الجديدة — ارفع صورة أو الصق لينك':'New image — upload a photo or paste a link'),p.image)
-   +'<div class="mini" style="color:var(--muted)">'+(lang==='ar'?'السعر والوصف والكود مش بيتغيّروا من هنا — الصورة بس.':'Price, description and code are locked here — image only.')+'</div>'
+   +(function(){ var all=prodImages(p); if(!all.length)return '<div class="mini" style="color:var(--muted);margin-bottom:8px">'+(lang==='ar'?'مفيش صورة للمنتج ده لسه — الصورة اللي هترفعها هتبقى صورته الأساسية.':'This product has no image yet — the one you upload becomes its main image.')+'</div>'; return '<div class="fld"><label>'+(lang==='ar'?'صور المنتج':'Product images')+'</label><div style="display:flex;flex-wrap:wrap;gap:10px">'+all.map(function(u,idx){ return '<div style="text-align:center;border:'+(idx===0?'2px solid var(--cyan,#37c0dc)':'1px solid var(--mist,#e3edf4)')+';border-radius:8px;padding:4px;width:104px"><img src="'+esc(u)+'" style="width:92px;height:92px;object-fit:contain;background:#fff;border-radius:5px"><div class="mini" style="margin-top:3px">'+(idx===0?('⭐ '+(lang==='ar'?'الأساسية':'Main')):('<button class="btn gh sm" style="padding:2px 6px" onclick="qImgSetMain('+si+','+ii+',\''+p.id+'\','+idx+')" title="'+(lang==='ar'?'اجعلها الأساسية':'Set as main')+'">⭐</button>'))+' <button class="btn dn sm" style="padding:2px 6px" onclick="qImgRemove('+si+','+ii+',\''+p.id+'\','+idx+')" title="'+(lang==='ar'?'مسح':'Remove')+'">🗑</button></div></div>'; }).join('')+'</div></div>'; })()
+   +fileField('qi_img',(lang==='ar'?'➕ إضافة صورة — ارفع صورة أو الصق لينك':'➕ Add an image — upload a photo or paste a link'))
+   +'<div class="mini" style="color:var(--muted)">'+(lang==='ar'?'لو المنتج ليه صورة، الجديدة هتتضاف كخيار. لو ملوش، هتبقى هي الأساسية. السعر والوصف والكود مش بيتغيّروا من هنا.':'If the product already has an image, the new one is added as an option; if not, it becomes the main. Price/description/code are unchanged here.')+'</div>'
    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button onclick="qCloseImg()" class="btn gh">'+(lang==='ar'?'إلغاء':'Cancel')+'</button><button id="qi_save" onclick="qSaveProductImage('+si+','+ii+',\''+p.id+'\')" class="btn cy">💾 '+(lang==='ar'?'حفظ الصورة':'Save image')+'</button></div>'
    +'</div></div>';
   ov.onclick=function(){ qCloseImg(); };
   document.body.appendChild(ov);
 }
 function qCloseImg(){ var ov=document.getElementById('qimg'); if(ov)ov.remove(); }
+/* All images for a product: main (p.image) first, then the extra options in p.images[]. */
+function prodImages(p){ var a=[]; if(p&&p.image)a.push(p.image); if(p&&Array.isArray(p.images))p.images.forEach(function(u){ if(u&&a.indexOf(u)<0)a.push(u); }); return a; }
 function qSaveProductImage(si,ii,pid){
   if(!(isAdmin()||isMgr())){ return; }
   var img=fileVal('qi_img'); if(!img){ alert(lang==='ar'?'اختر صورة أو الصق لينك':'Choose an image or paste a link'); return; }
+  var p=(inventory||[]).find(function(x){return x.id===pid;});
+  var hasMain=!!(p&&(p.image||(Array.isArray(p.images)&&p.images.length)));
+  var upd;
+  if(!hasMain){ upd={image:img}; }                                   // no image yet → this becomes THE product image
+  else { var arr=(p&&Array.isArray(p.images))?p.images.slice():[]; if(img!==(p&&p.image)&&arr.indexOf(img)<0)arr.push(img); upd={images:arr}; }  // already has one → add as an option
   var btn=document.getElementById('qi_save'); if(btn){ btn.disabled=true; btn.textContent='...'; }
-  apiMerge('inventory',pid,{image:img}).then(function(){
-    var p=(inventory||[]).find(function(x){return x.id===pid;}); if(p)p.image=img;
-    try{ qReadDOM(); var it=_qsec[si].items[ii]; if(it){ it.image=img; it._pid=pid; } }catch(e){}
-    try{ logAudit('update','inventory',pid,'image'); }catch(e){}
-    qCloseImg(); qSecRender();
-    try{ if(typeof showToast==='function') showToast({title:'✓ '+(lang==='ar'?'اتغيّرت صورة المنتج':'Image updated'),body:(p&&p.name)||''}); }catch(e){}
+  apiMerge('inventory',pid,upd).then(function(){
+    if(p)Object.assign(p,upd);
+    try{ qReadDOM(); var it=_qsec[si].items[ii]; if(it){ it.image=(p&&p.image)||img; it._pid=pid; } }catch(e){}
+    try{ logAudit('update','inventory',pid,hasMain?'image option added':'image'); }catch(e){}
+    _fileStore['qi_img']='';
+    try{ if(typeof showToast==='function') showToast({title:'✓ '+(hasMain?(lang==='ar'?'اتضافت كصورة إضافية':'Added as an option'):(lang==='ar'?'اتحطّت كصورة المنتج':'Set as product image')),body:(p&&p.name)||''}); }catch(e){}
+    qSecRender(); qEditProductImage(si,ii);   // reopen so the gallery shows the new image
   }).catch(function(e){ if(btn){ btn.disabled=false; btn.textContent='💾'; } alert('Error: '+(e.message||e)); });
+}
+/* Make one of the product's images the MAIN one (used in quotes); the old main becomes an option. */
+function qImgSetMain(si,ii,pid,idx){
+  var p=(inventory||[]).find(function(x){return x.id===pid;}); if(!p)return;
+  var all=prodImages(p); var pick=all[idx]; if(!pick||pick===p.image)return;
+  var rest=all.filter(function(u){return u!==pick;});
+  var upd={image:pick,images:rest};
+  apiMerge('inventory',pid,upd).then(function(){ Object.assign(p,upd);
+    try{ var it=_qsec[si]&&_qsec[si].items[ii]; if(it)it.image=pick; }catch(e){}
+    logAudit('update','inventory',pid,'main image changed'); qSecRender(); qEditProductImage(si,ii);
+  }).catch(function(e){ alert('Error: '+(e.message||e)); });
+}
+function qImgRemove(si,ii,pid,idx){
+  var p=(inventory||[]).find(function(x){return x.id===pid;}); if(!p)return;
+  var all=prodImages(p); var rm=all[idx]; if(!rm)return;
+  if(!confirm(lang==='ar'?'مسح الصورة دي؟':'Remove this image?'))return;
+  var left=all.filter(function(u){return u!==rm;});
+  var upd={image:left[0]||'',images:left.slice(1)};
+  apiMerge('inventory',pid,upd).then(function(){ Object.assign(p,upd);
+    try{ var it=_qsec[si]&&_qsec[si].items[ii]; if(it)it.image=upd.image; }catch(e){}
+    logAudit('update','inventory',pid,'image removed'); qSecRender(); qEditProductImage(si,ii);
+  }).catch(function(e){ alert('Error: '+(e.message||e)); });
 }
 /* New product from inside the quote: create a brand-new inventory item (image + code + full
    details), save it to Products AND add it as a new line in this system. Overlay above the modal. */
@@ -3640,7 +3687,7 @@ function qNewProductSave(si){
   apiAdd('inventory',d).then(function(newId){
     if(newId){ d.id=newId; inventory.push(d); }
     try{ logAudit('create','inventory',newId||'',name); }catch(e){}
-    qReadDOM(); _qsec[si].items.push({item:d.sku||'',desc:d.name||'',brand:d.brand||'',qty:1,price:linePrice,image:d.image||''});
+    qReadDOM(); _qsec[si].items.push({item:d.name||'',code:d.sku||'',desc:d.desc||'',brand:d.brand||'',qty:1,price:linePrice,image:d.image||''});
     qCloseNewProduct(); qSecRender();
     try{ if(typeof showToast==='function') showToast({title:'✓ '+(lang==='ar'?'اتضاف منتج جديد':'New product added'),body:name+(lang==='ar'?' — اتسجّل في المخزون':' — saved to inventory')}); }catch(e){}
   }).catch(function(e){ if(btn){ btn.disabled=false; btn.textContent='💾'; } alert('Error: '+(e.message||e)); });
@@ -3651,8 +3698,9 @@ function qSecRender(){ const el=g('qSec'); if(!el)return;
   el.innerHTML=dl+undobar+_qsec.map((s,si)=>{
     const rows=(s.items||[]).map((it,ii)=>`<tr ondragover="event.preventDefault()" ondrop="qDrop(event,${si},${ii})">
       <td class="draghandle" draggable="true" ondragstart="qDragStart(event,${si},${ii})" title="${lang==='ar'?'اسحب لإعادة الترتيب':'Drag to reorder'}" style="cursor:grab;color:#9aa;text-align:center;width:20px;user-select:none">⠿</td>
-      <td><input id="q_${si}_${ii}_item" value="${esc(it.item||'')}" placeholder="Item" style="width:84px"></td>
-      <td><div style="display:flex;gap:6px;align-items:center">${it.image?`<img src="${esc(it.image)}" title="${lang==='ar'?'صورة المنتج':'product image'}" style="width:34px;height:34px;object-fit:contain;border-radius:6px;background:#f4f8fb;flex-shrink:0">`:''}<input id="q_${si}_${ii}_desc" list="prod_dl" value="${esc(it.desc||'')}" placeholder="Description / pick product" onchange="qPickProduct(${si},${ii},this.value)" style="flex:1;min-width:130px"><button type="button" class="btn cy sm" title="${lang==='ar'?'اختر منتج من المخزون':'Pick product from inventory'}" onclick="qProductPicker(${si},${ii})" style="flex-shrink:0">📦</button>${(isAdmin()||isMgr())?`<button type="button" class="btn gh sm" title="${lang==='ar'?'تغيير/إضافة صورة المنتج (مدير/Super Admin)':'Change/add product image (Manager/Super Admin)'}" onclick="qEditProductImage(${si},${ii})" style="flex-shrink:0">🖼</button>`:''}</div></td>
+      <td><input id="q_${si}_${ii}_item" list="prod_dl" value="${esc(it.item||'')}" placeholder="${lang==='ar'?'اسم المنتج / اختر':'Item / pick'}" onchange="qPickProduct(${si},${ii},this.value)" style="min-width:130px"></td>
+      <td><input id="q_${si}_${ii}_code" value="${esc(it.code||'')}" placeholder="Code" style="width:78px"></td>
+      <td><div style="display:flex;gap:6px;align-items:center">${it.image?`<img src="${esc(it.image)}" title="${lang==='ar'?'صورة المنتج':'product image'}" style="width:34px;height:34px;object-fit:contain;border-radius:6px;background:#f4f8fb;flex-shrink:0">`:''}<input id="q_${si}_${ii}_desc" value="${esc(it.desc||'')}" placeholder="${lang==='ar'?'الوصف':'Description'}" style="flex:1;min-width:120px"><button type="button" class="btn cy sm" title="${lang==='ar'?'اختر منتج من المخزون':'Pick product from inventory'}" onclick="qProductPicker(${si},${ii})" style="flex-shrink:0">📦</button>${(isAdmin()||isMgr())?`<button type="button" class="btn gh sm" title="${lang==='ar'?'تغيير/إضافة صورة المنتج (مدير/Super Admin)':'Change/add product image (Manager/Super Admin)'}" onclick="qEditProductImage(${si},${ii})" style="flex-shrink:0">🖼</button>`:''}</div></td>
       <td><input id="q_${si}_${ii}_brand" value="${esc(it.brand||'')}" placeholder="Brand" style="width:80px"></td>
       <td><input id="q_${si}_${ii}_qty" type="number" value="${num(it.qty)||1}" style="width:50px" oninput="qRecalc()"></td>
       <td><input id="q_${si}_${ii}_price" type="number" value="${num(it.price)||0}" style="width:74px" oninput="qRecalc()" ${it.optional?'disabled':''}></td>
@@ -3660,7 +3708,7 @@ function qSecRender(){ const el=g('qSec'); if(!el)return;
       <td class="c" title="${lang==='ar'?'اختياري — يظهر في الكوتيشن بدون سعر ومش بيتحسب':'Optional — shown in the quote without price, not counted'}"><input type="checkbox" id="q_${si}_${ii}_opt" ${it.optional?'checked':''} onchange="qRecalc();qSecRender()"></td>
       <td><button class="btn dn sm" onclick="qItemDel(${si},${ii})">✕</button></td></tr>`).join('');
     return `<div class="card" style="margin-bottom:10px;padding:10px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><span class="mini" style="color:#157f96;font-weight:800">System ${si+1}</span><input id="qsT${si}" list="sys_dl" value="${esc(s.title||'')}" placeholder="Choose a system — KNX / Wireless / Light Current / Sound System / CCTV" style="font-weight:700;flex:1"><button class="btn gh sm" onclick="qSecDel(${si})">🗑 Remove system</button></div>
-      <div style="overflow-x:auto"><table class="items"><thead><tr><th></th><th>Item</th><th>Description</th><th>Brand</th><th>Qty</th><th>Unit</th><th>Sub</th><th title="${lang==='ar'?'اختياري':'Optional'}">Opt</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div style="overflow-x:auto"><table class="items"><thead><tr><th></th><th>${lang==='ar'?'اسم المنتج':'Item'}</th><th>${lang==='ar'?'الكود':'Code'}</th><th>${lang==='ar'?'الوصف':'Description'}</th><th>Brand</th><th>Qty</th><th>Unit</th><th>Sub</th><th title="${lang==='ar'?'اختياري':'Optional'}">Opt</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
       <button class="btn gh sm" style="margin-top:6px" onclick="qItemAdd(${si})">+ Add line</button>${(me&&me.role==='Viewer')?'':` <button class="btn cy sm" style="margin-top:6px" title="${lang==='ar'?'منتج جديد مش موجود في المخزون — أضفه هنا ويتسجّل في Products':'New product not in inventory — add it here & save to Products'}" onclick="qNewProduct(${si})">➕ ${lang==='ar'?'منتج جديد':'New product'}</button>`}
       <div style="margin-top:8px;border-top:1px dashed var(--mist);padding-top:8px;display:flex;gap:8px 14px;flex-wrap:wrap;align-items:center">
         <label style="display:flex;align-items:center;gap:5px;font-weight:700;color:var(--navy)"><input type="checkbox" id="qi_${si}_on" ${s.instOn?'checked':''} onchange="qRecalc()"> 🔧 ${lang==='ar'?'تركيب':'Installation'}</label>
@@ -3813,7 +3861,8 @@ function rfqCanSee(q){ if(!me||!q||!q.isRFQ)return false;
   var my=(me.email||'').toLowerCase();
   var assigned=(q.assignedEmail&&String(q.assignedEmail).toLowerCase()===my)||(q.assignedTo&&nameEq(q.assignedTo,me.name));
   var req=nameEq(q.requestedBy,me.name)||(q.requestedByEmail&&String(q.requestedByEmail).toLowerCase()===my);
-  return seesAll||salesLead||assigned||req; }
+  var techOffice=me.dept==='Technical';   /* every Technical Office member sees ALL requests, not just the assignee */
+  return seesAll||salesLead||assigned||req||techOffice; }
 function rfqPending(){ return (quotes||[]).filter(function(q){ return q.isRFQ && !q.rfqDone && rfqCanSee(q); }); }
 function setRfqPriority(id,p){ if(!rfqCanManage()){ alert(lang==='ar'?'تحديد الأولوية للمدير أو التيم ليدر فقط.':'Priority is set by a manager or team leader.'); return; } var q=quotes.find(function(x){return x.id===id;}); if(!q)return; apiMerge('quotes',id,{priority:p}).then(function(){ q.priority=p; logAudit('update','quotes',id,'priority '+p); synced(); }).catch(function(e){alert('Error: '+(e.message||e));}); }
 function setRfqStage(id,stage){ var q=quotes.find(function(x){return x.id===id;}); if(!q)return;
@@ -3898,7 +3947,7 @@ function deliverRFQ(id){
 function editQuote(id){
   if(!id && !canCreateQuote()){ alert(lang==='ar'?'إنشاء عروض الأسعار متاح للمدير أو الـ Team Leader في فريق المبيعات فقط.':'Creating quotations is limited to the Manager or Team Leader in the Sales team.'); return; }
   const r=id?quotes.find(x=>x.id===id):{branch:defBranch(),type:'Quotation',status:'Draft',vat:vatForBranch(defBranch()),dept:(me.dept==='Management'?'Operations':me.dept),date:today(),service:'Home Automation',number:genQuoteNo('home-automation'),preparedBy:(me&&me.name)||'',presalesName:(me&&me.name)||'',validity:30};
-  _qsec=JSON.parse(JSON.stringify(quoteSections(r))); if(!_qsec.length)_qsec=[{title:'Smart Home System',items:[qBlankItem()]}];
+  _qsec=qMigrateSecs(JSON.parse(JSON.stringify(quoteSections(r)))); if(!_qsec.length)_qsec=[{title:'Smart Home System',items:[qBlankItem()]}];
   _qUndo=[]; _qRedo=[];
   openModal(id?'Edit quotation':'New quotation',
     rfqSummaryHTML(r)+
@@ -3986,8 +4035,8 @@ function printQuote(id,opts){
     return r; };
   /* Show the Part Number (item code) only when enabled on the quote (default: shown). */
   const showPN = (q.showPartNo!==false);
-  const qThead = `<thead><tr><th class="c">Image</th><th>Item - Description</th><th>Brand</th><th class="c">Qty</th><th class="r">Unit Price</th><th class="r">Total</th></tr></thead>`;
-  const qRows = sc => (sc.items||[]).map(it=>`<tr><td class="c">${it.image?`<img src="${esc(it.image)}" class="pimg">`:''}</td><td class="pd">${(showPN&&it.item)?`<div class="pn">${esc(it.item)}</div>`:''}<div class="ds">${esc(it.desc||'')}${it.optional?` <span style="display:inline-block;font-size:9.5px;font-weight:800;color:#8a5a00;background:#f6e7c8;border-radius:4px;padding:1px 6px;vertical-align:middle">${lang==='ar'?'اختياري':'OPTIONAL'}</span>`:''}</div></td><td class="br">${esc(it.brand||'-')}</td><td class="c">${num(it.qty)}</td><td class="r">${it.optional?(lang==='ar'?'اختياري':'Optional'):M(it.price)}</td><td class="r">${it.optional?'—':`<b>${M(num(it.qty)*num(it.price))}</b>`}</td></tr>`).join('');
+  const qThead = `<thead><tr><th class="c">Image</th><th>Item &amp; Description</th><th>Brand</th><th class="c">Qty</th><th class="r">Unit Price</th><th class="r">Total</th></tr></thead>`;
+  const qRows = sc => (sc.items||[]).map(it=>{ const d=qLineDisp(it); return `<tr><td class="c">${it.image?`<img src="${esc(it.image)}" class="pimg">`:''}</td><td class="pd"><div class="pn">${esc(d.name)}${it.optional?` <span style="display:inline-block;font-size:9.5px;font-weight:800;color:#8a5a00;background:#f6e7c8;border-radius:4px;padding:1px 6px;vertical-align:middle">${lang==='ar'?'اختياري':'OPTIONAL'}</span>`:''}</div>${(showPN&&d.code)?`<div class="pcode">${esc(d.code)}</div>`:''}${d.desc?`<div class="ds">${esc(d.desc)}</div>`:''}</td><td class="br">${esc(it.brand||'-')}</td><td class="c">${num(it.qty)}</td><td class="r">${it.optional?(lang==='ar'?'اختياري':'Optional'):M(it.price)}</td><td class="r">${it.optional?'—':`<b>${M(num(it.qty)*num(it.price))}</b>`}</td></tr>`; }).join('');
   const secTable=(sc,i)=>`<div class="sec"><div class="sech">${esc(sc.title||'Section')}</div>
     <table>${qThead}<tbody>${qRows(sc)}</tbody></table>${secFinRows(sc,i)}</div>`;
   const pay=[['Advance',q.payAdvance],['Before delivery',q.payBefore],['After delivery',q.payAfter],['Testing & commissioning',q.payTest]].filter(pp=>num(pp[1]));
@@ -4122,7 +4171,7 @@ function printQuote(id,opts){
   th{background:#f1f5f9;color:#0e2c49;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px}
   .c{text-align:center}.r{text-align:right}.br{color:#6c7c8c}.pn{font-weight:800;color:#0e2c49;font-size:12.5px}
   .pimg{width:58px;height:58px;object-fit:contain;background:#fff;border:1px solid #e6ebf0;border-radius:8px;display:block;margin:0 auto;padding:3px}
-  td.pd{min-width:230px}.pd .pn{font-weight:800;color:#33445a;font-size:12px}.pd .ds{font-weight:400;color:#33445a;line-height:1.5;margin-top:2px}.pd .pn+.ds{margin-top:3px}
+  td.pd{min-width:230px}.pd .pn{font-weight:800;color:#0e2c49;font-size:12.5px}.pd .pcode{font-weight:600;color:#6c7c8c;font-size:10.5px;letter-spacing:.3px;margin-top:2px}.pd .ds{font-weight:400;color:#33445a;line-height:1.5;font-size:12px;margin-top:3px}
   .sect{background:#123a5f;color:#fff;font-weight:800;padding:9px 14px;display:flex;justify-content:space-between;gap:16px}
   .sect2{display:flex;justify-content:space-between;padding:7px 14px;font-size:12.5px;color:#1c2b3a;border-top:1px solid #eef;gap:16px}
   .sect span:last-child,.sect2 span:last-child{white-space:nowrap}
@@ -5377,7 +5426,16 @@ function filePick(id,inp){ var f=inp.files&&inp.files[0]; if(!f)return; var st=d
     apiAdd('blobs',rec).then(function(bid){ if(!bid){ throw new Error('no id'); } _fileStore[id]='blob:'+bid; setStatus('✓ '+name+' ('+fmtBytes(rawSize||durl.length)+') '+(ar?'مرفوع':'uploaded')); })
       .catch(function(e){ _fileStore[id]=''; setStatus((ar?'⚠ فشل الرفع — جرّب تاني':'⚠ Upload failed — try again')+' ('+(e&&e.message||e)+')'); });
   }
-  if(f.type.indexOf('image/')===0){ compressImage(f,1400,0.7,function(durl){ store(durl,f.name,durl.length); }); return; }
+  // Images ALWAYS stay inline (they render directly via <img src> in the editor, picker and
+  // print — a blob: pointer would show as broken). Compress hard enough to keep them inline.
+  if(f.type.indexOf('image/')===0){
+    var _lk0=document.getElementById(id+'_lnk'); if(_lk0)_lk0.value='';
+    compressImage(f,1400,0.7,function(durl){
+      if(durl.length>1100*1024){ compressImage(f,1000,0.55,function(d2){ var best=(d2.length<durl.length?d2:durl); _fileStore[id]=best; setStatus('✓ '+f.name+' ('+fmtBytes(best.length)+') '+(ar?'مرفق':'attached')); }); }
+      else { _fileStore[id]=durl; setStatus('✓ '+f.name+' ('+fmtBytes(durl.length)+') '+(ar?'مرفق':'attached')); }
+    });
+    return;
+  }
   var r=new FileReader(); r.onload=function(){ store(r.result,f.name,f.size); }; r.readAsDataURL(f);
 }
 function compressImage(file,maxW,q,cb){ var r=new FileReader(); r.onload=function(){ var img=new Image(); img.onload=function(){ var w=img.width,h=img.height; if(w>maxW){ h=Math.round(h*maxW/w); w=maxW; } var c=document.createElement('canvas'); c.width=w; c.height=h; try{ c.getContext('2d').drawImage(img,0,0,w,h); cb(c.toDataURL('image/jpeg',q)); }catch(e){ cb(r.result); } }; img.onerror=function(){ cb(r.result); }; img.src=r.result; }; r.readAsDataURL(file); }
