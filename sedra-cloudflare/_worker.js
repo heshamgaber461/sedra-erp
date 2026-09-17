@@ -224,6 +224,25 @@ function segsOf(path){
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    // ── Automatic backup endpoint (secret-protected, SA-credentialed) ──────────
+    // GET /backup?key=<BACKUP_SECRET> → full DB JSON. Called daily by a Google
+    // Apps Script (server-side) which saves the result to Drive. Uses the service
+    // account (same as the app), so it works under the Stage-2 locked rules. The
+    // shared BACKUP_SECRET (a Cloudflare env var) is the only gate; if it's not
+    // set, or the key is wrong, the endpoint returns 401 and reveals nothing.
+    if (url.pathname === '/backup') {
+      const key = url.searchParams.get('key') || '';
+      if (!env.BACKUP_SECRET || key !== env.BACKUP_SECRET)
+        return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: CORS });
+      const cred = await dbCred(env, '');
+      if (cred.param !== 'access_token')
+        return new Response(JSON.stringify({ error: 'backup requires the service account (SA_KEY) to be configured' }), { status: 500, headers: CORS });
+      const r = await fetch(RTDB + '/.json?' + cred.param + '=' + encodeURIComponent(cred.val));
+      const t = await r.text();
+      return new Response(t || 'null', { status: r.status, headers: CORS });
+    }
+
     if (url.pathname !== '/db') return env.ASSETS.fetch(request);
     if (request.method === 'OPTIONS') return new Response('', { headers: CORS });
     if (request.method !== 'POST') return new Response(JSON.stringify({ error: 'POST only' }), { status: 405, headers: CORS });
