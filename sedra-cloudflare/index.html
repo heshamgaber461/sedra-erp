@@ -3667,13 +3667,30 @@ function qBlankItem(){ return {item:'',code:'',desc:'',brand:'',qty:1,price:0}; 
 /* Line schema: it.item = product NAME, it.code = product code (part number),
    it.desc = description. LEGACY items (before this change) stored item=code, desc=name
    and have no `code` field — qMigrateItem converts them, qLineDisp renders either. */
+/* Does this string look like a product CODE (e.g. DSP117, DS-2CD1043G0-I, SE/S 3.16.1, IC 50 T)
+   rather than a descriptive NAME? Used to decide whether a legacy codeless line stored the code
+   in `item` (old format) or already has the product name in `item` (correct format). */
+function _looksLikeCode(s){ s=String(s||'').trim(); if(!s) return false;
+  if(s.length>24) return false;                 // descriptive names are long
+  if(s.split(/\s+/).length>4) return false;      // codes are only a few tokens
+  if(/\b(with|and|for|the|camera|switch|sensor|panel|light|module|network|imaging|system|speaker|screen|control|hybrid|smart|cable|power|indoor|outdoor|wireless|detector|monitor|display|amplifier|battery|solar|resolution|support|technology|storage|intercom|automation|socket|thermostat)\b/i.test(s)) return false;
+  if(/[0-9]/.test(s)) return true;               // codes normally carry a digit
+  if(/^[A-Z0-9\/\.\-\s()]+$/.test(s) && s.length<=12) return true;  // short all-caps codes
+  return false; }
 function qMigrateItem(it){ if(!it||typeof it!=='object')return it;
-  if(it.code===undefined){ if(it.desc){ it.code=it.item||''; it.item=it.desc; it.desc=''; } else { it.code=''; } }
+  if(it.code===undefined){
+    if(!it.item && it.desc){ it.item=it.desc; it.desc=''; it.code=''; }                 // everything was in desc -> it is the name
+    else if(it.desc && _looksLikeCode(it.item)){ it.code=it.item; it.item=it.desc; it.desc=''; }  // legacy: code was in item, name in desc
+    else { it.code=''; }                                                                 // item already holds the name; keep desc as the description
+  }
   return it; }
 function qMigrateSecs(secs){ (secs||[]).forEach(function(s){ (s&&s.items||[]).forEach(qMigrateItem); }); return secs; }
 function qLineDisp(it){ if(!it)return {name:'',code:'',desc:''};
   if(it.code!==undefined) return {name:it.item||'',code:it.code||'',desc:it.desc||''};
-  return {name:it.desc||it.item||'',code:(it.desc?(it.item||''):''),desc:''}; }
+  var item=it.item||'', desc=it.desc||'';
+  if(!item && desc) return {name:desc,code:'',desc:''};
+  if(desc && _looksLikeCode(item)) return {name:desc,code:item,desc:''};   // legacy: code in item, name in desc
+  return {name:item,code:'',desc:desc}; }                                   // item is the name, desc is the description
 function defQExcluding(){ return ['Lights supply','Sockets & switches supply','Sanitary supply','MEP Work (Conduits, Pulling Cables)'].join(NL); }
 function defQTerms(){ return ['- Prices don’t include VAT unless mentioned.','','- Offer Includes:','    · Supervision on the Contractor team in the cabling phase','    · Full Design for all systems','    · Full Installation','    Installation prices include works within Cairo or Giza.','    For any other location, additional charges will apply.','','- Offer Excludes:','    · Any piping or wiring works unless mentioned otherwise','    · Any pipes or cables unless mentioned otherwise','    · Any protection circuit breakers unless mentioned otherwise','','- Payment Terms:','    · Advance Payment: 80% of the total price','    · After Delivery: 10% of the total price','    · After system installation: 10% of the total price','','- Warranty:','    · Warranty against manufacturing defects is 12 Months','','- Delivery:','    · 2-8 Weeks'].join(NL); }
 var _qDrag=null;
