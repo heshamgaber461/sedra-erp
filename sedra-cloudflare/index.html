@@ -3554,7 +3554,7 @@ function qSecDel(si){ qUndoSnap(); _qsec.splice(si,1); if(!_qsec.length)_qsec=[{
 function qItemAdd(si){ qUndoSnap(); _qsec[si].items.push(qBlankItem()); qSecRender(); }
 function qItemDel(si,ii){ qUndoSnap(); _qsec[si].items.splice(ii,1); if(!_qsec[si].items.length)_qsec[si].items.push(qBlankItem()); qSecRender(); }
 function qPickProduct(si,ii,val){ qUndoSnap(); var v=String(val||'').trim(); var lv=v.toLowerCase();
-  const p=inventory.find(x=>((x.sku?x.sku+' — ':'')+(x.name||''))===v) || inventory.find(x=>(x.name||'')===v) || inventory.find(x=>(x.sku||'')===v) || inventory.find(x=>String(x.sku||'').toLowerCase()===lv || String(x.name||'').toLowerCase()===lv);
+  const p=inventory.find(x=>((x.name||'')+(x.sku?' — '+x.sku:''))===v) || inventory.find(x=>((x.sku?x.sku+' — ':'')+(x.name||''))===v) || inventory.find(x=>(x.name||'')===v) || inventory.find(x=>(x.sku||'')===v) || inventory.find(x=>String(x.sku||'').toLowerCase()===lv || String(x.name||'').toLowerCase()===lv);
   qReadDOM(); const it=_qsec[si].items[ii];
   if(p){ it.item=p.name||it.item||''; it.code=p.sku||p.code||''; it.desc=p.desc||p.description||''; if(p.brand)it.brand=p.brand; const pr=num(p.price)||num(p.cost); if(pr){ var _rt=qCurRate(); it.price=(_rt&&_rt!==1)?Math.round(pr*_rt*100)/100:pr; } if(p.image)it.image=p.image; it._pid=p.id; }
   qSecRender(); }
@@ -3708,7 +3708,7 @@ function qNewProductSave(si){
   }).catch(function(e){ if(btn){ btn.disabled=false; btn.textContent='💾'; } alert('Error: '+(e.message||e)); });
 }
 function qSecRender(){ const el=g('qSec'); if(!el)return;
-  const dl=`<datalist id="prod_dl">${inventory.filter(inBranch).map(p=>`<option value="${esc((p.sku?p.sku+' — ':'')+(p.name||''))}">`).join('')}</datalist><datalist id="sys_dl">${QSYS_ALL.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>`;
+  const dl=`<datalist id="prod_dl">${inventory.filter(inBranch).map(p=>`<option value="${esc((p.name||'')+(p.sku?' — '+p.sku:''))}">`).join('')}</datalist><datalist id="sys_dl">${QSYS_ALL.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>`;
   const undobar=`<div style="display:flex;gap:6px;margin-bottom:8px"><button id="qUndoBtn" class="btn gh sm" onclick="qUndo()" title="${lang==='ar'?'تراجع (Ctrl+Z)':'Undo (Ctrl+Z)'}">↶ ${lang==='ar'?'تراجع':'Undo'}</button><button id="qRedoBtn" class="btn gh sm" onclick="qRedo()" title="${lang==='ar'?'إعادة (Ctrl+Y)':'Redo (Ctrl+Y)'}">↷ ${lang==='ar'?'إعادة':'Redo'}</button></div>`;
   el.innerHTML=dl+undobar+_qsec.map((s,si)=>{
     const rows=(s.items||[]).map((it,ii)=>`<tr ondragover="event.preventDefault()" ondrop="qDrop(event,${si},${ii})">
@@ -3786,6 +3786,14 @@ const QSERVICES=['Home Automation','Smart Home','Home Cinema','Indoor Sound Syst
 /* Systems that can each become a page inside one quotation (Hesham: choose one or more, each system prints on its own page with its own title). Images per system are wired via SYS_IMG when supplied. */
 const QSYSTEMS=['KNX','Wireless','Light Current','Sound System','CCTV'];
 const SCOPE_SYSTEMS=['KNX','Wireless','Light Current'];
+/* Scope of work is now MULTI-select — the project can need more than one system. Rendered as
+   checkboxes; stored/read as a comma-joined string in `service`. */
+function scopeCheckboxes(id,label,selectedStr){
+  var sel=String(selectedStr||'').split(/\s*[,،]\s*/).map(function(s){return s.trim().toLowerCase();});
+  var boxes=SCOPE_SYSTEMS.map(function(s,i){ var on=sel.indexOf(s.toLowerCase())>=0; return '<label style="display:inline-flex;align-items:center;gap:6px;background:#f6f9fc;border:1px solid #e3edf4;border-radius:8px;padding:7px 12px;cursor:pointer;font-weight:700;color:var(--navy)"><input type="checkbox" id="'+id+'_'+i+'" value="'+esc(s)+'" '+(on?'checked':'')+' style="width:16px;height:16px"> '+esc(s)+'</label>'; }).join(' ');
+  return '<div class="fld"><label>'+esc(label)+'</label><div style="display:flex;flex-wrap:wrap;gap:8px">'+boxes+'</div></div>';
+}
+function scopeVal(id){ var out=[]; SCOPE_SYSTEMS.forEach(function(s,i){ var e=g(id+'_'+i); if(e&&e.checked)out.push(s); }); return out.join(', '); }
 /* One unified systems list — new systems + the older service names — so every system (new or old) is picked from the same place. */
 const QSYS_ALL=(function(){ var seen={},out=[]; QSYSTEMS.concat(QSERVICES).forEach(function(s){ var k=String(s).toLowerCase(); if(!seen[k]){ seen[k]=1; out.push(s); } }); return out; })();
 const SYS_IMG={}; /* system name -> banner image URL/dataURL, added when Hesham sends the system images */
@@ -3812,7 +3820,8 @@ function quoteToTech(){ openModal('Request quotation from Technical Office',
     '<div class="fld" style="background:#fff7ed;border:1px solid #f0c98a;border-radius:8px;padding:10px"><label>\ud83c\udfe2 '+(lang==='ar'?'\u0646\u0648\u0639 \u0627\u0644\u0645\u0634\u0631\u0648\u0639 (\u0628\u064a\u062d\u062f\u0651\u062f \u0645\u064a\u0646 \u064a\u0633\u062a\u0644\u0645 \u0627\u0644\u0637\u0644\u0628)':'Project category (decides who receives it)')+'</label><select id="tq_route" onchange="tqRouteHint()"><option value="Residential">'+(lang==='ar'?'\u0633\u0643\u0646\u064a Residential':'Residential')+'</option><option value="Commercial">'+(lang==='ar'?'\u062a\u062c\u0627\u0631\u064a Commercial':'Commercial')+'</option></select><div id="tq_routeHint" class="mini" style="margin-top:4px;color:#157f96"></div></div>'+
     '<div class="row2">'+fEl('Project name','tq_project','')+'<div class="fld"><label>Client name</label><input id="tq_client" list="cust_dl" value="">'+custDatalist()+'</div></div>'+
     '<div class="row2">'+fEl('Project location','tq_loc','')+selEl('Project type','tq_ptype',RFQ_PTYPES,'Apartment')+'</div>'+
-    '<div class="row2">'+selEl('Scope of work (KNX / Wireless / Light Current)','tq_service',SCOPE_SYSTEMS,'KNX')+selEl('Category','tq_cat',RFQ_CATS,'Mid-range')+'</div>'+
+    scopeCheckboxes('tq_service',(lang==='ar'?'مجال العمل (اختر واحد أو أكثر — KNX / Wireless / Light Current)':'Scope of work (pick one or more — KNX / Wireless / Light Current)'),'KNX')+
+    selEl('Category','tq_cat',RFQ_CATS,'Mid-range')+
     '<div class="row2">'+selEl('Design based on','tq_design',RFQ_DESIGN,'Plan')+fEl('Deadline (min 3 days)','tq_deadline','','date')+'</div>'+
     '<div class="row2">'+fEl('Sales person','tq_sales',(me&&me.name)||'')+fEl('Quotation code (by Pre-sales)','tq_code','')+'</div>'+
     fTa('KNX requirements','tq_knx','')+
@@ -3823,7 +3832,8 @@ function quoteToTech(){ openModal('Request quotation from Technical Office',
     '<div class="card mini" style="background:#eef6ff;border-color:#bcd6ee">'+(lang==='ar'?'📎 بعد الحفظ هتفتحلك نافذة ترفع فيها الملفات والصور والدرايوينج بتاعة المشروع.':'📎 After saving, an attachments window opens so you can upload the project files, images and drawings.')+'</div>'+fileField('tq_file',(lang==='ar'?'📎 ارفع ملف / صورة / درايوينج للطلب (اختياري — تقدر تزوّد أكتر بعد الحفظ)':'📎 Attach a project file / image / drawing (optional — add more after saving)')),
   ()=>{ if(!val('tq_client')){alert('Client name required');return false;}
     var route=val('tq_route')||'Residential'; var asg=TECH_ROUTING[route]||{};
-    var d={number:genQuoteNo(svcKey(val('tq_service'))),service:val('tq_service'),
+    var _scope=scopeVal('tq_service')||'KNX';
+    var d={number:genQuoteNo(svcKey(_scope.split(',')[0].trim())),service:_scope,
       projectName:val('tq_project'),client:val('tq_client'),location:val('tq_loc'),buildingType:val('tq_ptype'),projectType:val('tq_ptype'),
       category:val('tq_cat'),techCategory:route,assignedTo:asg.name||'',assignedEmail:(asg.email||'').toLowerCase(),
       designBasedOn:val('tq_design'),deadline:val('tq_deadline'),salesPerson:val('tq_sales'),quotationCode:val('tq_code'),
@@ -3902,9 +3912,17 @@ function vQuoteRequests(){
     var deliver=(canDeliverRFQ(q))? '<button class="btn cy sm" onclick="deliverRFQ(\''+q.id+'\')">✅ '+(ar?'سلّم':'Deliver')+'</button>':'';
     var edit='<button class="btn gh sm" onclick="editRequest(\''+q.id+'\')" title="'+(ar?'تعديل الطلب':'Edit request')+'">✏️ '+(ar?'تعديل':'Edit')+'</button> ';
     var log='<button class="btn gh sm" onclick="reqLog(\''+q.id+'\')" title="'+(ar?'سجل التعديلات':'Edit log')+'">📝'+((Array.isArray(q.reqHistory)&&q.reqHistory.length)?(' '+q.reqHistory.length):'')+'</button> ';
-    return '<tr><td>'+prioSel+'</td><td><b>'+esc(q.number||q.id.slice(-5))+'</b></td><td><b>'+esc(q.client||'')+'</b><div class="mini">'+esc(q.projectName||'')+'</div></td><td>'+esc(q.service||'')+'</td><td>'+esc(q.assignedTo||'—')+'</td><td'+(ov?' style="color:var(--bad);font-weight:700"':'')+'>'+esc(q.deadline||'—')+(ov?' ⚠️':'')+'</td><td style="white-space:nowrap">'+stageBtns+'</td><td style="white-space:nowrap">'+edit+log+build+'<button class="btn gh sm" onclick="attachOpen(\''+q.id+'\')">📎'+(attCount(q.id)?' '+attCount(q.id):'')+'</button> <button class="btn gh sm" onclick="recOpen(\''+q.id+'\')">👁</button> '+deliver+'</td></tr>';
+    var del=(rfqCanManage()||canEditRequest(q))?'<button class="btn dn sm" onclick="delRequest(\''+q.id+'\')" title="'+(ar?'حذف الطلب (يروح لسلة المحذوفات)':'Delete request (moves to Recycle Bin)')+'">🗑</button> ':'';
+    return '<tr><td>'+prioSel+'</td><td><b>'+esc(q.number||q.id.slice(-5))+'</b></td><td><b>'+esc(q.client||'')+'</b><div class="mini">'+esc(q.projectName||'')+'</div></td><td>'+esc(q.service||'')+'</td><td>'+esc(q.assignedTo||'—')+'</td><td'+(ov?' style="color:var(--bad);font-weight:700"':'')+'>'+esc(q.deadline||'—')+(ov?' ⚠️':'')+'</td><td style="white-space:nowrap">'+stageBtns+'</td><td style="white-space:nowrap">'+edit+log+build+'<button class="btn gh sm" onclick="attachOpen(\''+q.id+'\')">📎'+(attCount(q.id)?' '+attCount(q.id):'')+'</button> <button class="btn gh sm" onclick="recOpen(\''+q.id+'\')">👁</button> '+deliver+del+'</td></tr>';
   }).join('')+'</tbody></table></div>';
   return h;
+}
+/* Delete a quote request → moves it to the Recycle Bin (restorable for 30 days). */
+function delRequest(id){
+  var q=quotes.find(function(x){return x.id===id;}); if(!q)return;
+  if(!(rfqCanManage()||canEditRequest(q))){ alert(lang==='ar'?'حذف الطلب للمدير أو صاحب الطلب أو الأوفيس الفني فقط.':'Only a manager, the requester, or the Technical Office can delete this request.'); return; }
+  if(!confirm((lang==='ar'?'تحذف طلب الكوتيشن ده؟ هيروح لسلة المحذوفات وتقدر ترجّعه خلال 30 يوم.':'Delete this quote request? It moves to the Recycle Bin (restorable for 30 days).')+'\n\n'+(q.number||'')+' · '+(q.client||'')))return;
+  toTrash('quotes',id).then(function(){ quotes=quotes.filter(function(x){return x.id!==id;}); logAudit('delete','quotes',id,'request deleted'); try{if(typeof showToast==='function')showToast({title:(lang==='ar'?'اتحذف الطلب':'Request deleted'),body:(q.client||'')});}catch(e){} synced(); if(appReady)refreshAll(); }).catch(function(e){ alert('Error: '+(e.message||e)); });
 }
 function canEditRequest(q){ if(!q||!q.isRFQ)return false; var my=((me&&me.email)||'').toLowerCase(); var isReq=(nameEq(q.requestedBy,me&&me.name))||((q.requestedByEmail||'').toLowerCase()===my); return !!(isReq||canDeliverRFQ(q)||rfqCanManage()); }
 function editRequest(id){
@@ -3915,7 +3933,8 @@ function editRequest(id){
     '<div class="card mini" style="background:#fff7ed;border:1px solid #f0c98a;margin-bottom:10px">'+(ar?'أي تعديل هنا هيتسجّل في سجل التعديلات، وهيوصل إشعار تاني لكل المعنيين (الأوفيس الفني والمدراء والتيم ليدر).':'Any change here is logged and re-notifies everyone involved (Technical Office, managers, team leader).')+'</div>'+
     '<div class="row2">'+fEl('Project name','er_project',q.projectName||'')+'<div class="fld"><label>Client name</label><input id="er_client" list="cust_dl" value="'+esc(q.client||'')+'">'+custDatalist()+'</div></div>'+
     '<div class="row2">'+fEl('Project location','er_loc',q.location||'')+selEl('Project type','er_ptype',RFQ_PTYPES,q.projectType||q.buildingType||'Apartment')+'</div>'+
-    '<div class="row2">'+selEl('Scope of work (KNX / Wireless / Light Current)','er_service',SCOPE_SYSTEMS,q.service||'KNX')+selEl('Category','er_cat',RFQ_CATS,q.category||'Mid-range')+'</div>'+
+    scopeCheckboxes('er_service',(ar?'مجال العمل (اختر واحد أو أكثر)':'Scope of work (pick one or more)'),q.service||'KNX')+
+    selEl('Category','er_cat',RFQ_CATS,q.category||'Mid-range')+
     '<div class="row2">'+selEl('Design based on','er_design',RFQ_DESIGN,q.designBasedOn||'Plan')+fEl('Deadline','er_deadline',q.deadline||'','date')+'</div>'+
     '<div class="row2">'+fEl('Sales person','er_sales',q.salesPerson||'')+fEl('Quotation code','er_code',q.quotationCode||'')+'</div>'+
     fTa('KNX requirements','er_knx',q.reqKNX||'')+
@@ -3927,7 +3946,7 @@ function editRequest(id){
     var F=[['er_project','projectName','Project name'],['er_client','client','Client'],['er_loc','location','Location'],['er_ptype','projectType','Project type'],['er_service','service','Scope'],['er_cat','category','Category'],['er_design','designBasedOn','Design based on'],['er_deadline','deadline','Deadline'],['er_sales','salesPerson','Sales person'],['er_code','quotationCode','Quote code'],['er_knx','reqKNX','KNX'],['er_net','reqNetwork','Wireless'],['er_lc','reqLC','Light Current'],['er_links','refLinks','Reference links'],['er_rev','revisions','Revisions']];
     if(!val('er_client')){ alert(ar?'اسم العميل مطلوب':'Client name required'); return false; }
     var changes=[], d={};
-    F.forEach(function(f){ var nv=(val(f[0])||'').trim(); var ov=(q[f[1]]!=null?String(q[f[1]]):'').trim(); if(nv!==ov){ changes.push({field:f[2],from:ov,to:nv}); d[f[1]]=nv; } });
+    F.forEach(function(f){ var nv=(f[0]==='er_service'?scopeVal('er_service'):(val(f[0])||'')).trim(); var ov=(q[f[1]]!=null?String(q[f[1]]):'').trim(); if(nv!==ov){ changes.push({field:f[2],from:ov,to:nv}); d[f[1]]=nv; } });
     if(d.projectType!=null){ d.buildingType=d.projectType; }
     if(!changes.length){ alert(ar?'مفيش أي تعديل.':'No changes made.'); return true; }
     var hist=Array.isArray(q.reqHistory)?q.reqHistory.slice():[];
@@ -3984,7 +4003,7 @@ function editQuote(id){
     `<div class="row2">${selEl('Branch','q_branch',branchOpts(),r.branch)}<div class="fld"><label>Currency</label><select id="q_cur" onchange="qCurChange()">${CURRENCIES.map(function(c){return '<option '+((r.currency||CUR[r.branch||defBranch()]||'EGP')===c?'selected':'')+'>'+c+'</option>';}).join('')}</select></div></div>`+
     `<div class="card" id="q_fxbox" style="background:#f6f9fc;padding:10px;margin-bottom:8px"><div class="mini" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span>💱 ${lang==='ar'?'سعر الصرف — 1 وحدة بالعملة = كام جنيه':'Exchange rate — 1 unit = how many EGP'}</span><label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="q_fxman" ${r.fxManual?'checked':''} onchange="qCurChange()"> ${lang==='ar'?'أحدّده يدويًا':'set manually'}</label><input id="q_fx" type="number" step="0.01" placeholder="${lang==='ar'?'مثال 53':'e.g. 53'}" value="${(r.fxManual&&num(r.fxEgp))?num(r.fxEgp):''}" style="width:100px" oninput="qRecalc()" onchange="qCurChange()" ${r.fxManual?'':'disabled'}><span id="q_fxinfo" class="mini" style="color:#157f96"></span></div><div class="mini" style="color:var(--muted);margin-top:4px">${lang==='ar'?'اكتب سعر الدولار/الدرهم بالجنيه اللي انت عايزه (مثلاً 1 دولار = 53 جنيه) والأسعار هتتحسب عليه.':'Type how many EGP one unit of the currency equals (e.g. 1 USD = 53 EGP); prices are computed from it.'}</div></div>`+
     `<div class="qsec-h">🧩 ${lang==='ar'?'الأنظمة والبنود':'Systems & items'}</div>`+
-    `<div class="fld"><label>Sections & line items (pick products from inventory in the Description field)</label><div id="qSec"></div></div>`+
+    `<div class="fld"><label>${lang==='ar'?'الأنظمة والبنود (اكتب في خانة «اسم المنتج» أو دوس 📦 لاختيار منتج — الاسم في Item والكود في Code)':'Systems & line items (type in the “Item” box or press 📦 to pick a product — name goes to Item, code to Code)'}</label><div id="qSec"></div></div>`+
     `<div class="qsec-h">💰 ${lang==='ar'?'الحساب المالي':'Financials'}</div>`+
     `<div class="row2">${selEl('Status','q_status',QSTAT,r.status||'Draft')}${fEl('VAT %','q_vat',r.vat!=null?r.vat:vatForBranch(r.branch||defBranch()),'number','qRecalc()')}</div>`+
     `<div class="card" id="qTotals" style="background:#f6f9fc"></div>`+
