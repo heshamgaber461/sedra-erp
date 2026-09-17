@@ -1075,6 +1075,21 @@ async function apiList(coll){ return listToArr(await apiCall('GET','/'+coll+'.js
 async function apiAdd(coll,d){ var r=await apiCall('POST','/'+coll+'.json',d); return r&&r.name; }
 async function apiMerge(coll,id,d){ return apiCall('PATCH','/'+coll+'/'+id+'.json',d); }
 async function apiDelete(coll,id){ return apiCall('DELETE','/'+coll+'/'+id+'.json'); }
+/* Automatic email via the Gmail Apps Script relay. Fire-and-forget; posts as text/plain
+   to avoid a CORS preflight (Apps Script web apps don't answer OPTIONS). Never blocks the UI. */
+var MAIL_RELAY_URL='https://script.google.com/macros/s/AKfycby0EFpEW-JAERxwTwV9YXtT90cqn4wbHxq5sJ6xtBfPYH0gaYblGjXtcGP71Wl2O5lE/exec';
+var MAIL_RELAY_SECRET='s5gxMaRB2fzk1Ex-tZaUuvi8GXqRsov1';
+function mailRelayUrl(){ return (settings&&settings.mailRelayUrl)||MAIL_RELAY_URL; }
+function mailRelaySecret(){ return (settings&&settings.mailRelaySecret)||MAIL_RELAY_SECRET; }
+function sendEmailAuto(to,subject,body,opts){
+  try{
+    if(!to||!subject) return Promise.resolve(false);
+    var url=mailRelayUrl(); if(!url) return Promise.resolve(false);
+    var payload=Object.assign({secret:mailRelaySecret(),to:to,subject:subject,body:body||'',fromName:'Sedra Electric'},opts||{});
+    return fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),keepalive:true})
+      .then(function(r){ return r.ok; }).catch(function(){ return false; });
+  }catch(e){ return Promise.resolve(false); }
+}
 
 /* ===== Offline mode: work with no internet; queue writes locally; auto-sync on reconnect =====
    - Reads: the last full snapshot is cached in IndexedDB, so the app opens & shows data offline.
@@ -3815,7 +3830,9 @@ function quoteToTech(){ openModal('Request quotation from Technical Office',
       reqKNX:val('tq_knx'),reqLC:val('tq_lc'),reqNetwork:val('tq_net'),notes:val('tq_notes'),revisions:val('tq_rev'),refLinks:val('tq_links'),
       type:'Quotation',status:'Tech Office \u2014 Pending',dept:'Technical',branch:defBranch(),
       requestedBy:(me&&me.name)||'',requestedByEmail:((me&&me.email)||'').toLowerCase(),requestedByDept:(me&&me.dept)||'',requestedTs:Date.now(),date:today(),created:new Date().toISOString(),isRFQ:true};
-    apiAdd('quotes',d).then(function(newid){ try{ var _f=fileVal('tq_file'); if(_f&&newid){ var _lk=g('tq_file_lnk'); var _nm=(_lk&&_lk.value&&_lk.value.trim())?_lk.value.trim():((_f.slice(0,5)==='data:'||_f.slice(0,5)==='blob:')?'project-file':_f); var _rec={rec:newid,name:_nm,file:_f,by:(me&&me.name)||'',at:new Date().toISOString()}; apiAdd('attachments',_rec).then(function(aid){ if(aid){_rec.id=aid;attachments.push(_rec);} }); } }catch(e){} synced(); if(appReady)refreshAll(); alert('\u2714 '+(lang==='ar'?'\u0627\u062a\u0628\u0639\u062a \u0644\u0640 ':'Sent to ')+(asg.name||'Technical Office')+(lang==='ar'?' \u0628\u0643\u0644 \u0627\u0644\u0645\u062a\u0637\u0644\u0628\u0627\u062a.':' with the full requirements.')); if(newid){ setTimeout(function(){ attachOpen(newid, d.projectName||d.client); },350); } }).catch(function(e){ alert('Error: '+(e.message||e)); }); return true; }); tqRouteHint(); }
+    apiAdd('quotes',d).then(function(newid){ try{ var _f=fileVal('tq_file'); if(_f&&newid){ var _lk=g('tq_file_lnk'); var _nm=(_lk&&_lk.value&&_lk.value.trim())?_lk.value.trim():((_f.slice(0,5)==='data:'||_f.slice(0,5)==='blob:')?'project-file':_f); var _rec={rec:newid,name:_nm,file:_f,by:(me&&me.name)||'',at:new Date().toISOString()}; apiAdd('attachments',_rec).then(function(aid){ if(aid){_rec.id=aid;attachments.push(_rec);} }); } }catch(e){} synced(); if(appReady)refreshAll();
+      try{ if(asg.email){ var _ar=(lang==='ar'); var _NL=String.fromCharCode(10); var _subj=(_ar?'مطلوب كوتيشن — ':'Quotation requested — ')+(d.projectName||d.client||d.number||''); var _body=(_ar?'في طلب كوتيشن جديد مطلوب منك تجهيزه:':'A new quotation request has been assigned to you:')+_NL+_NL+(_ar?'العميل: ':'Client: ')+(d.client||'-')+_NL+(_ar?'المشروع: ':'Project: ')+(d.projectName||'-')+_NL+(_ar?'المجال: ':'Scope: ')+(d.service||'-')+_NL+(_ar?'التسليم: ':'Due: ')+(d.deadline||'-')+_NL+(_ar?'الطلب من: ':'Requested by: ')+(d.requestedBy||'-')+_NL+_NL+(_ar?'ادخل النظام لعرض كل المتطلبات والمرفقات.':'Open the system to view the full requirements and attachments.'); sendEmailAuto(asg.email,_subj,_body); } }catch(_e){}
+      alert('\u2714 '+(lang==='ar'?'\u0627\u062a\u0628\u0639\u062a \u0644\u0640 ':'Sent to ')+(asg.name||'Technical Office')+(lang==='ar'?' \u0628\u0643\u0644 \u0627\u0644\u0645\u062a\u0637\u0644\u0628\u0627\u062a.':' with the full requirements.')); if(newid){ setTimeout(function(){ attachOpen(newid, d.projectName||d.client); },350); } }).catch(function(e){ alert('Error: '+(e.message||e)); }); return true; }); tqRouteHint(); }
 function rfqSummaryHTML(r){
   if(!r||!(r.isRFQ||r.projectName||r.reqKNX||r.reqLC||r.reqNetwork||r.designBasedOn||r.deadline||r.revisions)) return '';
   var ar=(typeof lang!=='undefined'&&lang==='ar');
@@ -3938,10 +3955,15 @@ function deliverRFQ(id){
   if(!confirm(msg))return;
   var d={status:'Quotation Ready',rfqDone:true,completedTs:Date.now(),completedBy:(me&&me.name)||'',completedDate:today()};
   apiMerge('quotes',id,d).then(function(){ Object.assign(q,d); logAudit('update','quotes',id,'RFQ delivered to sales'); synced(); if(appReady)refreshAll();
-    var ar=(lang==='ar'); var hasEmail=!!q.requestedByEmail;
-    var msg=ar?'✔ اتسلّم للسيلز — هيوصله إشعار جوّه النظام إن الكوتيشن جاهز.':'✔ Delivered — the sales requester gets an in-app “quotation ready” notification.';
-    if(hasEmail && confirm(msg+String.fromCharCode(10)+String.fromCharCode(10)+(ar?'تحب كمان تبعتله إيميل جاهز؟ (هيفتح إيميلك بالرسالة، تضغط Send)':'Also send a ready email? (opens your email pre-filled — just press Send)'))){ emailSalesRFQ(q); }
-    else if(!hasEmail){ alert(msg); }
+    var ar=(lang==='ar'); var to=q.requestedByEmail||''; var NL2=String.fromCharCode(10);
+    if(to){
+      var subj=(ar?'كوتيشنك جاهز — ':'Your quotation is ready — ')+(q.number||q.client||'');
+      var body=(ar?'الكوتيشن اللي طلبته من المكتب الفني خلص وجاهز:':'The quotation you requested from the Technical Office is ready:')+NL2+NL2+(ar?'العميل: ':'Client: ')+(q.client||'-')+NL2+(ar?'رقم الكوتيشن: ':'Quote No.: ')+(q.number||'-')+NL2+(ar?'جهّزه: ':'Prepared by: ')+(q.completedBy||q.assignedTo||'-')+NL2+NL2+(ar?'ادخل النظام لعرض الكوتيشن والمرفقات.':'Open the system to view the quotation and attachments.');
+      sendEmailAuto(to,subj,body);
+      alert(ar?'✔ اتسلّم للسيلز — واتبعتله إيميل تلقائي إن الكوتيشن جاهز، وكمان إشعار جوّه النظام.':'✔ Delivered — an automatic “quotation ready” email was sent to the requester, plus an in-app notification.');
+    } else {
+      alert(ar?'✔ اتسلّم للسيلز — هيوصله إشعار جوّه النظام (مفيش إيميل متسجّل ليه).':'✔ Delivered — the requester gets an in-app notification (no email on file).');
+    }
   }).catch(function(e){ alert('Error: '+(e.message||e)); });
 }
 function editQuote(id){
