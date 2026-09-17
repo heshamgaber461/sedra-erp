@@ -1009,11 +1009,12 @@ async function importProductImagesOnce(){
    the app so bulk writes aren't classifier-blocked. Re-runs when ZOHO_PROD_REV is bumped. */
 var ZOHO_PROD_REV=1;
 async function importZohoProductsOnce(){
+  if(window.__zohoProdBusy) return; window.__zohoProdBusy=true;
   try{
-    if(typeof isAdmin==='function'?!isAdmin():true) return;
-    if(settings && num(settings.zohoProdRev)>=ZOHO_PROD_REV) return;
-    var data=null; try{ data=await fetch('/zoho-products.json?nc='+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}); }catch(e){ return; }
-    if(!data||!data.coded) return;
+    if(typeof isAdmin==='function'?!isAdmin():true) { window.__zohoProdBusy=false; return; }
+    if(settings && num(settings.zohoProdRev)>=ZOHO_PROD_REV) { window.__zohoProdBusy=false; return; }
+    var data=null; try{ data=await fetch('/zoho-products.json?nc='+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}); }catch(e){ window.__zohoProdBusy=false; return; }
+    if(!data||!data.coded) { window.__zohoProdBusy=false; return; }
     var zn=function(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,''); };
     var codeMap={}, nameMap={};
     (data.coded||[]).forEach(function(z){ if(z.c)codeMap[zn(z.c)]=z; });
@@ -1037,6 +1038,7 @@ async function importZohoProductsOnce(){
     window.__zohoProd={done:done,todo:todo.length,rev:ZOHO_PROD_REV};
     try{ if(typeof showToast==='function') showToast({title:'✓ '+(lang==='ar'?'مزامنة المنتجات من Zoho':'Zoho product sync'),body:done+' '+(lang==='ar'?'منتج اتحدّث':'products updated')}); }catch(e){}
   }catch(e){ window.__zohoProd={err:String(e&&e.message||e)}; }
+  finally{ window.__zohoProdBusy=false; }
 }
 /* One-time Zoho CRM sync: pull latest Vendors->suppliers, Accounts->customers, Contacts->contacts,
    Quotes->quotes from /zoho-crm-sync.json. Match by zohoId (exact, no dupes): update changed records,
@@ -1050,11 +1052,12 @@ function _zstatus(stage){ var s=String(stage||'').toLowerCase();
   if(/sent|deliver|negoti/.test(s)) return 'Sent';
   return 'Draft'; }
 async function importZohoCrmSyncOnce(){
+  if(window.__zohoCrmBusy) return; window.__zohoCrmBusy=true;   // concurrency guard: enterApp can fire more than once
   try{
-    if(typeof isAdmin==='function'?!isAdmin():true) return;
-    if(settings && num(settings.zohoCrmSyncRev)>=ZOHO_CRM_SYNC_REV) return;
-    var data=null; try{ data=await fetch('/zoho-crm-sync.json?nc='+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}); }catch(e){ return; }
-    if(!data) return;
+    if(typeof isAdmin==='function'?!isAdmin():true) { window.__zohoCrmBusy=false; return; }
+    if(settings && num(settings.zohoCrmSyncRev)>=ZOHO_CRM_SYNC_REV) { window.__zohoCrmBusy=false; return; }
+    var data=null; try{ data=await fetch('/zoho-crm-sync.json?nc='+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}); }catch(e){ window.__zohoCrmBusy=false; return; }
+    if(!data) { window.__zohoCrmBusy=false; return; }
     var rep={suppAdd:0,suppUpd:0,custAdd:0,custUpd:0,contAdd:0,contUpd:0,quoteAdd:0,quoteUpd:0,err:0};
     // fields that get synced per collection (only overwrite when incoming is non-empty and differs)
     async function upsert(collArr,collName,incoming,keyFields,extraOnAdd,matchNameKey){
@@ -1140,6 +1143,7 @@ async function importZohoCrmSyncOnce(){
     window.__zohoCrm=rep;
     try{ if(typeof showToast==='function') showToast({title:'✓ '+(lang==='ar'?'مزامنة Zoho CRM':'Zoho CRM sync'),body:(lang==='ar'?'موردين':'vendors')+' +'+rep.suppAdd+' · '+(lang==='ar'?'عملاء':'clients')+' +'+rep.custAdd+'/~'+rep.custUpd+' · '+(lang==='ar'?'جهات':'contacts')+' +'+rep.contAdd+'/~'+rep.contUpd+' · '+(lang==='ar'?'كوتيشن':'quotes')+' +'+rep.quoteAdd+'/~'+rep.quoteUpd}); }catch(e){}
   }catch(e){ window.__zohoCrm={err:String(e&&e.message||e)}; }
+  finally{ window.__zohoCrmBusy=false; }
 }
 /* One-time cleanup: strip the leading/trailing decorative dashes that came from the Zoho import
    (e.g. "--------------NVR 8ch POE" -> "NVR 8ch POE"). Internal dashes in model numbers
