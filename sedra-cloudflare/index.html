@@ -1038,6 +1038,109 @@ async function importZohoProductsOnce(){
     try{ if(typeof showToast==='function') showToast({title:'✓ '+(lang==='ar'?'مزامنة المنتجات من Zoho':'Zoho product sync'),body:done+' '+(lang==='ar'?'منتج اتحدّث':'products updated')}); }catch(e){}
   }catch(e){ window.__zohoProd={err:String(e&&e.message||e)}; }
 }
+/* One-time Zoho CRM sync: pull latest Vendors->suppliers, Accounts->customers, Contacts->contacts,
+   Quotes->quotes from /zoho-crm-sync.json. Match by zohoId (exact, no dupes): update changed records,
+   add new ones. Never wipes an ERP field with an empty Zoho value. Admin-only; re-runs on rev bump. */
+var ZOHO_CRM_SYNC_REV=1;
+function _zt(s){ if(!s)return 0; var t=new Date(String(s).replace(' ','T')).getTime(); return isNaN(t)?0:t; }
+function _zc(v){ return v==null?'':String(v); }
+function _zstatus(stage){ var s=String(stage||'').toLowerCase();
+  if(/reject|lost|denied|cancel/.test(s)) return 'Rejected';
+  if(/approv|accept|won|confirm/.test(s)) return 'Approved';
+  if(/sent|deliver|negoti/.test(s)) return 'Sent';
+  return 'Draft'; }
+async function importZohoCrmSyncOnce(){
+  try{
+    if(typeof isAdmin==='function'?!isAdmin():true) return;
+    if(settings && num(settings.zohoCrmSyncRev)>=ZOHO_CRM_SYNC_REV) return;
+    var data=null; try{ data=await fetch('/zoho-crm-sync.json?nc='+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}); }catch(e){ return; }
+    if(!data) return;
+    var rep={suppAdd:0,suppUpd:0,custAdd:0,custUpd:0,contAdd:0,contUpd:0,quoteAdd:0,quoteUpd:0,err:0};
+    // fields that get synced per collection (only overwrite when incoming is non-empty and differs)
+    async function upsert(collArr,collName,incoming,keyFields,extraOnAdd,matchNameKey){
+      var byId={}, byName={};
+      (collArr||[]).forEach(function(x){ if(x.zohoId)byId[x.zohoId]=x; if(matchNameKey&&x[matchNameKey])byName[String(x[matchNameKey]).toLowerCase().trim()]=x; });
+      var addN=0,updN=0;
+      for(var i=0;i<incoming.length;i++){
+        var z=incoming[i];
+        var ex=byId[z.zohoId]||(matchNameKey?byName[String(z[matchNameKey]||'').toLowerCase().trim()]:null);
+        try{
+          if(ex){
+            var upd={};
+            keyFields.forEach(function(k){ var nv=_zc(z[k]); if(nv!=='' && nv!==_zc(ex[k])) upd[k]=z[k]; });
+            if(_zc(ex.zohoId)==='' && z.zohoId) upd.zohoId=z.zohoId;
+            if(!ex.origin) upd.origin='Zoho';
+            if(_zc(z.zohoModified)!=='' && _zc(z.zohoModified)!==_zc(ex.zohoModified)) upd.zohoModified=z.zohoModified;
+            if(Object.keys(upd).length){ await apiMerge(collName,ex.id,upd); Object.assign(ex,upd); updN++; }
+          } else {
+            var rec={}; keyFields.forEach(function(k){ rec[k]=z[k]; });
+            rec.zohoId=z.zohoId; rec.zohoCreated=z.zohoCreated; rec.zohoModified=z.zohoModified;
+            rec.origin='Zoho'; rec.importId='zoho_sync_20260917'; rec.importedAt=new Date().toISOString();
+            rec.created=_zt(z.zohoCreated)?new Date(_zt(z.zohoCreated)).toISOString():new Date().toISOString();
+            if(extraOnAdd) Object.assign(rec,extraOnAdd);
+            var id=await apiAdd(collName,rec); if(id){ rec.id=id; collArr.push(rec); byId[z.zohoId]=rec; if(matchNameKey&&rec[matchNameKey])byName[String(rec[matchNameKey]).toLowerCase().trim()]=rec; }
+            addN++;
+          }
+        }catch(e){ rep.err++; }
+      }
+      return {addN:addN,updN:updN};
+    }
+
+    // SUPPLIERS (empty in ERP; match by zohoId then name to avoid dup of any manual entry)
+    var r1=await upsert(suppliers,'suppliers',data.suppliers||[],
+      ['name','phone','email','website','category','address','city','country','notes'],
+      {branch:'Egypt',contact:''},'name');
+    rep.suppAdd=r1.addN; rep.suppUpd=r1.updN;
+
+    // CUSTOMERS (Zoho Accounts)
+    var r2=await upsert(customers,'customers',data.customers||[],
+      ['name','phone','website','industry','address','city','area','email','mapsLink','source','sector','priority','owner','notes'],
+      {branch:'Egypt',ctype:'Company'},null);
+    rep.custAdd=r2.addN; rep.custUpd=r2.updN;
+
+    // CONTACTS (Zoho Contacts)
+    var r3=await upsert(contacts,'contacts',data.contacts||[],
+      ['firstName','lastName','name','company','companyZohoId','email','title','department','phone','mobile','salutation','city','area','address','sector','source','industry','owner','notes'],
+      {branch:'Egypt'},null);
+    rep.contAdd=r3.addN; rep.contUpd=r3.updN;
+
+    // QUOTES (match by zohoId; update zoho-metadata if Zoho record is newer; add new as header records)
+    var qById={}; (quotes||[]).forEach(function(q){ if(q.zohoId)qById[q.zohoId]=q; });
+    var zq=data.quotes||[];
+    for(var qi=0;qi<zq.length;qi++){
+      var z=zq[qi]; var ex=qById[z.zohoId];
+      try{
+        if(ex){
+          if(_zt(z.zohoModified) > _zt(ex.zohoModified)){
+            var upd={zohoStage:z.stage,zohoSubTotal:z.subTotal,zohoGrandTotal:z.grandTotal,zohoDiscount:z.discount,zohoVAT:z.vat,zohoModified:z.zohoModified};
+            if(_zc(z.client)!=='' && _zc(z.client)!==_zc(ex.client)) upd.client=z.client;
+            if(_zc(z.subject)!=='' && _zc(z.subject)!==_zc(ex.subject)) upd.subject=z.subject;
+            if(_zc(z.validUntil)!=='' && _zc(z.validUntil)!==_zc(ex.validUntil)) upd.validUntil=z.validUntil;
+            await apiMerge('quotes',ex.id,upd); Object.assign(ex,upd); rep.quoteUpd++;
+          }
+        } else {
+          var dstr=_zt(z.zohoCreated)?new Date(_zt(z.zohoCreated)).toISOString().slice(0,10):today();
+          var rec={number:z.number,subject:z.subject,client:z.client,currency:z.currency||'EGP',date:dstr,
+            branch:'Egypt',dept:'Operations',type:'Quotation',status:_zstatus(z.stage),origin:'Zoho',
+            itemized:false,validUntil:z.validUntil,validity:'',terms:z.terms||'',
+            zohoId:z.zohoId,zohoAccountId:z.clientZohoId||'',zohoContactId:z.contactZohoId||'',zohoDealId:z.dealZohoId||'',
+            zohoStage:z.stage,zohoSubTotal:z.subTotal,zohoGrandTotal:z.grandTotal,zohoDiscount:z.discount,zohoVAT:z.vat,
+            zohoCreated:z.zohoCreated,zohoModified:z.zohoModified,
+            presalesName:z.presales||'',salesPerson:z.salesPerson||'',preparedBy:z.presales||'',
+            importId:'zoho_sync_20260917',created:_zt(z.zohoCreated)?new Date(_zt(z.zohoCreated)).toISOString():new Date().toISOString(),
+            notes:'Zoho quote. Deal: '+(z.client||'')+' | Sub Total: '+(z.subTotal||'')+' | Grand Total: '+(z.grandTotal||'')+' | Stage: '+(z.stage||'')+(z.desc?(' | Desc: '+z.desc):'')};
+          var qid=await apiAdd('quotes',rec); if(qid){ rec.id=qid; quotes.push(rec); qById[z.zohoId]=rec; } rep.quoteAdd++;
+        }
+      }catch(e){ rep.err++; }
+    }
+
+    try{ await apiMerge('meta','settings',{zohoCrmSyncRev:ZOHO_CRM_SYNC_REV}); }catch(e){}
+    if(!settings)settings={}; settings.zohoCrmSyncRev=ZOHO_CRM_SYNC_REV;
+    try{ render(); }catch(e){}
+    window.__zohoCrm=rep;
+    try{ if(typeof showToast==='function') showToast({title:'✓ '+(lang==='ar'?'مزامنة Zoho CRM':'Zoho CRM sync'),body:(lang==='ar'?'موردين':'vendors')+' +'+rep.suppAdd+' · '+(lang==='ar'?'عملاء':'clients')+' +'+rep.custAdd+'/~'+rep.custUpd+' · '+(lang==='ar'?'جهات':'contacts')+' +'+rep.contAdd+'/~'+rep.contUpd+' · '+(lang==='ar'?'كوتيشن':'quotes')+' +'+rep.quoteAdd+'/~'+rep.quoteUpd}); }catch(e){}
+  }catch(e){ window.__zohoCrm={err:String(e&&e.message||e)}; }
+}
 /* One-time cleanup: strip the leading/trailing decorative dashes that came from the Zoho import
    (e.g. "--------------NVR 8ch POE" -> "NVR 8ch POE"). Internal dashes in model numbers
    (e.g. DS-7608NI-K2/8P) are kept. Admin-only, runs as the app; one bulk PATCH. Re-runs on rev bump. */
@@ -1401,7 +1504,7 @@ function ensureAdminDoc(u){
 function pickBranch(b){ curBranch=b; localStorage.setItem('sedra_branch',b); enterApp(); }
 function enterApp(){ appReady=true; lastSig=''; hideLoad(); hideGate(); g('app').classList.remove('hide'); buildNav();
   try{ var _dh=DEPT_HOME[me.dept]||'hub'; var _dm=MODULES.find(function(x){return x.id===_dh;}); curView=(_dm&&canSee(_dm))?_dh:'hub'; }catch(e){ curView='hub'; }
-  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); migrateStagesOnce(); importAdelOnce(); importProductImagesOnce(); importZohoProductsOnce(); cleanProductDashesOnce(); _setupUpdateCheck(); try{ purgeOldTrash(); }catch(e){} }
+  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); migrateStagesOnce(); importAdelOnce(); importProductImagesOnce(); importZohoProductsOnce(); importZohoCrmSyncOnce(); cleanProductDashesOnce(); _setupUpdateCheck(); try{ purgeOldTrash(); }catch(e){} }
 
 /* ---- "My Tasks" pop-up on first open each day (Phase 1) ---- */
 function maybeTasksPopup(){

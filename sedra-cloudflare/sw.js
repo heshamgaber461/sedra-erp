@@ -2,7 +2,7 @@
    Network-first for the app document (so a new deploy shows up immediately on next load),
    stale-while-revalidate for other same-origin GET assets. Never touches POST /db.
    Bump CACHE on every meaningful change so old caches are purged on activate. */
-const CACHE = 'sedra-v99';
+const CACHE = 'sedra-v100';
 
 self.addEventListener('install', function(e){
   self.skipWaiting();
