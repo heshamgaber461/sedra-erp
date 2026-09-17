@@ -1210,10 +1210,23 @@ async function refreshLight(){
   }catch(e){ setPill(false); }
   finally{ polling=false; }
 }
+/* Bulk DB read that EXCLUDES the large-file store ('blobs').
+   Big attachments (up to 50MB) live under /blobs and are fetched on demand only,
+   so they never bloat this whole-DB read, the 120s poll, or the offline snapshot.
+   Falls back to a plain /.json read if the shallow key list can't be fetched. */
+async function loadAllExceptBlobs(){
+  var keys=null;
+  try{ keys=await apiCall('GET','/.json?shallow=true'); }catch(e){ if(e&&e.__net) throw e; keys=null; }
+  if(!keys||typeof keys!=='object'){ return await apiCall('GET','/.json') || {}; }
+  var names=Object.keys(keys).filter(function(k){ return k!=='blobs'; });
+  var res=await Promise.all(names.map(function(k){ return apiCall('GET','/'+k+'.json').catch(function(e){ if(e&&e.__net) throw e; return undefined; }); }));
+  var all={}; names.forEach(function(k,i){ if(res[i]!==undefined&&res[i]!==null) all[k]=res[i]; });
+  return all;
+}
 async function refreshAll(quiet){
   if(polling)return; polling=true; lastRefresh=Date.now();
   try{
-    var all=await apiCall('GET','/.json') || {};
+    var all=await loadAllExceptBlobs() || {};
     var _rs=''; try{ _rs=String(JSON.stringify(all).length); }catch(e){}
     if(quiet && _rs && _rs===_lastRawSig && appReady && employeesLoaded){ polling=false; return; }
     _lastRawSig=_rs;
@@ -3482,13 +3495,19 @@ function vQuotes(){
   return h;
 }
 let _qsec=[];
+var _qUndo=[], _qRedo=[], _qTypeTmr=null;
+function qUndoSnap(){ try{ qReadDOM(); }catch(e){} var s; try{ s=JSON.stringify(_qsec); }catch(e){ return; } if(_qUndo.length&&_qUndo[_qUndo.length-1]===s)return; _qUndo.push(s); if(_qUndo.length>60)_qUndo.shift(); _qRedo=[]; qUndoBtns(); }
+function qUndo(){ if(!_qUndo.length)return; try{ qReadDOM(); }catch(e){} _qRedo.push(JSON.stringify(_qsec)); _qsec=JSON.parse(_qUndo.pop()); qSecRender(); }
+function qRedo(){ if(!_qRedo.length)return; try{ qReadDOM(); }catch(e){} _qUndo.push(JSON.stringify(_qsec)); _qsec=JSON.parse(_qRedo.pop()); qSecRender(); }
+function qUndoBtns(){ var u=g('qUndoBtn'),r=g('qRedoBtn'); if(u)u.disabled=!_qUndo.length; if(r)r.disabled=!_qRedo.length; }
+document.addEventListener('keydown',function(e){ if(!g('qSec'))return; var k=(e.key||'').toLowerCase(); if((e.ctrlKey||e.metaKey)&&k==='z'){ e.preventDefault(); if(e.shiftKey)qRedo(); else qUndo(); } else if((e.ctrlKey||e.metaKey)&&k==='y'){ e.preventDefault(); qRedo(); } });
 const NL=String.fromCharCode(10);
 function qBlankItem(){ return {item:'',desc:'',brand:'',qty:1,price:0}; }
 function defQExcluding(){ return ['Lights supply','Sockets & switches supply','Sanitary supply','MEP Work (Conduits, Pulling Cables)'].join(NL); }
 function defQTerms(){ return ['- Prices don’t include VAT unless mentioned.','','- Offer Includes:','    · Supervision on the Contractor team in the cabling phase','    · Full Design for all systems','    · Full Installation','    Installation prices include works within Cairo or Giza.','    For any other location, additional charges will apply.','','- Offer Excludes:','    · Any piping or wiring works unless mentioned otherwise','    · Any pipes or cables unless mentioned otherwise','    · Any protection circuit breakers unless mentioned otherwise','','- Payment Terms:','    · Advance Payment: 80% of the total price','    · After Delivery: 10% of the total price','    · After system installation: 10% of the total price','','- Warranty:','    · Warranty against manufacturing defects is 12 Months','','- Delivery:','    · 2-8 Weeks'].join(NL); }
 var _qDrag=null;
 function qDragStart(e,si,ii){ qReadDOM(); _qDrag={si:si,ii:ii}; try{ e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain','row'); }catch(_e){} }
-function qDrop(e,si,ii){ try{ e.preventDefault(); }catch(_e){} qReadDOM(); var d=_qDrag; _qDrag=null; if(!d)return; if(d.si===si&&d.ii===ii)return;
+function qDrop(e,si,ii){ try{ e.preventDefault(); }catch(_e){} qUndoSnap(); var d=_qDrag; _qDrag=null; if(!d)return; if(d.si===si&&d.ii===ii)return;
   var from=_qsec[d.si]&&_qsec[d.si].items; if(!from)return; var moved=from.splice(d.ii,1)[0]; if(!moved){ qSecRender(); return; }
   var to=_qsec[si]&&_qsec[si].items; if(!to){ from.splice(d.ii,0,moved); qSecRender(); return; }
   var idx=ii; if(d.si===si && d.ii<ii) idx=ii-1;
@@ -3500,11 +3519,11 @@ function qReadDOM(){ _qsec.forEach((s,si)=>{ const t=g('qsT'+si); if(t)s.title=t
   const dn=g('qd_'+si+'_on'); if(dn){ s.discOn=dn.checked; s.discType=((g('qd_'+si+'_type')||{}).value)||'percent'; s.discVal=num((g('qd_'+si+'_val')||{}).value); }
   const fe=g('qf_'+si); if(fe)s.features=fe.value; const ne=g('qn_'+si); if(ne)s.notes=ne.value;
 }); }
-function qSecAdd(){ qReadDOM(); _qsec.push({title:'',items:[qBlankItem()]}); qSecRender(); }
-function qSecDel(si){ qReadDOM(); _qsec.splice(si,1); if(!_qsec.length)_qsec=[{title:'Section',items:[qBlankItem()]}]; qSecRender(); }
-function qItemAdd(si){ qReadDOM(); _qsec[si].items.push(qBlankItem()); qSecRender(); }
-function qItemDel(si,ii){ qReadDOM(); _qsec[si].items.splice(ii,1); if(!_qsec[si].items.length)_qsec[si].items.push(qBlankItem()); qSecRender(); }
-function qPickProduct(si,ii,val){ var v=String(val||'').trim(); var lv=v.toLowerCase();
+function qSecAdd(){ qUndoSnap(); _qsec.push({title:'',items:[qBlankItem()]}); qSecRender(); }
+function qSecDel(si){ qUndoSnap(); _qsec.splice(si,1); if(!_qsec.length)_qsec=[{title:'Section',items:[qBlankItem()]}]; qSecRender(); }
+function qItemAdd(si){ qUndoSnap(); _qsec[si].items.push(qBlankItem()); qSecRender(); }
+function qItemDel(si,ii){ qUndoSnap(); _qsec[si].items.splice(ii,1); if(!_qsec[si].items.length)_qsec[si].items.push(qBlankItem()); qSecRender(); }
+function qPickProduct(si,ii,val){ qUndoSnap(); var v=String(val||'').trim(); var lv=v.toLowerCase();
   const p=inventory.find(x=>((x.sku?x.sku+' — ':'')+(x.name||''))===v) || inventory.find(x=>(x.name||'')===v) || inventory.find(x=>(x.sku||'')===v) || inventory.find(x=>String(x.sku||'').toLowerCase()===lv || String(x.name||'').toLowerCase()===lv);
   qReadDOM(); const it=_qsec[si].items[ii];
   if(p){ it.item=p.sku||p.code||it.item||''; it.desc=p.name||p.desc||it.desc||''; if(p.brand)it.brand=p.brand; const pr=num(p.price)||num(p.cost); if(pr){ var _rt=qCurRate(); it.price=(_rt&&_rt!==1)?Math.round(pr*_rt*100)/100:pr; } if(p.image)it.image=p.image; it._pid=p.id; }
@@ -3628,7 +3647,8 @@ function qNewProductSave(si){
 }
 function qSecRender(){ const el=g('qSec'); if(!el)return;
   const dl=`<datalist id="prod_dl">${inventory.filter(inBranch).map(p=>`<option value="${esc((p.sku?p.sku+' — ':'')+(p.name||''))}">`).join('')}</datalist><datalist id="sys_dl">${QSYS_ALL.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>`;
-  el.innerHTML=dl+_qsec.map((s,si)=>{
+  const undobar=`<div style="display:flex;gap:6px;margin-bottom:8px"><button id="qUndoBtn" class="btn gh sm" onclick="qUndo()" title="${lang==='ar'?'تراجع (Ctrl+Z)':'Undo (Ctrl+Z)'}">↶ ${lang==='ar'?'تراجع':'Undo'}</button><button id="qRedoBtn" class="btn gh sm" onclick="qRedo()" title="${lang==='ar'?'إعادة (Ctrl+Y)':'Redo (Ctrl+Y)'}">↷ ${lang==='ar'?'إعادة':'Redo'}</button></div>`;
+  el.innerHTML=dl+undobar+_qsec.map((s,si)=>{
     const rows=(s.items||[]).map((it,ii)=>`<tr ondragover="event.preventDefault()" ondrop="qDrop(event,${si},${ii})">
       <td class="draghandle" draggable="true" ondragstart="qDragStart(event,${si},${ii})" title="${lang==='ar'?'اسحب لإعادة الترتيب':'Drag to reorder'}" style="cursor:grab;color:#9aa;text-align:center;width:20px;user-select:none">⠿</td>
       <td><input id="q_${si}_${ii}_item" value="${esc(it.item||'')}" placeholder="Item" style="width:84px"></td>
@@ -3656,6 +3676,8 @@ function qSecRender(){ const el=g('qSec'); if(!el)return;
       </div>
       <div class="mini" id="qsecT${si}" style="text-align:right;margin-top:6px;font-weight:800;color:var(--navy)"></div></div>`;
   }).join('')+`<button class="btn cy" onclick="qSecAdd()">➕ Add another system</button><div class="mini" style="color:var(--muted);margin-top:4px">${lang==='ar'?'كل سيستم بيحسب التركيب والخصم بتاعه لوحده، والصفحة الأخيرة بتجمع كل السيستمز وتحسب الضريبة على المجموع.':'Each system computes its own installation & discount; the final page sums all systems and applies VAT to the total.'}</div>`;
+  if(!el._qi){ el._qi=1; el.addEventListener('input',function(){ clearTimeout(_qTypeTmr); _qTypeTmr=setTimeout(qUndoSnap,700); }); }
+  qUndoBtns();
   qRecalc();
 }
 /* Manual FX is entered the NATURAL way: "1 <currency> = X EGP" (e.g. 1 USD = 53 EGP).
@@ -3745,7 +3767,7 @@ function quoteToTech(){ openModal('Request quotation from Technical Office',
       reqKNX:val('tq_knx'),reqLC:val('tq_lc'),reqNetwork:val('tq_net'),notes:val('tq_notes'),revisions:val('tq_rev'),refLinks:val('tq_links'),
       type:'Quotation',status:'Tech Office \u2014 Pending',dept:'Technical',branch:defBranch(),
       requestedBy:(me&&me.name)||'',requestedByEmail:((me&&me.email)||'').toLowerCase(),requestedByDept:(me&&me.dept)||'',requestedTs:Date.now(),date:today(),created:new Date().toISOString(),isRFQ:true};
-    apiAdd('quotes',d).then(function(newid){ try{ var _f=fileVal('tq_file'); if(_f&&newid){ var _lk=g('tq_file_lnk'); var _nm=(_lk&&_lk.value&&_lk.value.trim())?_lk.value.trim():((_f.slice(0,5)==='data:')?'project-file':_f); var _rec={rec:newid,name:_nm,file:_f,by:(me&&me.name)||'',at:new Date().toISOString()}; apiAdd('attachments',_rec).then(function(aid){ if(aid){_rec.id=aid;attachments.push(_rec);} }); } }catch(e){} synced(); if(appReady)refreshAll(); alert('\u2714 '+(lang==='ar'?'\u0627\u062a\u0628\u0639\u062a \u0644\u0640 ':'Sent to ')+(asg.name||'Technical Office')+(lang==='ar'?' \u0628\u0643\u0644 \u0627\u0644\u0645\u062a\u0637\u0644\u0628\u0627\u062a.':' with the full requirements.')); if(newid){ setTimeout(function(){ attachOpen(newid, d.projectName||d.client); },350); } }).catch(function(e){ alert('Error: '+(e.message||e)); }); return true; }); tqRouteHint(); }
+    apiAdd('quotes',d).then(function(newid){ try{ var _f=fileVal('tq_file'); if(_f&&newid){ var _lk=g('tq_file_lnk'); var _nm=(_lk&&_lk.value&&_lk.value.trim())?_lk.value.trim():((_f.slice(0,5)==='data:'||_f.slice(0,5)==='blob:')?'project-file':_f); var _rec={rec:newid,name:_nm,file:_f,by:(me&&me.name)||'',at:new Date().toISOString()}; apiAdd('attachments',_rec).then(function(aid){ if(aid){_rec.id=aid;attachments.push(_rec);} }); } }catch(e){} synced(); if(appReady)refreshAll(); alert('\u2714 '+(lang==='ar'?'\u0627\u062a\u0628\u0639\u062a \u0644\u0640 ':'Sent to ')+(asg.name||'Technical Office')+(lang==='ar'?' \u0628\u0643\u0644 \u0627\u0644\u0645\u062a\u0637\u0644\u0628\u0627\u062a.':' with the full requirements.')); if(newid){ setTimeout(function(){ attachOpen(newid, d.projectName||d.client); },350); } }).catch(function(e){ alert('Error: '+(e.message||e)); }); return true; }); tqRouteHint(); }
 function rfqSummaryHTML(r){
   if(!r||!(r.isRFQ||r.projectName||r.reqKNX||r.reqLC||r.reqNetwork||r.designBasedOn||r.deadline||r.revisions)) return '';
   var ar=(typeof lang!=='undefined'&&lang==='ar');
@@ -3812,10 +3834,53 @@ function vQuoteRequests(){
     var stageBtns=(canDeliverRFQ(q)||rfqCanManage())? RFQ_STAGES.map(function(s){ var on=stg===s[0]; return '<button class="btn '+(on?'cy':'gh')+' sm" onclick="setRfqStage(\''+q.id+'\',\''+s[0]+'\')">'+(ar?s[2]:s[1])+'</button>'; }).join(' ') : '<span class="tag" style="background:#eef3f8;color:var(--navy)">'+esc(rfqStageLbl(stg))+'</span>';
     var build=(canDeliverRFQ(q)||canCreateQuote())? '<button class="btn cy sm" onclick="editQuote(\''+q.id+'\')">🛠 '+(ar?'جهّز':'Build')+'</button> ':'';
     var deliver=(canDeliverRFQ(q))? '<button class="btn cy sm" onclick="deliverRFQ(\''+q.id+'\')">✅ '+(ar?'سلّم':'Deliver')+'</button>':'';
-    return '<tr><td>'+prioSel+'</td><td><b>'+esc(q.number||q.id.slice(-5))+'</b></td><td><b>'+esc(q.client||'')+'</b><div class="mini">'+esc(q.projectName||'')+'</div></td><td>'+esc(q.service||'')+'</td><td>'+esc(q.assignedTo||'—')+'</td><td'+(ov?' style="color:var(--bad);font-weight:700"':'')+'>'+esc(q.deadline||'—')+(ov?' ⚠️':'')+'</td><td style="white-space:nowrap">'+stageBtns+'</td><td style="white-space:nowrap">'+build+'<button class="btn gh sm" onclick="attachOpen(\''+q.id+'\')">📎'+(attCount(q.id)?' '+attCount(q.id):'')+'</button> <button class="btn gh sm" onclick="recOpen(\''+q.id+'\')">👁</button> '+deliver+'</td></tr>';
+    var edit='<button class="btn gh sm" onclick="editRequest(\''+q.id+'\')" title="'+(ar?'تعديل الطلب':'Edit request')+'">✏️ '+(ar?'تعديل':'Edit')+'</button> ';
+    var log='<button class="btn gh sm" onclick="reqLog(\''+q.id+'\')" title="'+(ar?'سجل التعديلات':'Edit log')+'">📝'+((Array.isArray(q.reqHistory)&&q.reqHistory.length)?(' '+q.reqHistory.length):'')+'</button> ';
+    return '<tr><td>'+prioSel+'</td><td><b>'+esc(q.number||q.id.slice(-5))+'</b></td><td><b>'+esc(q.client||'')+'</b><div class="mini">'+esc(q.projectName||'')+'</div></td><td>'+esc(q.service||'')+'</td><td>'+esc(q.assignedTo||'—')+'</td><td'+(ov?' style="color:var(--bad);font-weight:700"':'')+'>'+esc(q.deadline||'—')+(ov?' ⚠️':'')+'</td><td style="white-space:nowrap">'+stageBtns+'</td><td style="white-space:nowrap">'+edit+log+build+'<button class="btn gh sm" onclick="attachOpen(\''+q.id+'\')">📎'+(attCount(q.id)?' '+attCount(q.id):'')+'</button> <button class="btn gh sm" onclick="recOpen(\''+q.id+'\')">👁</button> '+deliver+'</td></tr>';
   }).join('')+'</tbody></table></div>';
   return h;
 }
+function canEditRequest(q){ if(!q||!q.isRFQ)return false; var my=((me&&me.email)||'').toLowerCase(); var isReq=(nameEq(q.requestedBy,me&&me.name))||((q.requestedByEmail||'').toLowerCase()===my); return !!(isReq||canDeliverRFQ(q)||rfqCanManage()); }
+function editRequest(id){
+  var q=quotes.find(function(x){return x.id===id;}); if(!q)return;
+  if(!canEditRequest(q)){ alert(lang==='ar'?'تعديل الطلب لصاحب الطلب أو الأوفيس الفني أو المدير فقط.':'Only the requester, the Technical Office, or a manager can edit this request.'); return; }
+  var ar=(lang==='ar');
+  openModal((ar?'تعديل طلب الكوتيشن — ':'Edit quote request — ')+esc(q.number||q.client||''),
+    '<div class="card mini" style="background:#fff7ed;border:1px solid #f0c98a;margin-bottom:10px">'+(ar?'أي تعديل هنا هيتسجّل في سجل التعديلات، وهيوصل إشعار تاني لكل المعنيين (الأوفيس الفني والمدراء والتيم ليدر).':'Any change here is logged and re-notifies everyone involved (Technical Office, managers, team leader).')+'</div>'+
+    '<div class="row2">'+fEl('Project name','er_project',q.projectName||'')+'<div class="fld"><label>Client name</label><input id="er_client" list="cust_dl" value="'+esc(q.client||'')+'">'+custDatalist()+'</div></div>'+
+    '<div class="row2">'+fEl('Project location','er_loc',q.location||'')+selEl('Project type','er_ptype',RFQ_PTYPES,q.projectType||q.buildingType||'Apartment')+'</div>'+
+    '<div class="row2">'+selEl('Scope of work (KNX / Wireless / Light Current)','er_service',SCOPE_SYSTEMS,q.service||'KNX')+selEl('Category','er_cat',RFQ_CATS,q.category||'Mid-range')+'</div>'+
+    '<div class="row2">'+selEl('Design based on','er_design',RFQ_DESIGN,q.designBasedOn||'Plan')+fEl('Deadline','er_deadline',q.deadline||'','date')+'</div>'+
+    '<div class="row2">'+fEl('Sales person','er_sales',q.salesPerson||'')+fEl('Quotation code','er_code',q.quotationCode||'')+'</div>'+
+    fTa('KNX requirements','er_knx',q.reqKNX||'')+
+    fTa('Wireless requirements','er_net',q.reqNetwork||'')+
+    fTa('Light Current requirements','er_lc',q.reqLC||'')+
+    fTa(ar?'لينكات مرجعية (لينك في كل سطر)':'Reference links (one per line)','er_links',q.refLinks||'')+
+    fTa('Revisions','er_rev',q.revisions||''),
+  function(){
+    var F=[['er_project','projectName','Project name'],['er_client','client','Client'],['er_loc','location','Location'],['er_ptype','projectType','Project type'],['er_service','service','Scope'],['er_cat','category','Category'],['er_design','designBasedOn','Design based on'],['er_deadline','deadline','Deadline'],['er_sales','salesPerson','Sales person'],['er_code','quotationCode','Quote code'],['er_knx','reqKNX','KNX'],['er_net','reqNetwork','Wireless'],['er_lc','reqLC','Light Current'],['er_links','refLinks','Reference links'],['er_rev','revisions','Revisions']];
+    if(!val('er_client')){ alert(ar?'اسم العميل مطلوب':'Client name required'); return false; }
+    var changes=[], d={};
+    F.forEach(function(f){ var nv=(val(f[0])||'').trim(); var ov=(q[f[1]]!=null?String(q[f[1]]):'').trim(); if(nv!==ov){ changes.push({field:f[2],from:ov,to:nv}); d[f[1]]=nv; } });
+    if(d.projectType!=null){ d.buildingType=d.projectType; }
+    if(!changes.length){ alert(ar?'مفيش أي تعديل.':'No changes made.'); return true; }
+    var hist=Array.isArray(q.reqHistory)?q.reqHistory.slice():[];
+    hist.push({at:new Date().toISOString(),by:(me&&me.name)||'',byEmail:((me&&me.email)||'').toLowerCase(),changes:changes});
+    d.reqHistory=hist; d.lastEditBy=(me&&me.name)||''; d.lastEditAt=new Date().toISOString(); d.requestedTs=Date.now();
+    apiMerge('quotes',id,d).then(function(){ Object.assign(q,d); logAudit('update','quotes',id,'request edited: '+changes.map(function(c){return c.field;}).join(', ')); synced(); if(appReady)refreshAll();
+      alert('✔ '+(ar?'اتعدّل الطلب واتسجّل ('+changes.length+' تغيير) — كل المعنيين هيوصلهم إشعار.':'Request updated and logged ('+changes.length+' change(s)) — everyone involved is re-notified.')); }).catch(function(e){ alert('Error: '+(e.message||e)); });
+    return true;
+  }); }
+function reqLog(id){
+  var q=quotes.find(function(x){return x.id===id;}); if(!q)return; var ar=(lang==='ar');
+  var H=Array.isArray(q.reqHistory)?q.reqHistory:[];
+  var body;
+  if(!H.length){ body='<div class="card empty">'+(ar?'مفيش تعديلات على الطلب ده لسه.':'No edits recorded on this request yet.')+'</div>'; }
+  else { body=H.slice().reverse().map(function(h){
+      var rows=(h.changes||[]).map(function(c){ return '<tr><td style="font-weight:700;white-space:nowrap">'+esc(c.field)+'</td><td style="color:var(--bad)"><s>'+esc(c.from||'—')+'</s></td><td style="color:var(--good);font-weight:600">'+esc(c.to||'—')+'</td></tr>'; }).join('');
+      return '<div class="card" style="margin-bottom:10px"><div class="mini" style="margin-bottom:6px"><b>'+esc(h.by||'')+'</b> · '+esc(fmtNotifTime(new Date(h.at).getTime())||h.at)+'</div><table style="width:100%"><thead><tr><th>'+(ar?'الحقل':'Field')+'</th><th>'+(ar?'قبل':'Before')+'</th><th>'+(ar?'بعد':'After')+'</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+    }).join(''); }
+  openModal((ar?'سجل تعديلات الطلب — ':'Request edit log — ')+esc(q.number||q.client||''), body, null); }
 function deliverRFQ(id){
   var q=quotes.find(function(x){return x.id===id;}); if(!q)return;
   if(!canDeliverRFQ(q)){ alert(lang==='ar'?'تسليم الكوتيشن من صلاحية الأوفيس الفني (أو المسؤول عن الطلب) فقط.':'Only the Technical Office (or the assignee) can deliver the quotation.'); return; }
@@ -3834,6 +3899,7 @@ function editQuote(id){
   if(!id && !canCreateQuote()){ alert(lang==='ar'?'إنشاء عروض الأسعار متاح للمدير أو الـ Team Leader في فريق المبيعات فقط.':'Creating quotations is limited to the Manager or Team Leader in the Sales team.'); return; }
   const r=id?quotes.find(x=>x.id===id):{branch:defBranch(),type:'Quotation',status:'Draft',vat:vatForBranch(defBranch()),dept:(me.dept==='Management'?'Operations':me.dept),date:today(),service:'Home Automation',number:genQuoteNo('home-automation'),preparedBy:(me&&me.name)||'',presalesName:(me&&me.name)||'',validity:30};
   _qsec=JSON.parse(JSON.stringify(quoteSections(r))); if(!_qsec.length)_qsec=[{title:'Smart Home System',items:[qBlankItem()]}];
+  _qUndo=[]; _qRedo=[];
   openModal(id?'Edit quotation':'New quotation',
     rfqSummaryHTML(r)+
     `<div class="qsec-h">📋 ${lang==='ar'?'بيانات العرض':'Quote details'}</div>`+
@@ -5282,23 +5348,53 @@ document.addEventListener('keydown',function(e){ if(!g('calcOv')||!g('calcOv').c
 var _fileStore={};
 function fileField(id,label,existing){ _fileStore[id]=existing||''; return `<div class="fld"><label>${label}</label><input type="file" accept="image/*,application/pdf,.xlsx,.xls,.csv,.doc,.docx,.ppt,.pptx,.txt" onchange="filePick('${id}',this)"><div style="margin-top:6px"><input type="url" id="${id}_lnk" placeholder="${lang==='ar'?'أو الصق رابط (https://...)':'or paste a link (https://...)'}" value="${existing&&/^https?:/i.test(existing)?esc(existing):''}" oninput="fileLink('${id}',this.value)" style="width:100%"></div><div id="${id}_st" class="mini">${existing?'✓ file attached (choose a file to replace)':'No file — image, PDF, Excel/Word…'}</div></div>`; }
 function fileVal(id){ return _fileStore[id]||''; }
-function fileLink(id,url){ url=(url||'').trim(); var cur=_fileStore[id]||''; if(url){ _fileStore[id]=url; } else if(cur.slice(0,5)!=='data:'){ _fileStore[id]=''; } var st=g(id+'_st'); if(st)st.textContent=url?'🔗 link attached':((_fileStore[id]||'').slice(0,5)==='data:'?'✓ file attached':'No file / link'); }
+function fileLink(id,url){ url=(url||'').trim(); var cur=_fileStore[id]||''; if(url){ _fileStore[id]=url; } else if(cur.slice(0,5)!=='data:'){ _fileStore[id]=''; } var st=g(id+'_st'); var _pf=(_fileStore[id]||'').slice(0,5); if(st)st.textContent=url?'🔗 link attached':((_pf==='data:'||_pf==='blob:')?'✓ file attached':'No file / link'); }
 function recAtt(id){ return (attachments||[]).filter(function(a){return a.rec===id;}); }
 function attCount(id){ return recAtt(id).length; }
 function attRowHtml(id,title){ var list=recAtt(id); if(!list.length)return '<div class="mini">'+(lang==='ar'?'لا مرفقات بعد':'No attachments yet')+'</div>'; return list.map(function(a){ return '<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px"><div style="min-width:0"><b style="word-break:break-word">'+esc(a.name||'attachment')+'</b><div class="mini">'+esc(a.by||'')+' · '+esc((a.at||'').slice(0,10))+'</div></div><div style="white-space:nowrap"><button class="btn gh sm" onclick="attOpenFile(\''+a.id+'\')">'+(lang==='ar'?'فتح':'Open')+'</button> '+((isMgr()||a.by===(me&&me.name))?'<button class="btn dn sm" onclick="delAtt(\''+a.id+'\',\''+id+'\')">✕</button>':'')+'</div></div>'; }).join(''); }
 function attachOpen(id,title){ openModal((lang==='ar'?'📎 مرفقات':'📎 Attachments')+(title?' — '+esc(title):''), '<div id="attList">'+attRowHtml(id,title)+'</div><div style="border-top:1px solid var(--mist);margin-top:10px;padding-top:10px">'+fileField('att_new',(lang==='ar'?'إضافة ملف / صورة / لينك':'Add file / image / link'))+'<button class="btn cy" style="margin-top:8px" onclick="addAtt(\''+id+'\')">➕ '+(lang==='ar'?'إضافة مرفق':'Add attachment')+'</button></div>', function(){ return true; }); }
-function addAtt(id){ var v=fileVal('att_new'); if(!v){ alert(lang==='ar'?'اختر ملف أو الصق لينك':'Choose a file or paste a link'); return; } var lk=document.getElementById('att_new_lnk'); var nm=(lk&&lk.value&&lk.value.trim())?lk.value.trim():((v.slice(0,5)==='data:')?'file':v); var rec={rec:id,name:nm,file:v,by:(me&&me.name)||'',at:new Date().toISOString()}; apiAdd('attachments',rec).then(function(aid){ rec.id=aid; attachments.push(rec); _fileStore['att_new']=''; attachOpen(id); if(appReady)refreshAll(); }).catch(function(e){ alert('Error: '+(e.message||e)); }); }
+function addAtt(id){ var v=fileVal('att_new'); if(!v){ alert(lang==='ar'?'اختر ملف أو الصق لينك':'Choose a file or paste a link'); return; } var lk=document.getElementById('att_new_lnk'); var nm=(lk&&lk.value&&lk.value.trim())?lk.value.trim():((v.slice(0,5)==='data:'||v.slice(0,5)==='blob:')?'file':v); var rec={rec:id,name:nm,file:v,by:(me&&me.name)||'',at:new Date().toISOString()}; apiAdd('attachments',rec).then(function(aid){ rec.id=aid; attachments.push(rec); _fileStore['att_new']=''; attachOpen(id); if(appReady)refreshAll(); }).catch(function(e){ alert('Error: '+(e.message||e)); }); }
 function attOpenFile(aid){ var a=(attachments||[]).find(function(x){return x.id===aid;}); if(a&&a.file)openStoredFile(a.file,a.name||'file'); }
 function delAtt(aid,id){ if(!confirm(lang==='ar'?'مسح المرفق؟':'Delete attachment?'))return; attachments=attachments.filter(function(a){return a.id!==aid;}); apiDelete('attachments',aid).then(function(){ logAudit('delete','attachments',aid,''); }); attachOpen(id); }
 function openRecFile(coll,id){ var arr={leads:leads,projects:projects,inventory:inventory,customers:customers,incidents:incidents,prs:prs,pettycash:pettycash,snags:snags,kbase:kbase,agreements:agreements,workorders:workorders,courses:courses,inspections:inspections,subcontractors:subcontractors,licenses:licenses,tenders:tenders,drawings:drawings,submittals:submittals,ipcs:ipcs,rfis:rfis,dsrs:dsrs,esigns:esigns,mktplans:mktplans,mktlib:mktlib,posts:posts}[coll]; var r=arr&&arr.find(x=>x.id===id); if(r&&r.file){ openStoredFile(r.file,(r.name||r.title||r.company||r.client||'file')); } else { alert('No file attached.'); } }
+/* Files up to 50MB. Small files stay inline (dataURL in the record, as before).
+   Anything larger than BLOB_INLINE_MAX is offloaded to the /blobs store and the record
+   keeps only a small "blob:<id>" pointer, so the bulk DB read stays light. */
+var BLOB_MAX=50*1024*1024;            // 50 MB raw file
+var BLOB_INLINE_MAX=700*1024;         // ≤ ~700KB dataURL kept inline
+function fmtBytes(n){ n=Number(n)||0; return n>=1048576?((n/1048576).toFixed(1)+' MB'):(Math.round(n/1024)+' KB'); }
 function filePick(id,inp){ var f=inp.files&&inp.files[0]; if(!f)return; var st=document.getElementById(id+'_st');
-  function done(durl,name){ if(durl.length>2.0*1024*1024){ alert('File too large (max ~1.5 MB). Please compress it.'); inp.value=''; return; } _fileStore[id]=durl; var _lk=document.getElementById(id+'_lnk'); if(_lk)_lk.value=''; if(st)st.textContent='✓ '+name+' ('+Math.round(durl.length/1024)+' KB) attached'; }
-  if(f.type.indexOf('image/')===0){ compressImage(f,1000,0.6,function(durl){ done(durl,f.name); }); return; }
-  if(f.size>1.5*1024*1024){ alert('Max ~1.5 MB for non-image files. Please compress it.'); inp.value=''; return; }
-  var r=new FileReader(); r.onload=function(){ done(r.result,f.name); }; r.readAsDataURL(f);
+  var ar=(lang==='ar');
+  if(f.size>BLOB_MAX){ alert(ar?'الملف كبير جدًا (الحد الأقصى 50 ميجا).':'File too large (max 50 MB).'); inp.value=''; return; }
+  function setStatus(t){ if(st)st.textContent=t; }
+  function store(durl,name,rawSize){
+    var _lk=document.getElementById(id+'_lnk'); if(_lk)_lk.value='';
+    if(durl.length<=BLOB_INLINE_MAX){ _fileStore[id]=durl; setStatus('✓ '+name+' ('+fmtBytes(rawSize||durl.length)+') '+(ar?'مرفق':'attached')); return; }
+    // large -> offload to /blobs, keep a pointer. Big files need a live connection.
+    if(OFF&&OFF.offline){ _fileStore[id]=''; if(inp)inp.value=''; setStatus(ar?'⚠ الملف كبير ومحتاج نت — ارفعه لما النت يرجع.':'⚠ Large file needs a connection — upload it when you’re back online.'); alert(ar?'الملفات الكبيرة (فوق ~0.7 ميجا) محتاجة إنترنت. ارفعها لما النت يرجع، أو استخدم لينك.':'Large files (over ~0.7 MB) need an internet connection. Upload them when you’re back online, or paste a link instead.'); return; }
+    setStatus((ar?'⏳ جاري رفع ':'⏳ Uploading ')+name+' ('+fmtBytes(rawSize||durl.length)+')…');
+    var rec={data:durl,name:name,type:(f.type||''),size:rawSize||durl.length,by:(me&&me.name)||'',at:new Date().toISOString()};
+    apiAdd('blobs',rec).then(function(bid){ if(!bid){ throw new Error('no id'); } _fileStore[id]='blob:'+bid; setStatus('✓ '+name+' ('+fmtBytes(rawSize||durl.length)+') '+(ar?'مرفوع':'uploaded')); })
+      .catch(function(e){ _fileStore[id]=''; setStatus((ar?'⚠ فشل الرفع — جرّب تاني':'⚠ Upload failed — try again')+' ('+(e&&e.message||e)+')'); });
+  }
+  if(f.type.indexOf('image/')===0){ compressImage(f,1400,0.7,function(durl){ store(durl,f.name,durl.length); }); return; }
+  var r=new FileReader(); r.onload=function(){ store(r.result,f.name,f.size); }; r.readAsDataURL(f);
 }
 function compressImage(file,maxW,q,cb){ var r=new FileReader(); r.onload=function(){ var img=new Image(); img.onload=function(){ var w=img.width,h=img.height; if(w>maxW){ h=Math.round(h*maxW/w); w=maxW; } var c=document.createElement('canvas'); c.width=w; c.height=h; try{ c.getContext('2d').drawImage(img,0,0,w,h); cb(c.toDataURL('image/jpeg',q)); }catch(e){ cb(r.result); } }; img.onerror=function(){ cb(r.result); }; img.src=r.result; }; r.readAsDataURL(file); }
-function openStoredFile(durl,name){ if(!durl){alert('No file.');return;} try{ var parts=durl.split(','); var mime=(parts[0].match(/:(.*?);/)||[])[1]||'application/octet-stream'; var bin=atob(parts[1]); var arr=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i); var blob=new Blob([arr],{type:mime}); var url=URL.createObjectURL(blob); if(mime.indexOf('image/')===0||mime==='application/pdf'){ window.open(url,'_blank'); } else { var a=document.createElement('a'); a.href=url; a.download=name||'sedra-file'; document.body.appendChild(a); a.click(); a.remove(); } setTimeout(function(){ URL.revokeObjectURL(url); },30000); }catch(e){ try{ window.open(durl,'_blank'); }catch(_){} } }
+/* Resolve a stored file for viewing. A "blob:<id>" pointer is fetched on demand from
+   the /blobs store (these are the large 50MB-class files kept out of the bulk read). */
+function openStoredFile(durl,name){ if(!durl){alert('No file.');return;}
+  if(typeof durl==='string' && durl.slice(0,5)==='blob:'){
+    var bid=durl.slice(5); var ar=(lang==='ar');
+    apiCall('GET','/blobs/'+bid+'.json').then(function(rec){
+      if(!rec||!rec.data){ alert(ar?'الملف مش موجود (ممكن يكون اتمسح).':'File not found (it may have been deleted).'); return; }
+      _openDataUrl(rec.data, rec.name||name);
+    }).catch(function(e){ alert((e&&e.__net)?(ar?'مفيش نت — الملفات الكبيرة بتتفتح لما النت يرجع.':'You’re offline — large files open when you’re back online.'):(ar?'تعذّر فتح الملف: ':'Could not open file: ')+(e&&e.message||e)); });
+    return;
+  }
+  _openDataUrl(durl,name);
+}
+function _openDataUrl(durl,name){ if(!durl){alert('No file.');return;} try{ var parts=durl.split(','); var mime=(parts[0].match(/:(.*?);/)||[])[1]||'application/octet-stream'; var bin=atob(parts[1]); var arr=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i); var blob=new Blob([arr],{type:mime}); var url=URL.createObjectURL(blob); if(mime.indexOf('image/')===0||mime==='application/pdf'){ window.open(url,'_blank'); } else { var a=document.createElement('a'); a.href=url; a.download=name||'sedra-file'; document.body.appendChild(a); a.click(); a.remove(); } setTimeout(function(){ URL.revokeObjectURL(url); },30000); }catch(e){ try{ window.open(durl,'_blank'); }catch(_){} } }
 /* ---- HR: Site Labor daily distribution + cost (Phase 2) ---- */
 let slDate=today();
 function saveSetting(k,v){ settings[k]=v; apiMerge('meta','settings',{[k]:v}).then(synced); }
@@ -6458,7 +6554,7 @@ function getNotifications(){
     var _mineRFQ=(typeof rfqPending==='function')?rfqPending():[];
     if(_mineRFQ.length){ var _ov=_mineRFQ.filter(function(q){return q.deadline&&q.deadline<today();});
       var _nextDue=_mineRFQ.map(function(q){return q.deadline;}).filter(Boolean).sort()[0]||'';
-      var _stk=_mineRFQ.map(function(q){return q.id+':'+(q.rfqStage||'pending');}).sort().join(',');
+      var _stk=_mineRFQ.map(function(q){return q.id+':'+(q.rfqStage||'pending')+':'+((q.reqHistory&&q.reqHistory.length)||0);}).sort().join(',');
       list.unshift({ico:'📨',key:'rfq:pending:'+_stk,title:(lang==='ar'?'طلبات كوتيشن':'Quote requests'),sub:_mineRFQ.length+' '+(lang==='ar'?'طلب مفتوح':'open request(s)')+(_ov.length?' · '+_ov.length+' '+(lang==='ar'?'متأخر':'overdue'):'')+(_nextDue?' · '+(lang==='ar'?'أقرب تسليم ':'due ')+_nextDue:''),count:_mineRFQ.length,act:function(){curView='quoterequests';closeBell();render();}}); }
   }catch(e){}
   // ---- Sales: my requested quotation is now ready ----
