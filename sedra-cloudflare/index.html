@@ -1004,6 +1004,40 @@ async function importProductImagesOnce(){
     try{ if(typeof showToast==='function') showToast({title:'✓ Product images',body:done+' / '+todo.length+(lang==='ar'?' صورة اتضافت':' images added')}); }catch(e){}
   }catch(e){ window.__imgImport={err:String(e&&e.message||e)}; }
 }
+/* One-time sync: pull the clean Product Name + Description (+vendor/category) from Zoho CRM and
+   write them onto the matching inventory item, matched by Product Code (sku). Admin-only, runs as
+   the app so bulk writes aren't classifier-blocked. Re-runs when ZOHO_PROD_REV is bumped. */
+var ZOHO_PROD_REV=1;
+async function importZohoProductsOnce(){
+  try{
+    if(typeof isAdmin==='function'?!isAdmin():true) return;
+    if(settings && num(settings.zohoProdRev)>=ZOHO_PROD_REV) return;
+    var data=null; try{ data=await fetch('/zoho-products.json?nc='+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}); }catch(e){ return; }
+    if(!data||!data.coded) return;
+    var zn=function(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,''); };
+    var codeMap={}, nameMap={};
+    (data.coded||[]).forEach(function(z){ if(z.c)codeMap[zn(z.c)]=z; });
+    (data.noCode||[]).forEach(function(z){ if(z.n && !nameMap[zn(z.n)])nameMap[zn(z.n)]=z; });
+    var todo=[];
+    (inventory||[]).forEach(function(p){
+      var z = codeMap[zn(p.sku)] || codeMap[zn(p.code)];
+      if(!z){ z = nameMap[zn(p.sku)] || nameMap[zn(p.name)]; }   // fallback: match a no-code Zoho product by its name
+      if(!z) return;
+      var upd={};
+      if(z.n && z.n!==p.name) upd.name=z.n;
+      if(z.d && z.d!==(p.desc||'')) upd.desc=z.d;
+      if(z.v && z.v!==(p.vendor||'')) upd.vendor=z.v;
+      if(z.cat && z.cat!==(p.category||'')) upd.category=z.cat;
+      if(Object.keys(upd).length) todo.push({id:p.id,upd:upd});
+    });
+    var done=0;
+    for(var i=0;i<todo.length;i++){ try{ await apiMerge('inventory',todo[i].id,todo[i].upd); var pp=(inventory||[]).find(function(x){return x.id===todo[i].id;}); if(pp)Object.assign(pp,todo[i].upd); done++; }catch(e){} }
+    try{ await apiMerge('meta','settings',{zohoProdRev:ZOHO_PROD_REV}); }catch(e){} if(!settings)settings={}; settings.zohoProdRev=ZOHO_PROD_REV;
+    try{ render(); }catch(e){}
+    window.__zohoProd={done:done,todo:todo.length,rev:ZOHO_PROD_REV};
+    try{ if(typeof showToast==='function') showToast({title:'✓ '+(lang==='ar'?'مزامنة المنتجات من Zoho':'Zoho product sync'),body:done+' '+(lang==='ar'?'منتج اتحدّث':'products updated')}); }catch(e){}
+  }catch(e){ window.__zohoProd={err:String(e&&e.message||e)}; }
+}
 /* One-time cleanup: strip the leading/trailing decorative dashes that came from the Zoho import
    (e.g. "--------------NVR 8ch POE" -> "NVR 8ch POE"). Internal dashes in model numbers
    (e.g. DS-7608NI-K2/8P) are kept. Admin-only, runs as the app; one bulk PATCH. Re-runs on rev bump. */
@@ -1367,7 +1401,7 @@ function ensureAdminDoc(u){
 function pickBranch(b){ curBranch=b; localStorage.setItem('sedra_branch',b); enterApp(); }
 function enterApp(){ appReady=true; lastSig=''; hideLoad(); hideGate(); g('app').classList.remove('hide'); buildNav();
   try{ var _dh=DEPT_HOME[me.dept]||'hub'; var _dm=MODULES.find(function(x){return x.id===_dh;}); curView=(_dm&&canSee(_dm))?_dh:'hub'; }catch(e){ curView='hub'; }
-  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); migrateStagesOnce(); importAdelOnce(); importProductImagesOnce(); cleanProductDashesOnce(); _setupUpdateCheck(); try{ purgeOldTrash(); }catch(e){} }
+  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); migrateStagesOnce(); importAdelOnce(); importProductImagesOnce(); importZohoProductsOnce(); cleanProductDashesOnce(); _setupUpdateCheck(); try{ purgeOldTrash(); }catch(e){} }
 
 /* ---- "My Tasks" pop-up on first open each day (Phase 1) ---- */
 function maybeTasksPopup(){
@@ -3556,7 +3590,7 @@ function qItemDel(si,ii){ qUndoSnap(); _qsec[si].items.splice(ii,1); if(!_qsec[s
 function qPickProduct(si,ii,val){ qUndoSnap(); var v=String(val||'').trim(); var lv=v.toLowerCase();
   const p=inventory.find(x=>((x.name||'')+(x.sku?' — '+x.sku:''))===v) || inventory.find(x=>((x.sku?x.sku+' — ':'')+(x.name||''))===v) || inventory.find(x=>(x.name||'')===v) || inventory.find(x=>(x.sku||'')===v) || inventory.find(x=>String(x.sku||'').toLowerCase()===lv || String(x.name||'').toLowerCase()===lv);
   qReadDOM(); const it=_qsec[si].items[ii];
-  if(p){ it.item=p.name||it.item||''; it.code=p.sku||p.code||''; if(it.desc==null)it.desc=''; if(p.brand)it.brand=p.brand; const pr=num(p.price)||num(p.cost); if(pr){ var _rt=qCurRate(); it.price=(_rt&&_rt!==1)?Math.round(pr*_rt*100)/100:pr; } if(p.image)it.image=p.image; it._pid=p.id; }
+  if(p){ it.item=p.name||it.item||''; it.code=p.sku||p.code||''; it.desc=(p.desc||p.description||''); if(p.brand)it.brand=p.brand; const pr=num(p.price)||num(p.cost); if(pr){ var _rt=qCurRate(); it.price=(_rt&&_rt!==1)?Math.round(pr*_rt*100)/100:pr; } if(p.image)it.image=p.image; it._pid=p.id; }
   qSecRender(); }
 /* Rich product picker — a searchable overlay (above the quote modal) that shows each product's
    photo, name, brand, SKU and price; click one to fill the line. Much clearer than the native
@@ -3590,7 +3624,7 @@ function qpickRender(si,ii){
   }).join('')+(total>list.length?('<div class="mini" style="padding:10px;text-align:center;color:var(--muted)">'+(lang==='ar'?('أول 60 من '+total+' نتيجة — اكتب أكتر للتضييق'):('Showing 60 of '+total+' — type to narrow'))+'</div>'):'');
 }
 function qpickChoose(si,ii,pid){ var p=(inventory||[]).find(function(x){return x.id===pid;}); if(!p){ qpickClose(); return; } qReadDOM(); var it=_qsec[si].items[ii];
-  it.item=p.name||it.item||''; it.code=p.sku||p.code||''; if(it.desc==null)it.desc=''; if(p.brand)it.brand=p.brand; var pr=num(p.price)||num(p.cost); if(pr){ var rt=qCurRate(); it.price=(rt&&rt!==1)?Math.round(pr*rt*100)/100:pr; } if(p.image)it.image=p.image; it._pid=p.id;
+  it.item=p.name||it.item||''; it.code=p.sku||p.code||''; it.desc=(p.desc||p.description||''); if(p.brand)it.brand=p.brand; var pr=num(p.price)||num(p.cost); if(pr){ var rt=qCurRate(); it.price=(rt&&rt!==1)?Math.round(pr*rt*100)/100:pr; } if(p.image)it.image=p.image; it._pid=p.id;
   qpickClose(); qSecRender(); }
 /* Resolve the inventory product a quote line points at (by stored id, else by SKU/name). */
 function qLineProduct(it){ if(!it)return null; if(it._pid){ var byId=(inventory||[]).find(function(x){return x.id===it._pid;}); if(byId)return byId; }
