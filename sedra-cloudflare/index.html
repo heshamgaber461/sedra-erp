@@ -6153,8 +6153,15 @@ function chatBubble(m,myEmail){ const mine=(m.email||'').toLowerCase()===myEmail
     <div style="font-size:14px;white-space:pre-wrap;word-break:break-word">${renderMsgText(m.text)}</div>
     <div style="font-size:10px;color:var(--muted);text-align:right;margin-top:2px">${tm}</div></div></div>`;
 }
+function chatPushTargets(ch, text){
+  var me_=((me&&me.email)||'').toLowerCase(); var out=[];
+  if(ch.indexOf('dm_')===0){ out=ch.slice(3).split('__').filter(function(e){return e&&e.toLowerCase()!==me_;}); }
+  else if(ch.indexOf('grp_')===0){ var gr=(groups||[]).find(function(x){return x.id===ch.slice(4);}); if(gr) out=(gr.members||[]).filter(function(e){return e&&e.toLowerCase()!==me_;}); }
+  else if(ch==='company'){ var tl=(text||'').toLowerCase(); (employees||[]).forEach(function(e){ var em=(e.email||'').toLowerCase(); if(!em||em===me_)return; var nm=(e.name||'').toLowerCase(); var first=nm.split(' ')[0]; if((nm&&tl.indexOf('@'+nm)>=0)||(first&&first.length>1&&tl.indexOf('@'+first)>=0)) out.push(em); }); }
+  var seen={}, res=[]; out.forEach(function(x){ x=String(x||'').toLowerCase(); if(x&&!seen[x]){seen[x]=1;res.push(x);} }); return res;
+}
 function sendChat(){ const t=(chatDraft||'').trim(); const ch=currentChannel(); if(!t||!ch)return; chatDraft=''; const inp=g('chatInput'); if(inp)inp.value='';
-  apiAdd('messages',{channel:ch,text:t,sender:me.name||me.email,email:(me.email||'').toLowerCase(),ts:Date.now()}).then(synced).catch(e=>alert('Send error: '+(e.message||e))); }
+  apiAdd('messages',{channel:ch,text:t,sender:me.name||me.email,email:(me.email||'').toLowerCase(),ts:Date.now()}).then(function(){ synced(); try{ var _tg=chatPushTargets(ch,t); if(_tg.length) sendPushToStaff(_tg,(lang==='ar'?'💬 رسالة من ':'💬 Message from ')+((me&&me.name)||(me&&me.email)||''), t.slice(0,140), '/'); }catch(_e){} }).catch(e=>alert('Send error: '+(e.message||e))); }
 function newGroup(){
   const myE=(me.email||'').toLowerCase();
   openModal('New group',
