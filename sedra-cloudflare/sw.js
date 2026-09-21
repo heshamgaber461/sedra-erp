@@ -2,10 +2,44 @@
    Network-first for the app document (so a new deploy shows up immediately on next load),
    stale-while-revalidate for other same-origin GET assets. Never touches POST /db.
    Bump CACHE on every meaningful change so old caches are purged on activate. */
-const CACHE = 'sedra-v103';
+const CACHE = 'sedra-v104';
 
 self.addEventListener('install', function(e){
   self.skipWaiting();
+});
+
+/* ===== Web Push: show a notification even when the app/tab is closed ===== */
+self.addEventListener('push', function(e){
+  var data = {};
+  try{ data = e.data ? e.data.json() : {}; }
+  catch(err){ try{ data = { body: e.data.text() }; }catch(e2){} }
+  var title = data.title || 'Sedra Electric';
+  var opts = {
+    body: data.body || '',
+    icon: 'icon-192.png',
+    badge: 'icon-192.png',
+    tag: data.tag || 'sedra',
+    renotify: true,
+    requireInteraction: true,
+    vibrate: [220, 90, 220, 90, 220],
+    data: { url: data.url || '/' }
+  };
+  e.waitUntil(self.registration.showNotification(title, opts));
+});
+
+self.addEventListener('notificationclick', function(e){
+  e.notification.close();
+  var target = (e.notification.data && e.notification.data.url) || '/';
+  e.waitUntil((async function(){
+    try{
+      var all = await self.clients.matchAll({ type:'window', includeUncontrolled:true });
+      for(var i=0;i<all.length;i++){
+        var c = all[i];
+        if(c && 'focus' in c){ try{ if(c.navigate) await c.navigate(target); }catch(err){} return c.focus(); }
+      }
+      if(self.clients.openWindow) return self.clients.openWindow(target);
+    }catch(err){}
+  })());
 });
 
 self.addEventListener('activate', function(e){

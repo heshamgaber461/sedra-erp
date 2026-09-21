@@ -241,6 +241,10 @@
   .bellwrap{position:relative}
   .bell{position:relative;background:none;border:0;font-size:20px;cursor:pointer;line-height:1;padding:4px}
   .badge{position:absolute;top:-3px;right:-5px;background:var(--bad);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+  @keyframes bellring{0%,100%{transform:rotate(0)}8%,24%,40%{transform:rotate(15deg)}16%,32%,48%{transform:rotate(-15deg)}60%{transform:rotate(6deg)}72%{transform:rotate(-6deg)}}
+  .bell.ring{animation:bellring 1s ease}
+  @keyframes badgepulse{0%,100%{transform:scale(1)}50%{transform:scale(1.4);box-shadow:0 0 0 4px rgba(192,57,43,.25)}}
+  .badge.pulse{animation:badgepulse .55s ease 3}
   .bellpanel{position:absolute;top:40px;right:0;width:330px;max-height:72vh;overflow-y:auto;background:#fff;border:1px solid var(--mist);border-radius:10px;box-shadow:0 12px 34px rgba(0,0,0,.16);z-index:60;padding:8px}
   .bellpanel .bh{font-weight:700;color:var(--navy);font-size:13px;padding:4px 8px 8px;border-bottom:1px solid var(--mist);margin-bottom:4px}
   .bellpanel .ni{display:flex;gap:9px;align-items:flex-start;padding:9px;border-radius:8px;cursor:pointer}
@@ -3999,7 +4003,7 @@ function quoteToTech(){ openModal('Request quotation from Technical Office',
       type:'Quotation',status:'Tech Office \u2014 Pending',dept:'Technical',branch:defBranch(),
       requestedBy:(me&&me.name)||'',requestedByEmail:((me&&me.email)||'').toLowerCase(),requestedByDept:(me&&me.dept)||'',requestedTs:Date.now(),date:today(),created:new Date().toISOString(),isRFQ:true};
     apiAdd('quotes',d).then(function(newid){ try{ var _f=fileVal('tq_file'); if(_f&&newid){ var _lk=g('tq_file_lnk'); var _nm=(_lk&&_lk.value&&_lk.value.trim())?_lk.value.trim():((_f.slice(0,5)==='data:'||_f.slice(0,5)==='blob:')?'project-file':_f); var _rec={rec:newid,name:_nm,file:_f,by:(me&&me.name)||'',at:new Date().toISOString()}; apiAdd('attachments',_rec).then(function(aid){ if(aid){_rec.id=aid;attachments.push(_rec);} }); } }catch(e){} synced(); if(appReady)refreshAll();
-      try{ if(asg.email){ var _ar=(lang==='ar'); var _NL=String.fromCharCode(10); var _subj=(_ar?'مطلوب كوتيشن — ':'Quotation requested — ')+(d.projectName||d.client||d.number||''); var _body=(_ar?'في طلب كوتيشن جديد مطلوب منك تجهيزه:':'A new quotation request has been assigned to you:')+_NL+_NL+(_ar?'العميل: ':'Client: ')+(d.client||'-')+_NL+(_ar?'المشروع: ':'Project: ')+(d.projectName||'-')+_NL+(_ar?'المجال: ':'Scope: ')+(d.service||'-')+_NL+(_ar?'التسليم: ':'Due: ')+(d.deadline||'-')+_NL+(_ar?'الطلب من: ':'Requested by: ')+(d.requestedBy||'-')+_NL+_NL+(_ar?'ادخل النظام لعرض كل المتطلبات والمرفقات.':'Open the system to view the full requirements and attachments.'); sendEmailAuto(asg.email,_subj,_body); } }catch(_e){}
+      try{ if(asg.email){ var _ar=(lang==='ar'); var _NL=String.fromCharCode(10); var _subj=(_ar?'مطلوب كوتيشن — ':'Quotation requested — ')+(d.projectName||d.client||d.number||''); var _body=(_ar?'في طلب كوتيشن جديد مطلوب منك تجهيزه:':'A new quotation request has been assigned to you:')+_NL+_NL+(_ar?'العميل: ':'Client: ')+(d.client||'-')+_NL+(_ar?'المشروع: ':'Project: ')+(d.projectName||'-')+_NL+(_ar?'المجال: ':'Scope: ')+(d.service||'-')+_NL+(_ar?'التسليم: ':'Due: ')+(d.deadline||'-')+_NL+(_ar?'الطلب من: ':'Requested by: ')+(d.requestedBy||'-')+_NL+_NL+(_ar?'ادخل النظام لعرض كل المتطلبات والمرفقات.':'Open the system to view the full requirements and attachments.'); sendEmailAuto(asg.email,_subj,_body); try{sendPushToStaff([asg.email],(lang==='ar'?'📨 طلب كوتيشن جديد':'📨 New quote request'),(d.client||'')+(d.service?(' · '+d.service):''),'/');}catch(_p){} } }catch(_e){}
       alert('\u2714 '+(lang==='ar'?'\u0627\u062a\u0628\u0639\u062a \u0644\u0640 ':'Sent to ')+(asg.name||'Technical Office')+(lang==='ar'?' \u0628\u0643\u0644 \u0627\u0644\u0645\u062a\u0637\u0644\u0628\u0627\u062a.':' with the full requirements.')); if(newid){ setTimeout(function(){ attachOpen(newid, d.projectName||d.client); },350); } }).catch(function(e){ alert('Error: '+(e.message||e)); }); return true; }); tqRouteHint(); }
 function rfqSummaryHTML(r){
   if(!r||!(r.isRFQ||r.projectName||r.reqKNX||r.reqLC||r.reqNetwork||r.designBasedOn||r.deadline||r.revisions)) return '';
@@ -4136,7 +4140,7 @@ function deliverRFQ(id){
     if(to){
       var subj=(ar?'كوتيشنك جاهز — ':'Your quotation is ready — ')+(q.number||q.client||'');
       var body=(ar?'الكوتيشن اللي طلبته من المكتب الفني خلص وجاهز:':'The quotation you requested from the Technical Office is ready:')+NL2+NL2+(ar?'العميل: ':'Client: ')+(q.client||'-')+NL2+(ar?'رقم الكوتيشن: ':'Quote No.: ')+(q.number||'-')+NL2+(ar?'جهّزه: ':'Prepared by: ')+(q.completedBy||q.assignedTo||'-')+NL2+NL2+(ar?'ادخل النظام لعرض الكوتيشن والمرفقات.':'Open the system to view the quotation and attachments.');
-      sendEmailAuto(to,subj,body);
+      sendEmailAuto(to,subj,body); try{sendPushToStaff([to],(ar?'✅ كوتيشنك جاهز':'✅ Your quotation is ready'),(q.client||'')+(q.number?(' · '+q.number):''),'/');}catch(_p){}
       alert(ar?'✔ اتسلّم للسيلز — واتبعتله إيميل تلقائي إن الكوتيشن جاهز، وكمان إشعار جوّه النظام.':'✔ Delivered — an automatic “quotation ready” email was sent to the requester, plus an in-app notification.');
     } else {
       alert(ar?'✔ اتسلّم للسيلز — هيوصله إشعار جوّه النظام (مفيش إيميل متسجّل ليه).':'✔ Delivered — the requester gets an in-app notification (no email on file).');
@@ -6756,16 +6760,49 @@ function showToast(o){ const wrap=g('toasts'); if(!wrap)return; const el=documen
 }
 function _tone(freq,start,dur,vol,type){ try{ _actx=_actx||new (window.AudioContext||window.webkitAudioContext)(); if(_actx.state==='suspended')_actx.resume(); const o=_actx.createOscillator(),gn=_actx.createGain(); o.type=type||'sine'; o.frequency.value=freq; o.connect(gn); gn.connect(_actx.destination); const t=_actx.currentTime+start; gn.gain.setValueAtTime(0.0001,t); gn.gain.exponentialRampToValueAtTime(vol||0.12,t+0.02); gn.gain.exponentialRampToValueAtTime(0.0001,t+dur); o.start(t); o.stop(t+dur+0.02); }catch(e){} }
 function pingMessage(){ _tone(680,0,0.16,0.12); _tone(1020,0.12,0.22,0.12); } /* رسالة: نغمتان صاعدتان */
-function pingNotify(){ _tone(520,0,0.42,0.10,'triangle'); } /* إشعار عادي: نغمة واحدة أخفض */
+function pingNotify(){ _tone(660,0,0.18,0.17); _tone(880,0.17,0.18,0.17); _tone(1240,0.34,0.34,0.18); } /* إشعار: نغمة صاعدة تشد الانتباه */
+function flashBell(){ try{ var b=document.querySelector('.bell'); if(b){ b.classList.remove('ring'); void b.offsetWidth; b.classList.add('ring'); setTimeout(function(){ try{b.classList.remove('ring');}catch(e){} },1200); } var bd=document.getElementById('bellBadge'); if(bd){ bd.classList.add('pulse'); setTimeout(function(){ try{bd.classList.remove('pulse');}catch(e){} },1400); } }catch(e){} }
 function pingSound(){ pingNotify(); }
 function desktopNotify(m){ try{ if(!('Notification' in window)||Notification.permission!=='granted')return; const n=new Notification('Sedra · '+(m.sender||'New message'),{body:(m.text||'').slice(0,120)}); n.onclick=function(){ try{window.focus();}catch(e){} openChatChannel(m.channel); n.close(); }; }catch(e){} }
+/* ===== Web Push (offline notifications) — subscribe + send ===== */
+var VAPID_PUBLIC='BPDLnlT1-K1ZumUzDVpgDIymEaOEzRgv1umHp_yn75VfrDJEr19aWBTbWSk4azDShSZzzW0-FYx2ybchQVOFeT8';
+function _urlB64ToU8(s){ var pad='='.repeat((4-s.length%4)%4); var b=(s+pad).replace(/-/g,'+').replace(/_/g,'/'); var raw=atob(b); var u=new Uint8Array(raw.length); for(var i=0;i<raw.length;i++)u[i]=raw.charCodeAt(i); return u; }
+function _pushSubId(ep){ var h=5381; for(var i=0;i<ep.length;i++){ h=((h<<5)+h+ep.charCodeAt(i))>>>0; } return 'sub_'+h.toString(36)+String(ep.length); }
+async function enablePush(silent){
+  try{
+    if(!('serviceWorker' in navigator)||!('PushManager' in window)){ if(!silent)alert(lang==='ar'?'المتصفح لا يدعم إشعارات الجهاز':'This browser does not support push notifications'); return false; }
+    var perm=(typeof Notification!=='undefined')?Notification.permission:'denied';
+    if(perm==='default'){ perm=await Notification.requestPermission(); }
+    if(perm!=='granted'){ if(!silent)alert(lang==='ar'?'لازم تسمح بالإشعارات من المتصفح الأول':'Please allow notifications in the browser first'); return false; }
+    var reg=await navigator.serviceWorker.ready;
+    var sub=await reg.pushManager.getSubscription();
+    if(!sub){ sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64ToU8(VAPID_PUBLIC)}); }
+    var j=sub.toJSON(); if(!j||!j.keys||!j.keys.p256dh){ return false; }
+    var rec={endpoint:sub.endpoint, p256dh:j.keys.p256dh, auth:j.keys.auth, email:((me&&me.email)||'').toLowerCase(), name:(me&&me.name)||'', ua:(navigator.userAgent||'').slice(0,140), at:new Date().toISOString()};
+    await apiMerge('pushsubs', _pushSubId(sub.endpoint), rec);
+    window.__pushOn=true;
+    if(!silent){ try{ showToast({title:(lang==='ar'?'✓ تنبيهات الجهاز مفعّلة':'✓ Device alerts enabled'), body:(lang==='ar'?'هتوصلك الإشعارات بصوت حتى والنظام مقفول':'You will get sound alerts even when the app is closed')}); }catch(e){} }
+    return true;
+  }catch(e){ if(!silent)alert('Push error: '+(e&&e.message||e)); return false; }
+}
+function sendPushToStaff(emails, title, body, url){
+  try{
+    emails=(emails||[]).map(function(x){return String(x||'').toLowerCase();}).filter(Boolean);
+    if(!emails.length) return;
+    if(!(auth&&auth.currentUser)) return;
+    auth.currentUser.getIdToken().then(function(tok){
+      try{ fetch('/push',{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({token:tok,targets:emails,title:title||'Sedra Electric',body:body||'',url:url||'/'}),keepalive:true}).catch(function(){}); }catch(e){}
+    }).catch(function(){});
+  }catch(e){}
+}
 function setupNotif(){
   if(_notifSetup)return; _notifSetup=true;
+  try{ if('Notification' in window && Notification.permission==='granted'){ setTimeout(function(){ enablePush(true); },1500); } }catch(e){}
   try{ if('Notification' in window){ if(Notification.permission==='granted')_wantDesktop=true; else if(Notification.permission!=='denied')Notification.requestPermission().then(p=>{_wantDesktop=(p==='granted');}); } }catch(e){}
   document.addEventListener('click',function(e){ if(!e.target.closest('.bellwrap')){ const bp=g('bellPanel'); if(bp)bp.classList.add('hide'); } if(!e.target.closest('.gswrap')){ const sr=g('searchResults'); if(sr)sr.classList.add('hide'); } });
 }
 var _nbCount=-1;
-function checkNotifSound(){ try{ var n=getNotifications().filter(function(x){return x.ico!=='💬';}).reduce(function(s,x){return s+(x.count||1);},0); if(_nbCount>=0 && n>_nbCount){ pingNotify(); try{ if(_wantDesktop && 'Notification' in window && Notification.permission==='granted'){ new Notification('Sedra Electric', {body:'You have a new notification', icon:'icon-192.png'}); } }catch(_){} } _nbCount=n; }catch(e){} }
+function checkNotifSound(){ try{ var n=getNotifications().filter(function(x){return x.ico!=='💬';}).reduce(function(s,x){return s+(x.count||1);},0); if(_nbCount>=0 && n>_nbCount){ pingNotify(); try{flashBell();}catch(_f){} try{ if(_wantDesktop && 'Notification' in window && Notification.permission==='granted'){ new Notification('Sedra Electric', {body:'You have a new notification', icon:'icon-192.png'}); } }catch(_){} } _nbCount=n; }catch(e){} }
 function updateBadges(){ try{ updateChatNavBadge(); updateBellBadge(); checkNotifSound(); updateReqNavBadge(); }catch(e){} }
 function updateReqNavBadge(){ const nav=g('nav'); if(!nav)return; const btn=nav.querySelector('button[data-v="quoterequests"]'); if(!btn)return; let b=btn.querySelector('.navbadge'); const n=(typeof rfqPending==='function')?rfqPending().length:0; if(n>0){ if(!b){ b=document.createElement('span'); b.className='navbadge'; btn.appendChild(b);} b.textContent=n>99?'99+':n; } else if(b){ b.remove(); } }
 function chatUnreadTotal(){ const myEmail=(me&&me.email||'').toLowerCase(); if(!myEmail)return 0; let n=0; messages.forEach(m=>{ if(msgForMe(m,myEmail)&&(m.email||'').toLowerCase()!==myEmail&&num(m.ts)>chReadFor(m.channel))n++; }); return n; }
@@ -6830,7 +6867,7 @@ function markBellSeen(){ try{ localStorage.setItem('sedra_bell_sig', JSON.string
 function fmtNotifTime(ts){ if(!ts)return ''; var d=new Date(Number(ts)); if(isNaN(d.getTime()))return ''; var now=new Date(); if(d.toDateString()===now.toDateString())return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); var y=new Date(now); y.setDate(now.getDate()-1); if(d.toDateString()===y.toDateString())return (lang==='ar'?'أمس ':'Yesterday ')+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); return d.getDate()+'/'+(d.getMonth()+1)+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); }
 function closeBell(){ const p=g('bellPanel'); if(p)p.classList.add('hide'); }
 function renderBellPanel(){ const p=g('bellPanel'); if(!p)return; const list=getNotifications(); window._notif=list;
-  const _tot=list.reduce((s,x)=>s+(x.count||1),0); p.innerHTML=`<div class="bh" style="display:flex;justify-content:space-between;align-items:center"><span>🔔 ${lang==='ar'?'الإشعارات':'Notifications'} ${_tot?'('+_tot+')':''}</span>${list.length?`<a onclick="markBellSeen();updateBellBadge()" style="cursor:pointer;color:#157f96;font-size:11px;font-weight:600">${lang==='ar'?'تعليم كمقروء':'Mark read'}</a>`:''}</div>`+(list.length?list.map((x,i)=>`<div class="ni" onclick="window._notif[${i}].act()"><div class="ico">${x.ico}</div><div class="tx">${esc(x.title)}<small>${esc(x.sub)}${x.ts?' · '+esc(fmtNotifTime(x.ts)):''}</small></div></div>`).join(''):`<div class="empty" style="padding:18px">${lang==='ar'?'مفيش إشعارات 🎉':"You're all caught up 🎉"}</div>`); }
+  const _tot=list.reduce((s,x)=>s+(x.count||1),0); p.innerHTML=`<div class="bh" style="display:flex;justify-content:space-between;align-items:center"><span>🔔 ${lang==='ar'?'الإشعارات':'Notifications'} ${_tot?'('+_tot+')':''}</span>${(typeof Notification==='undefined'||Notification.permission!=='granted'||!window.__pushOn)?`<a onclick="event.stopPropagation();enablePush(false)" style="cursor:pointer;color:#c0392b;font-size:11px;font-weight:700;margin-inline:8px">${lang==='ar'?'🔔 فعّل تنبيهات الجهاز':'🔔 Enable device alerts'}</a>`:''}${list.length?`<a onclick="markBellSeen();updateBellBadge()" style="cursor:pointer;color:#157f96;font-size:11px;font-weight:600">${lang==='ar'?'تعليم كمقروء':'Mark read'}</a>`:''}</div>`+(list.length?list.map((x,i)=>`<div class="ni" onclick="window._notif[${i}].act()"><div class="ico">${x.ico}</div><div class="tx">${esc(x.title)}<small>${esc(x.sub)}${x.ts?' · '+esc(fmtNotifTime(x.ts)):''}</small></div></div>`).join(''):`<div class="empty" style="padding:18px">${lang==='ar'?'مفيش إشعارات 🎉':"You're all caught up 🎉"}</div>`); }
 var _gsT=null;
 function globalSearch(q){ clearTimeout(_gsT); _gsT=setTimeout(function(){ _globalSearchRun(q); }, 160); }
 function _globalSearchRun(q){ const box=g('searchResults'); if(!box)return; q=(q||'').trim().toLowerCase();
