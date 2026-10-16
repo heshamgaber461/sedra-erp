@@ -1511,7 +1511,7 @@ function ensureAdminDoc(u){
 }
 function pickBranch(b){ curBranch=b; localStorage.setItem('sedra_branch',b); enterApp(); }
 function enterApp(){ appReady=true; lastSig=''; hideLoad(); hideGate(); g('app').classList.remove('hide'); buildNav();
-  try{ var _dh=DEPT_HOME[me.dept]||'hub'; var _dm=MODULES.find(function(x){return x.id===_dh;}); curView=(_dm&&canSee(_dm))?_dh:'hub'; }catch(e){ curView='hub'; }
+  try{ var _dh=DEPT_HOME[me.dept]||'hub'; var _dm=MODULES.find(function(x){return x.id===_dh;}); curView=(_dm&&canSee(_dm))?_dh:'hub'; var _sv=null; try{_sv=localStorage.getItem('orbit_view');}catch(e2){} if(_sv){ var _svm=MODULES.find(function(x){return x.id===_sv;}); if(_svm&&canSee(_svm)) curView=_sv; } }catch(e){ curView='hub'; }
   g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); migrateStagesOnce(); importAdelOnce(); importProductImagesOnce(); importZohoProductsOnce(); importZohoCrmSyncOnce(); cleanProductDashesOnce(); _setupUpdateCheck(); try{ purgeOldTrash(); }catch(e){} }
 
 /* ---- "My Tasks" pop-up on first open each day (Phase 1) ---- */
@@ -11053,6 +11053,10 @@ nav a.on,.side a.on,.navlink.on{background:#e8f2ff !important;color:#1763c7 !imp
   function schedule(){ if(pend)return; pend=true; setTimeout(function(){pend=false; try{cap();}catch(e){}},120); }
   if(document.readyState!=='loading') schedule(); else document.addEventListener('DOMContentLoaded',schedule);
   try{ new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true}); }catch(e){}
+  /* Re-selectable pickers: any input backed by a <datalist> selects its text on focus,
+     so you can click the field (or its arrow) and immediately type/pick a different value
+     without having to clear it first. */
+  try{ document.addEventListener('focusin',function(ev){ var t=ev.target; if(t&&t.tagName==='INPUT'&&t.getAttribute('list')){ setTimeout(function(){ try{t.select();}catch(_e){} },0); } }); }catch(e){}
 })();
 </script>
 <!-- ===== END SEDRA ZOHO THEME ===== -->
