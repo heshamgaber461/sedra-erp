@@ -11008,3 +11008,51 @@ document.addEventListener('keydown',function(e){
 </script>
 </body>
 </html>
+<!-- ===== SEDRA ZOHO THEME (added by Claude) ===== -->
+<link id="zoho-font" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<style id="zoho-theme">
+:root{--z-top:#273a4d;--z-side:#1f2e3d;--z-accent:#1a8cff;--z-bg:#eef1f5;--z-card:#ffffff;--z-border:#e4e8ee;--z-text:#2b3d4f;--z-muted:#6b7b8c;}
+body, body *{font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif !important;}
+body{background:var(--z-bg) !important;}
+main > .top{background:var(--z-top) !important;color:#fff !important;border-bottom:1px solid rgba(255,255,255,.06) !important;box-shadow:0 1px 4px rgba(0,0,0,.12) !important;}
+main > .top *{color:#fff;}
+main > .top input,main > .top .srch,main > .top [class*="search"]{background:rgba(255,255,255,.10) !important;color:#fff !important;border:1px solid rgba(255,255,255,.14) !important;border-radius:8px !important;}
+main > .top input::placeholder{color:rgba(255,255,255,.7) !important;}
+aside,nav.rail,.rail,.side{background:var(--z-side) !important;border-right:1px solid rgba(255,255,255,.05) !important;}
+.logo{background:var(--z-side) !important;border-bottom:1px solid rgba(255,255,255,.06) !important;}
+.nrail-i{color:#9fb3c6 !important;border-radius:10px !important;transition:all .15s;}
+.nrail-i:hover{background:rgba(255,255,255,.07) !important;color:#fff !important;}
+.nrail-i.on,.nrail-i.active{background:rgba(26,140,255,.16) !important;color:#fff !important;box-shadow:inset 3px 0 0 var(--z-accent) !important;}
+nav a.on,.side a.on,.navlink.on{background:#e8f2ff !important;color:#1763c7 !important;font-weight:600 !important;}
+.card{background:var(--z-card) !important;border:1px solid var(--z-border) !important;border-radius:10px !important;box-shadow:0 1px 2px rgba(16,30,54,.06) !important;}
+.dstat{border:1px solid var(--z-border) !important;border-top:3px solid var(--acc,var(--z-accent)) !important;border-radius:10px !important;box-shadow:0 1px 2px rgba(16,30,54,.06) !important;color:var(--z-text) !important;}
+.dstat *{color:var(--z-text) !important;}
+.dstat .top{background:transparent !important;box-shadow:none !important;border:0 !important;}
+.dstat .val{color:#16263a !important;font-weight:800 !important;}
+.dstat .ic{border-radius:10px !important;}
+.dstat .dl{border-radius:999px !important;font-weight:700 !important;}
+.btn-primary,.btnp,button.primary,.chk-btn{background:var(--z-accent) !important;border-color:var(--z-accent) !important;color:#fff !important;border-radius:8px !important;}
+</style>
+<script id="zoho-theme-js">
+(function(){
+  function cap(){
+    document.querySelectorAll('.dstat').forEach(function(t){
+      if(t.getAttribute('data-acc')) return;
+      var bi=getComputedStyle(t).backgroundImage||'';
+      var m=bi.match(/rgb\([^)]+\)/);
+      var acc=m?m[0]:'rgb(26,140,255)';
+      t.style.setProperty('--acc',acc);
+      t.style.background='#ffffff';
+      t.style.backgroundImage='none';
+      var tint=acc.replace('rgb(','rgba(').replace(')',',0.12)');
+      t.querySelectorAll('.ic,.dl').forEach(function(e){ e.style.background=tint; e.style.color=acc; });
+      t.setAttribute('data-acc','1');
+    });
+  }
+  var pend=false;
+  function schedule(){ if(pend)return; pend=true; setTimeout(function(){pend=false; try{cap();}catch(e){}},120); }
+  if(document.readyState!=='loading') schedule(); else document.addEventListener('DOMContentLoaded',schedule);
+  try{ new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true}); }catch(e){}
+})();
+</script>
+<!-- ===== END SEDRA ZOHO THEME ===== -->
