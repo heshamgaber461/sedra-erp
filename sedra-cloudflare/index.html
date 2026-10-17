@@ -2600,12 +2600,18 @@ async function migrateStagesOnce(){
    re-picking. Fix: when a field already holds a value that IS one of its options (a completed
    selection), clear it on focus so the FULL list shows; restore it on blur if nothing new was
    picked. Free-typed text (not matching an option) is left untouched. Delegated once, globally. */
-document.addEventListener('focusin',function(e){
-  var el=e.target; if(!(el&&el.tagName==='INPUT'&&el.getAttribute)) return;
-  var lid=el.getAttribute('list'); if(!lid||el.readOnly||el.disabled||!el.value) return;
-  var dl=document.getElementById(lid); if(!dl||!dl.options) return;
-  for(var i=0;i<dl.options.length;i++){ if(dl.options[i].value===el.value){ el.setAttribute('data-prevval',el.value); el.value=''; return; } }
-},true);
+function _dlStashClear(el){
+  if(!(el&&el.tagName==='INPUT'&&el.getAttribute)) return;
+  if(!el.getAttribute('list')||el.readOnly||el.disabled) return;
+  if(el.value && el.getAttribute('data-prevval')==null){ el.setAttribute('data-prevval',el.value); el.value=''; }
+}
+/* First click on a datalist field (not yet focused) → focusin clears it so the FULL list shows. */
+document.addEventListener('focusin',function(e){ _dlStashClear(e.target); },true);
+/* Clicking the arrow again while ALREADY focused → mousedown clears so you can re-pick. */
+document.addEventListener('mousedown',function(e){ var el=e.target; if(el&&el===document.activeElement) _dlStashClear(el); },true);
+/* Once a new value is typed or picked, forget the stashed value (keep the new one). */
+document.addEventListener('input',function(e){ var el=e.target; if(el&&el.tagName==='INPUT'&&el.getAttribute&&el.getAttribute('list')) el.removeAttribute('data-prevval'); },true);
+/* Left without picking anything → put the previous value back (non-destructive). */
 document.addEventListener('focusout',function(e){
   var el=e.target; if(!(el&&el.tagName==='INPUT'&&el.getAttribute)) return;
   if(!el.getAttribute('list')) return;
@@ -11130,10 +11136,13 @@ nav a.on,.side a.on,.navlink.on{background:#e8f2ff !important;color:#1763c7 !imp
   function schedule(){ if(pend)return; pend=true; setTimeout(function(){pend=false; try{cap();}catch(e){}},120); }
   if(document.readyState!=='loading') schedule(); else document.addEventListener('DOMContentLoaded',schedule);
   try{ new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true}); }catch(e){}
-  /* Re-selectable pickers: any input backed by a <datalist> selects its text on focus,
-     so you can click the field (or its arrow) and immediately type/pick a different value
-     without having to clear it first. */
-  try{ document.addEventListener('focusin',function(ev){ var t=ev.target; if(t&&t.tagName==='INPUT'&&t.getAttribute('list')){ setTimeout(function(){ try{t.select();}catch(_e){} },0); } }); }catch(e){}
+  /* Datalist re-pick is handled by the global _dlStashClear handlers in the main script. */
+  /* Protect work-in-progress: if an edit window (modal) is open and the page is about to
+     refresh / close / navigate away, ask first — so an accidental reload doesn't wipe an
+     unsaved quotation, customer, lead, etc. The browser shows its standard "Leave site?" prompt. */
+  try{ window.addEventListener('beforeunload',function(ev){
+    try{ var m=document.getElementById('modal'); if(m&&m.classList.contains('show')){ ev.preventDefault(); ev.returnValue=''; return ''; } }catch(_e){}
+  }); }catch(e){}
 })();
 </script>
 <!-- ===== END SEDRA ZOHO THEME ===== -->
