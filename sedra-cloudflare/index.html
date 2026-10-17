@@ -460,6 +460,7 @@
       <button class="navtoggle" onclick="toggleSide()" aria-label="Menu">☰</button>
       <h1 id="viewTitle">Dashboard</h1>
       <div class="gswrap"><input id="globalSearch" class="gsearch" placeholder="🔎 Search anything…  Ctrl+K" autocomplete="off" oninput="globalSearch(this.value)" onfocus="globalSearch(this.value)"><div id="searchResults" class="searchbox hide"></div></div>
+      <div class="qawrap"><button class="btn cy sm" id="qaBtn" title="Quick actions" onclick="toggleQuickActions(event)" style="white-space:nowrap">⚡ <span id="qaLbl">Quick</span></button><div id="qaPanel" class="qapanel hide"></div></div>
       <button class="btn cy sm" id="askBtn" title="Ask" onclick="openAsk()" style="white-space:nowrap">✨ Ask</button>
       <button class="bell" id="darkBtn" title="Day / Night mode" onclick="toggleDark()" style="font-size:17px">🌙</button>
       <button class="bell" id="calcBtn" title="Calculator" onclick="openCalc()" style="font-size:16px">🧮</button>
@@ -6897,6 +6898,29 @@ function _globalSearchRun(q){ const box=g('searchResults'); if(!box)return; q=(q
   box.innerHTML=html||`<div class="empty" style="padding:16px">No matches.</div>`; box.classList.remove('hide');
 }
 function closeSearch(){ const b=g('searchResults'); if(b)b.classList.add('hide'); const i=g('globalSearch'); if(i)i.value=''; }
+/* ===== Quick actions (global toolbar) ===== */
+function qaItems(){ var ar=(typeof lang!=='undefined'&&lang==='ar');
+  return [
+    {ic:'➕',t:ar?'Lead جديد':'New lead',act:'editLead()'},
+    {ic:'📄',t:ar?'عرض سعر جديد':'New quotation',act:'newQuoteChoice()'},
+    {ic:'🔍',t:ar?'بحث في الـ Leads':'Search leads',act:"quickSearch('leads')"},
+    {ic:'📦',t:ar?'بحث في المنتجات':'Search products',act:"quickSearch('inventory')"},
+    {ic:'🧩',t:ar?'منتج جديد':'New product',act:'editItem()'},
+    {ic:'📁',t:ar?'استيراد منتجات (ملف)':'Import products (file)',act:'importCatalog()'}
+  ];
+}
+function qaPanelHTML(){ return qaItems().map(function(a){ return '<button class="qa-item" onclick="closeQuickActions();'+a.act+'"><span class="qa-ic">'+a.ic+'</span>'+a.t+'</button>'; }).join(''); }
+function toggleQuickActions(ev){ if(ev){ev.stopPropagation();} var p=g('qaPanel'); if(!p)return;
+  if(p.classList.contains('hide')){ p.innerHTML=qaPanelHTML(); p.classList.remove('hide'); setTimeout(function(){ document.addEventListener('click',closeQuickActions,{once:true}); },0); }
+  else { closeQuickActions(); } }
+function closeQuickActions(){ var p=g('qaPanel'); if(p)p.classList.add('hide'); }
+function quickSearch(which){ closeQuickActions();
+  try{
+    if(which==='leads'){ if(typeof go==='function')go('sales'); if(typeof salesTab!=='undefined'){salesTab='leads';} if(typeof render==='function')render(); }
+    else if(which==='inventory'){ if(typeof go==='function')go('inventory'); if(typeof invTab!=='undefined'){invTab='items';} if(typeof render==='function')render(); }
+  }catch(e){}
+  setTimeout(function(){ var s=document.querySelector('#view input[type=search], #view .tvq, #view input[placeholder*="Search"], #view input[placeholder*="بحث"]'); if(s){ try{ s.focus(); if(s.select)s.select(); }catch(e){} } }, 320);
+}
 function exportBtns(type){ if(!isAdmin())return ''; return `<button class="btn gh sm" onclick="doExport('${type}','csv')">⬇ Excel</button> <button class="btn gh sm" onclick="doExport('${type}','pdf')">🖨 PDF</button>`; }
 function doExport(type,fmt){
   if(!exportGuard())return;
@@ -11032,6 +11056,14 @@ nav a.on,.side a.on,.navlink.on{background:#e8f2ff !important;color:#1763c7 !imp
 .dstat .ic{border-radius:10px !important;}
 .dstat .dl{border-radius:999px !important;font-weight:700 !important;}
 .btn-primary,.btnp,button.primary,.chk-btn{background:var(--z-accent) !important;border-color:var(--z-accent) !important;color:#fff !important;border-radius:8px !important;}
+/* ===== Quick actions toolbar ===== */
+.qawrap{position:relative;display:inline-block}
+#qaBtn{background:var(--z-accent) !important;border-color:var(--z-accent) !important;color:#fff !important;}
+.qapanel{position:absolute;top:calc(100% + 8px);inset-inline-end:0;z-index:120;background:#fff;border:1px solid #e4e8ee;border-radius:12px;box-shadow:0 14px 38px rgba(16,30,54,.2);padding:6px;min-width:236px}
+.qapanel.hide{display:none}
+.qa-item{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;text-align:start;padding:10px 12px;border-radius:9px;font-family:inherit !important;font-size:14px;font-weight:600;color:#2b3d4f;cursor:pointer}
+.qa-item:hover{background:#eef5ff;color:#1763c7}
+.qa-ic{width:28px;height:28px;border-radius:8px;background:rgba(26,140,255,.1);display:grid;place-items:center;font-size:15px;flex-shrink:0}
 </style>
 <script id="zoho-theme-js">
 (function(){
