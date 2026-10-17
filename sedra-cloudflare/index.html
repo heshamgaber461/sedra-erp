@@ -1842,9 +1842,13 @@ function go(v){ const m=MODULES.find(x=>x.id===v); if(!m||!canSee(m))return; cur
 var custOpen=null;
 var invTab='items';
 function vCustomers(){
+  var _canPortal = !!(me && (isAdmin() || ['CO Founder','CEO','Director','Manager'].indexOf(me.role)>=0));
+  var _ar=(typeof lang!=='undefined'&&lang==='ar');
+  var _tabs = _canPortal ? ('<div class="tabs"><button class="'+(custTab==='portal'?'':'active')+'" onclick="custTab=\'list\';render()">🤝 '+(_ar?'العملاء':'Customers')+'</button><button class="'+(custTab==='portal'?'active':'')+'" onclick="loadClientAccts()">📱 '+(_ar?'حسابات دخول العملاء (التطبيق)':'Client portal logins')+'</button></div>') : '';
+  if(_canPortal && custTab==='portal'){ return _tabs + clientAccountsView(); }
   if(custOpen){ const c=customers.find(x=>x.id===custOpen); if(c)return customerDetail(c); custOpen=null; }
   const rows=customers.filter(inBranch);
-  let h=`<div class="sect"><h2>Customers</h2><div class="sp"></div>${exportBtns('customers')} <button class="btn cy" onclick="editCustomer()">+ Add customer</button></div>`;
+  let h=_tabs+`<div class="sect"><h2>Customers</h2><div class="sp"></div>${exportBtns('customers')} <button class="btn cy" onclick="editCustomer()">+ Add customer</button></div>`;
   h+=tableView('customers', rows,
     `<th>Customer</th><th>Type</th><th>Branch</th><th>Phone</th><th>Invoiced</th><th>Outstanding</th><th></th>`,
     c=>{const inv=custInvoices(c);const tot=inv.reduce((s,v)=>s+baseAmt(v),0),out=inv.reduce((s,v)=>s+baseOut(v),0);const over=num(c.creditLimit)>0&&out>num(c.creditLimit);return `<tr>
@@ -1855,6 +1859,102 @@ function vCustomers(){
      search:c=>[c.name,c.contact,c.phone,c.email,c.city,c.branch,c.ctype].join(' '),
      filters:[{label:'Type',opts:['Company','Individual'],match:(c,v)=>c.ctype===v}].concat(curBranch==='All'?[{label:'Branch',opts:BRANCHES,match:(c,v)=>c.branch===v}]:[])});
   return h;
+}
+/* ===== Client portal logins — native section inside Customers (admin/manager only) ===== */
+var custTab='list';
+function clientAccountsView(){
+  var ar=(typeof lang!=='undefined'&&lang==='ar');
+  var h='<div class="card mini" style="background:#eef6ff;border-color:#9ecbff;margin-bottom:12px">'
+    +(ar?'من هنا بتتحكّم في <b>حسابات دخول العملاء على تطبيق الموبايل</b>: اعمل حساب لعميل جديد (بيوصله إيميل وكلمة مرور يدخل بيهم)، أوقف/فعّل حساب، أو احذف عميل. كله جوّه السيستم.'
+          :'Manage the <b>login accounts your customers use in the Sedra mobile app</b>: create a new client login (they get an email + password), deactivate/activate, or delete.')+'</div>';
+  h+='<div class="sect"><h2>📱 '+(ar?'حسابات دخول العملاء':'Client portal accounts')+'</h2><div class="sp"></div>'
+    +'<button class="btn gh sm" onclick="loadClientAccts()">↻ '+(ar?'تحديث':'Refresh')+'</button> '
+    +'<button class="btn cy" onclick="newClientLogin()">+ '+(ar?'عميل جديد (حساب دخول)':'New client login')+'</button></div>';
+  if(!window.__clientAcctsLoaded) return h+'<div class="card empty">'+(ar?'جارٍ التحميل…':'Loading…')+'</div>';
+  if(window.__clientAcctsErr) return h+'<div class="card" style="color:#c0392b">'+(ar?'تعذّر التحميل: ':'Load error: ')+esc(window.__clientAcctsErr)+'</div>';
+  var o=window.__clientAccts||{}; var arr=[];
+  for(var k in o){ if(o[k]&&typeof o[k]==='object') arr.push(Object.assign({_id:k},o[k])); }
+  arr.sort(function(a,b){ return (''+(b.createdAt||'')).localeCompare(''+(a.createdAt||'')); });
+  if(!arr.length) return h+'<div class="card empty">'+(ar?'لسه مفيش حسابات دخول. اعمل واحد بزرار «+ عميل جديد».':'No client logins yet. Create one with “+ New client login”.')+'</div>';
+  h+='<table><thead><tr><th>'+(ar?'الاسم':'Name')+'</th><th>'+(ar?'الإيميل':'Email')+'</th><th>'+(ar?'الفرع':'Branch')+'</th><th>'+(ar?'الباقة':'Plan')+'</th><th>'+(ar?'الحالة':'Status')+'</th><th></th></tr></thead><tbody>';
+  arr.forEach(function(c){
+    var on=(c.active!==false);
+    h+='<tr><td><b>'+esc(c.name||'')+'</b></td><td>'+esc(c.email||'')+'</td><td>'+(FLAG[c.branch]||'')+' '+esc(c.branch||'')+'</td><td>'+esc(c.plan||'—')+'</td>'
+      +'<td><span class="tag" style="background:'+(on?'#1a7a4f22;color:#1a7a4f':'#c0392b22;color:#c0392b')+'">'+(on?(ar?'مُفعّل':'Active'):(ar?'موقوف':'Inactive'))+'</span></td>'
+      +'<td style="white-space:nowrap"><button class="btn gh sm" onclick="toggleClientActive(\''+c._id+'\','+(on?'false':'true')+')">'+(on?(ar?'إيقاف':'Deactivate'):(ar?'تفعيل':'Activate'))+'</button> '
+      +'<button class="btn dn sm" onclick="delClientAccount(\''+c._id+'\')">🗑 '+(ar?'حذف':'Delete')+'</button></td></tr>';
+  });
+  h+='</tbody></table>';
+  return h;
+}
+function loadClientAccts(){
+  custTab='portal';
+  try{ render(); }catch(e){}
+  apiCall('GET','/clientaccounts.json',undefined).then(function(o){
+    window.__clientAccts=o||{}; window.__clientAcctsLoaded=true; window.__clientAcctsErr=null;
+    if(curView==='customers'&&custTab==='portal'){ try{render();}catch(e){} }
+  }).catch(function(e){ window.__clientAcctsLoaded=true; window.__clientAcctsErr=(e&&e.message)||(''+e); if(curView==='customers'&&custTab==='portal'){ try{render();}catch(_e){} } });
+}
+function genClientPass(){
+  var cs='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789', p='';
+  for(var i=0;i<10;i++) p+=cs[Math.floor(Math.random()*cs.length)];
+  var e=g('cl_pass'); if(e)e.value=p;
+}
+function newClientLogin(){
+  var ar=(typeof lang!=='undefined'&&lang==='ar');
+  openModal(ar?'عميل جديد — حساب دخول على التطبيق':'New client — mobile app login',
+    '<div class="row2">'+fEl(ar?'الاسم بالكامل *':'Full name *','cl_name','')+selEl(ar?'الفرع':'Branch','cl_branch',branchOpts(),defBranch())+'</div>'
+    +'<div class="row2">'+fEl(ar?'الإيميل (اللي هيدخل بيه) *':'Email (their login) *','cl_email','','email')+fEl(ar?'التليفون':'Phone','cl_phone','')+'</div>'
+    +'<div class="row2">'+fEl(ar?'كلمة المرور (٨ حروف على الأقل) *':'Password (min 8) *','cl_pass','','text')
+    +'<div class="fld"><label>&nbsp;</label><button type="button" class="btn gh" style="width:100%" onclick="genClientPass()">🎲 '+(ar?'توليد كلمة مرور':'Generate password')+'</button></div></div>'
+    +'<div style="font-weight:700;color:var(--navy);margin:12px 0 6px;border-top:1px solid var(--mist);padding-top:10px">🏠 '+(ar?'بيانات الفيلا / الموقع (اختياري)':'Property / site (optional)')+'</div>'
+    +'<div class="row2">'+fEl(ar?'العنوان':'Address','cl_addr','')+selEl(ar?'النوع':'Type','cl_ptype',['Villa','Apartment','Company','Other'],'Villa')+'</div>'
+    +'<div class="row2">'+fEl(ar?'المساحة / عدد الغرف':'Area / rooms','cl_area','')+fEl(ar?'تاريخ التركيب':'Install date','cl_install','','date')+'</div>'
+    +'<div style="font-weight:700;color:var(--navy);margin:12px 0 6px;border-top:1px solid var(--mist);padding-top:10px">📋 '+(ar?'العقد (اختياري)':'Contract (optional)')+'</div>'
+    +'<div class="row2">'+fEl(ar?'رقم العقد':'Contract number','cl_knum','')+selEl(ar?'باقة الصيانة':'Plan','cl_plan',['—','Basic','Plus'],'—')+'</div>'
+    +'<div class="row2">'+fEl(ar?'آخر صيانة':'Last service','cl_klast','','date')+fEl(ar?'الصيانة الجاية':'Next service','cl_knext','','date')+'</div>'
+    +'<div class="mini" style="margin-top:8px">'+(ar?'بعد الحفظ: بيتعمل الحساب فورًا وبتظهرلك كلمة المرور علشان تبعتها للعميل.':'On save the account is created and the password is shown so you can send it to the client.')+'</div>',
+    function(){
+      var name=val('cl_name').trim(), email=val('cl_email').trim().toLowerCase(), pass=val('cl_pass'), phone=val('cl_phone').trim();
+      if(!name||!email||!pass){ alert(ar?'الاسم والإيميل وكلمة المرور مطلوبين.':'Name, email and password are required.'); return false; }
+      if(pass.length<8){ alert(ar?'كلمة المرور لازم ٨ حروف على الأقل.':'Password must be at least 8 characters.'); return false; }
+      if(!secondary){ try{ secondary=firebase.initializeApp(firebaseConfig,'sec'); }catch(e){ secondary=firebase.app('sec'); } }
+      var branch=val('cl_branch');
+      var profile={ role:'customer', active:true, name:name, email:email, phone:phone, branch:branch,
+        villa:{ address:val('cl_addr').trim(), type:val('cl_ptype'), area:val('cl_area').trim(), systems:[], installDate:val('cl_install')||'' },
+        contract:{ number:val('cl_knum').trim(), plan:(val('cl_plan')==='—'?'':val('cl_plan')), team:'', lastService:val('cl_klast')||'', nextService:val('cl_knext')||'' },
+        provisionedBy:(me&&me.name)||'', provisionedByEmail:(auth&&auth.currentUser&&auth.currentUser.email)||'', createdAt:new Date().toISOString() };
+      secondary.auth().createUserWithEmailAndPassword(email,pass).then(function(cr){
+        var uid=cr.user.uid;
+        try{ secondary.auth().signOut(); }catch(_){}
+        return apiCall('PUT','/clientspace/'+uid+'/profile.json',profile).then(function(){
+          return apiCall('PUT','/clientaccounts/'+uid+'.json',{uid:uid,name:name,email:email,phone:phone,branch:branch,plan:profile.contract.plan,active:true,createdAt:profile.createdAt});
+        }).then(function(){
+          try{logAudit('create','clientaccounts',uid,email);}catch(_){}
+          alert((ar?'✔ اتعمل حساب العميل: ':'✔ Client login created: ')+email+'\n'+(ar?'كلمة المرور (ابعتها للعميل): ':'Password (send it to the client): ')+pass);
+          loadClientAccts();
+        });
+      }).catch(function(e){
+        if(e&&e.code==='auth/email-already-in-use'){ alert(ar?'الإيميل ده له حساب بالفعل. استخدم «تفعيل» للحساب الموجود أو إيميل تاني.':'This email already has a login. Use “Activate” on the existing one, or a different email.'); }
+        else{ alert((ar?'تعذّر إنشاء الحساب: ':'Could not create login: ')+((e&&e.message)||e)); }
+      });
+      return true;
+    });
+}
+function toggleClientActive(uid,to){
+  to=(to===true||to==='true');
+  apiCall('PATCH','/clientspace/'+uid+'/profile.json',{active:to}).then(function(){
+    return apiCall('PATCH','/clientaccounts/'+uid+'.json',{active:to});
+  }).then(function(){ try{logAudit('update','clientaccounts',uid,'active='+to);}catch(_){} loadClientAccts(); })
+  .catch(function(e){ alert('Error: '+((e&&e.message)||e)); });
+}
+function delClientAccount(uid){
+  var ar=(typeof lang!=='undefined'&&lang==='ar');
+  if(!confirm(ar?'حذف العميل نهائيًا؟\nهيتشال حسابه وكل بياناته (البروفايل والطلبات) من النظام، ومش هيقدر يدخّل التطبيق بعد كده.\n\n(حساب الدخول نفسه بيفضل في Firebase؛ لمسحه تمامًا امسحه من Firebase → Authentication.)':'Delete this client permanently?\nTheir profile, requests and account are removed and they can no longer sign in.\n\n(Their Firebase sign-in stays; to fully remove it, delete the user in Firebase → Authentication.)'))return;
+  apiCall('DELETE','/clientspace/'+uid+'.json',undefined).then(function(){
+    return apiCall('DELETE','/clientaccounts/'+uid+'.json',undefined);
+  }).then(function(){ try{logAudit('delete','clientaccounts',uid,'');}catch(_){} loadClientAccts(); alert(ar?'تم حذف العميل وكل بياناته.':'Client deleted.'); })
+  .catch(function(e){ alert((ar?'تعذّر الحذف: ':'Delete error: ')+((e&&e.message)||e)); });
 }
 async function importCatalog(){
   if(!confirm('Import the automation catalog (products with prices, descriptions & images) into Inventory?'))return;
