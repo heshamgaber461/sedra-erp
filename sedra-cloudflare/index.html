@@ -3871,22 +3871,31 @@ function qNewProductSave(si){
   }).catch(function(e){ if(btn){ btn.disabled=false; btn.textContent='💾'; } alert('Error: '+(e.message||e)); });
 }
 function qSecRender(){ const el=g('qSec'); if(!el)return;
-  const dl=`<datalist id="prod_dl">${inventory.filter(inBranch).map(p=>`<option value="${esc((p.name||'')+(p.sku?' — '+p.sku:''))}">`).join('')}</datalist><datalist id="sys_dl">${QSYS_ALL.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>`;
+  const dl=`<datalist id="sys_dl">${QSYS_ALL.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>`;
   const undobar=`<div style="display:flex;gap:6px;margin-bottom:8px"><button id="qUndoBtn" class="btn gh sm" onclick="qUndo()" title="${lang==='ar'?'تراجع (Ctrl+Z)':'Undo (Ctrl+Z)'}">↶ ${lang==='ar'?'تراجع':'Undo'}</button><button id="qRedoBtn" class="btn gh sm" onclick="qRedo()" title="${lang==='ar'?'إعادة (Ctrl+Y)':'Redo (Ctrl+Y)'}">↷ ${lang==='ar'?'إعادة':'Redo'}</button></div>`;
   el.innerHTML=dl+undobar+_qsec.map((s,si)=>{
-    const rows=(s.items||[]).map((it,ii)=>`<tr ondragover="event.preventDefault()" ondrop="qDrop(event,${si},${ii})">
-      <td class="draghandle" draggable="true" ondragstart="qDragStart(event,${si},${ii})" title="${lang==='ar'?'اسحب لإعادة الترتيب':'Drag to reorder'}" style="cursor:grab;color:#9aa;text-align:center;width:20px;user-select:none">⠿</td>
-      <td><input id="q_${si}_${ii}_item" list="prod_dl" value="${esc(it.item||'')}" placeholder="${lang==='ar'?'اسم المنتج / اختر':'Item / pick'}" onchange="qPickProduct(${si},${ii},this.value)" style="min-width:130px"></td>
-      <td><input id="q_${si}_${ii}_code" value="${esc(it.code||'')}" placeholder="Code" style="width:78px"></td>
-      <td><div style="display:flex;gap:6px;align-items:center">${it.image?`<img src="${esc(it.image)}" title="${lang==='ar'?'صورة المنتج':'product image'}" style="width:34px;height:34px;object-fit:contain;border-radius:6px;background:#f4f8fb;flex-shrink:0">`:''}<input id="q_${si}_${ii}_desc" value="${esc(it.desc||'')}" placeholder="${lang==='ar'?'الوصف':'Description'}" style="flex:1;min-width:120px"><button type="button" class="btn cy sm" title="${lang==='ar'?'اختر منتج من المخزون':'Pick product from inventory'}" onclick="qProductPicker(${si},${ii})" style="flex-shrink:0">📦</button>${(isAdmin()||isMgr())?`<button type="button" class="btn gh sm" title="${lang==='ar'?'تغيير/إضافة صورة المنتج (مدير/Super Admin)':'Change/add product image (Manager/Super Admin)'}" onclick="qEditProductImage(${si},${ii})" style="flex-shrink:0">🖼</button>`:''}</div></td>
-      <td><input id="q_${si}_${ii}_brand" value="${esc(it.brand||'')}" placeholder="Brand" style="width:80px"></td>
-      <td><input id="q_${si}_${ii}_qty" type="number" value="${num(it.qty)||1}" style="width:50px" oninput="qRecalc()"></td>
-      <td><input id="q_${si}_${ii}_price" type="number" value="${num(it.price)||0}" style="width:74px" oninput="qRecalc()" ${it.optional?'disabled':''}></td>
-      <td class="mini" id="q_${si}_${ii}_sub" style="white-space:nowrap">0</td>
-      <td class="c" title="${lang==='ar'?'اختياري — يظهر في الكوتيشن بدون سعر ومش بيتحسب':'Optional — shown in the quote without price, not counted'}"><input type="checkbox" id="q_${si}_${ii}_opt" ${it.optional?'checked':''} onchange="qRecalc();qSecRender()"></td>
-      <td><button class="btn dn sm" onclick="qItemDel(${si},${ii})">✕</button></td></tr>`).join('');
+    const rows=(s.items||[]).map((it,ii)=>`<div class="qrow" ondragover="event.preventDefault()" ondrop="qDrop(event,${si},${ii})">
+      <div class="qr-main">
+        <span class="qr-drag" draggable="true" ondragstart="qDragStart(event,${si},${ii})" title="${lang==='ar'?'اسحب لإعادة الترتيب':'Drag to reorder'}">⠿</span>
+        ${it.image?`<img src="${esc(it.image)}" class="qr-img" title="${lang==='ar'?'صورة المنتج':'product image'}">`:`<span class="qr-img ph">📦</span>`}
+        <div class="qr-id">
+          <input id="q_${si}_${ii}_item" class="qr-name" value="${esc(it.item||'')}" placeholder="${lang==='ar'?'اسم المنتج':'Item name'}" onchange="qPickProduct(${si},${ii},this.value)">
+          <div class="qr-id2"><input id="q_${si}_${ii}_code" class="qr-code" value="${esc(it.code||'')}" placeholder="${lang==='ar'?'كود':'Code'}"><input id="q_${si}_${ii}_brand" class="qr-brand" value="${esc(it.brand||'')}" placeholder="${lang==='ar'?'براند':'Brand'}"></div>
+        </div>
+        <button type="button" class="qr-pick" title="${lang==='ar'?'اختر من الكتالوج':'Pick from catalog'}" onclick="qProductPicker(${si},${ii})">📦</button>
+        ${(isAdmin()||isMgr())?`<button type="button" class="qr-pick gh" title="${lang==='ar'?'صورة المنتج':'product image'}" onclick="qEditProductImage(${si},${ii})">🖼</button>`:''}
+        <button type="button" class="qr-x" title="${lang==='ar'?'حذف البند':'Delete item'}" onclick="qItemDel(${si},${ii})">✕</button>
+      </div>
+      <input id="q_${si}_${ii}_desc" class="qr-desc" value="${esc(it.desc||'')}" placeholder="${lang==='ar'?'الوصف':'Description'}">
+      <div class="qr-bot">
+        <label class="qr-f"><span>${lang==='ar'?'الكمية':'Qty'}</span><input id="q_${si}_${ii}_qty" type="number" value="${num(it.qty)||1}" oninput="qRecalc()"></label>
+        <label class="qr-f"><span>${lang==='ar'?'سعر الوحدة':'Unit price'}</span><input id="q_${si}_${ii}_price" type="number" value="${num(it.price)||0}" oninput="qRecalc()" ${it.optional?'disabled':''}></label>
+        <span class="qr-line">${lang==='ar'?'إجمالي السطر':'Line total'}: <b id="q_${si}_${ii}_sub">0</b></span>
+        <label class="qr-opt" title="${lang==='ar'?'اختياري — يظهر بدون سعر ومش بيتحسب':'Optional — shown without price, not counted'}"><input type="checkbox" id="q_${si}_${ii}_opt" ${it.optional?'checked':''} onchange="qRecalc();qSecRender()"> ${lang==='ar'?'اختياري':'Optional'}</label>
+      </div>
+    </div>`).join('');
     return `<div class="card" style="margin-bottom:10px;padding:10px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><span class="mini" style="color:#157f96;font-weight:800">System ${si+1}</span><input id="qsT${si}" list="sys_dl" value="${esc(s.title||'')}" placeholder="Choose a system — KNX / Wireless / Light Current / Sound System / CCTV" style="font-weight:700;flex:1"><button class="btn gh sm" onclick="qSecDel(${si})">🗑 Remove system</button></div>
-      <div style="overflow-x:auto"><table class="items"><thead><tr><th></th><th>${lang==='ar'?'اسم المنتج':'Item'}</th><th>${lang==='ar'?'الكود':'Code'}</th><th>${lang==='ar'?'الوصف':'Description'}</th><th>Brand</th><th>Qty</th><th>Unit</th><th>Sub</th><th title="${lang==='ar'?'اختياري':'Optional'}">Opt</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="qrows">${rows}</div>
       <button class="btn gh sm" style="margin-top:6px" onclick="qItemAdd(${si})">+ Add line</button>${(me&&me.role==='Viewer')?'':` <button class="btn cy sm" style="margin-top:6px" title="${lang==='ar'?'منتج جديد مش موجود في المخزون — أضفه هنا ويتسجّل في Products':'New product not in inventory — add it here & save to Products'}" onclick="qNewProduct(${si})">➕ ${lang==='ar'?'منتج جديد':'New product'}</button>`}
       <div style="margin-top:8px;border-top:1px dashed var(--mist);padding-top:8px;display:flex;gap:8px 14px;flex-wrap:wrap;align-items:center">
         <label style="display:flex;align-items:center;gap:5px;font-weight:700;color:var(--navy)"><input type="checkbox" id="qi_${si}_on" ${s.instOn?'checked':''} onchange="qRecalc()"> 🔧 ${lang==='ar'?'تركيب':'Installation'}</label>
@@ -11066,6 +11075,29 @@ nav a.on,.side a.on,.navlink.on{background:#e8f2ff !important;color:#1763c7 !imp
 .qa-item:hover{background:#eef5ff}
 .qa-item:hover,.qa-item:hover .qa-ic,.qa-item:hover span{color:#1763c7 !important}
 .qa-ic{width:28px;height:28px;border-radius:8px;background:rgba(26,140,255,.1);display:grid;place-items:center;font-size:15px;flex-shrink:0}
+/* ===== Quotation item cards (new roomier layout) ===== */
+.qrows{display:flex;flex-direction:column;gap:9px;margin:4px 0 2px}
+.qrow{border:1.5px solid #e4e8ee;border-radius:11px;padding:11px 12px;background:#fff}
+.qr-main{display:flex;align-items:center;gap:9px}
+.qr-drag{cursor:grab;color:#aebccb;font-size:15px;user-select:none;flex-shrink:0}
+.qr-img{width:42px;height:42px;border-radius:9px;object-fit:contain;background:#f4f8fb;flex-shrink:0}
+.qr-img.ph{display:grid;place-items:center;color:#aebccb;font-size:18px}
+.qr-id{flex:1;min-width:0}
+.qr-name{width:100%;border:1.5px solid #e4e8ee !important;border-radius:8px;padding:8px 10px !important;font-weight:700;font-size:14px;background:#f7f9fc}
+.qr-id2{display:flex;gap:7px;margin-top:5px}
+.qr-code{width:120px;border:1.5px solid #e4e8ee !important;border-radius:7px;padding:6px 9px !important;font-size:12.5px;background:#f7f9fc}
+.qr-brand{width:120px;border:1.5px solid #e4e8ee !important;border-radius:7px;padding:6px 9px !important;font-size:12.5px;background:#f7f9fc}
+.qr-pick{flex-shrink:0;background:rgba(26,140,255,.1);color:#1a8cff;border:0;border-radius:8px;width:34px;height:34px;font-size:15px;cursor:pointer}
+.qr-pick.gh{background:#eef2f6;color:#6b7b8c}
+.qr-x{flex-shrink:0;background:none;border:0;color:#c0623a;font-size:15px;cursor:pointer}
+.qr-desc{width:100%;border:1.5px solid #e4e8ee !important;border-radius:8px;padding:7px 10px !important;font-size:13px;background:#f7f9fc;margin-top:8px}
+.qr-bot{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:9px}
+.qr-f{display:flex;flex-direction:column;gap:3px;font-size:11px;color:#6b7b8c;font-weight:700}
+.qr-f input{width:92px;border:1.5px solid #e4e8ee !important;border-radius:7px;padding:7px 9px !important;font-size:13.5px;text-align:center;background:#f7f9fc;font-weight:700;color:#16263a}
+.qr-line{font-size:13px;color:#6b7b8c}
+.qr-line b{color:#16263a;font-size:15px}
+.qr-opt{display:flex;align-items:center;gap:6px;font-size:12.5px;color:#6b7b8c;font-weight:600;margin-inline-start:auto}
+.qrow input:focus{border-color:#1a8cff !important;background:#fff;outline:0}
 </style>
 <script id="zoho-theme-js">
 (function(){
