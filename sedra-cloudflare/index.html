@@ -3953,6 +3953,7 @@ function qRecalc(){ qReadDOM(); const cur=(g('q_cur')&&val('q_cur'))||'EGP'; con
   if(_hasVat) html+=rw('VAT ('+vat+'%)', f(v)+' '+cur);
   html+=`<div style="display:flex;justify-content:space-between;gap:16px;font-size:16px;color:var(--navy)"><span>${lang==='ar'?'الإجمالي النهائي':'Grand total'}</span><b style="white-space:nowrap">${f(grandTot)} ${cur}</b></div>`;
   if(tot)tot.innerHTML=html+baseNote;
+  var sv=g('qStickyVal'); if(sv)sv.textContent=f(grandTot)+' '+cur;
 }
 const QSERVICES=['Home Automation','Smart Home','Home Cinema','Indoor Sound System','Outdoor Sound System','Security Camera','Intrusion System','Safety System','Intercom System','Structured Cabling System','MATV Satellite System','Solar Energy','Smart Gates'];
 /* Systems that can each become a page inside one quotation (Hesham: choose one or more, each system prints on its own page with its own title). Images per system are wired via SYS_IMG when supplied. */
@@ -4186,7 +4187,8 @@ function editQuote(id){
     `<div class="row2">${fEl('After delivery %','q_pc',r.payAfter!=null?r.payAfter:15,'number')}${fEl('Testing & commissioning %','q_pd',r.payTest!=null?r.payTest:15,'number')}</div>`+
     `<div class="row2">${fEl('Validity (days)','q_valid',r.validity!=null?r.validity:30,'number')}${fEl('Due date (finish by)','q_due',r.dueDate||r.deadline||'','date')}</div>`+
     fTa('Terms & conditions (one per line)','q_terms',r.terms||defQTerms())+
-    fTa('Notes','q_notes',r.notes),
+    fTa('Notes','q_notes',r.notes)+
+    `<div id="qStickyTotal" class="qsticky"><span class="qst-lbl">${lang==='ar'?'الإجمالي النهائي':'Grand total'}</span><b id="qStickyVal">—</b></div>`,
     ()=>{ qReadDOM(); const secs=_qsec.map(s=>({title:s.title||'Section',items:(s.items||[]).filter(i=>(i.desc||i.item)).map(i=>({item:i.item||'',code:i.code||'',desc:i.desc||'',brand:i.brand||'',qty:num(i.qty),price:num(i.price),image:i.image||'',optional:!!i.optional})),instOn:!!s.instOn,instType:s.instType||'percent',instVal:num(s.instVal),discOn:!!s.discOn,discType:s.discType||'percent',discVal:num(s.discVal),features:s.features||'',notes:s.notes||''})).filter(s=>s.items.length);
       const d={number:val('q_number'),type:val('q_type'),subject:val('q_subject'),presalesName:val('q_presales'),client:val('q_client'),date:val('q_date'),dueDate:val('q_due'),buildingType:val('q_btype'),location:val('q_loc'),consultant:val('q_consultant'),preparedBy:val('q_prep'),service:(g('q_service')?val('q_service'):(r.service||'Home Automation')),useGeneralCover:!!(g('q_gencover')&&g('q_gencover').checked),showPartNo:!!(g('q_showpn')&&g('q_showpn').checked),branch:val('q_branch'),dept:r.dept||'Operations',currency:val('q_cur'),fxManual:!!(g('q_fxman')&&g('q_fxman').checked),fxRate:(typeof qCurRate==='function'?qCurRate():1),fxEgp:num(val('q_fx'))||0,status:val('q_status'),vat:num(val('q_vat')),sections:secs,excluding:val('q_excl'),featuresList:val('q_features'),payAdvance:num(val('q_pa')),payBefore:num(val('q_pb')),payAfter:num(val('q_pc')),payTest:num(val('q_pd')),validity:num(val('q_valid')),terms:val('q_terms'),notes:val('q_notes')};
       if(!d.client){alert('Client name required');return false;} if(!secs.length){alert('Add at least one line item with a description.');return false;} if(!id){d.created=new Date().toISOString(); d.number=genQuoteNo(svcKey(d.service));}
@@ -4196,8 +4198,11 @@ function editQuote(id){
       /* Update the in-memory quote immediately so Print / view reflect the edits at once
          (otherwise the change only appears after the next background sync). */
       try{ if(id){ var _qq=quotes.find(function(x){return x.id===id;}); if(_qq) Object.assign(_qq,d); } }catch(e){} },{wide:true,confirmClose:true});
-  qSecRender(); try{ qCurChange(); }catch(e){}
+  qSecRender(); try{ qCurChange(); }catch(e){} try{ qSetupSections(); }catch(e){}
 }
+/* Collapsible quote sections: click a section header to fold/unfold it. */
+function qSetupSections(){ try{ var mb=g('mBody'); if(!mb)return; var hs=mb.querySelectorAll('.qsec-h'); for(var i=0;i<hs.length;i++){ var h=hs[i]; if(h.getAttribute('data-coll'))continue; h.setAttribute('data-coll','1'); h.style.cursor='pointer'; var cv=document.createElement('span'); cv.className='qsec-chev'; cv.textContent='▾'; h.appendChild(cv); (function(hh){ hh.addEventListener('click',function(ev){ if(ev.target&&(ev.target.tagName==='INPUT'||ev.target.tagName==='SELECT'||ev.target.tagName==='TEXTAREA'))return; qToggleSect(hh); }); })(h); } }catch(e){} }
+function qToggleSect(h){ var collapsed=h.classList.toggle('qcollapsed'); var cv=h.querySelector('.qsec-chev'); if(cv)cv.textContent=collapsed?'▸':'▾'; var n=h.nextElementSibling; while(n && !(n.classList&&n.classList.contains('qsec-h'))){ if(n.id!=='qStickyTotal'){ n.style.display=collapsed?'none':''; } n=n.nextElementSibling; } }
 /* ---- Quote version history: snapshot on every save; restore any past version ---- */
 function qSnap(d){ var s={}; for(var k in d){ if(k==='history')continue; s[k]=d[k]; } s._savedAt=new Date().toISOString(); s._savedBy=(me&&me.name)||''; try{ s._total=Math.round(quoteTotal(d).total)||0; }catch(e){ s._total=null; } return s; }
 function qVersions(id){ var q=quotes.find(function(x){return x.id===id;}); if(!q){ alert(lang==='ar'?'العرض غير موجود':'Quote not found'); return; }
@@ -11098,6 +11103,12 @@ nav a.on,.side a.on,.navlink.on{background:#e8f2ff !important;color:#1763c7 !imp
 .qr-line b{color:#16263a;font-size:15px}
 .qr-opt{display:flex;align-items:center;gap:6px;font-size:12.5px;color:#6b7b8c;font-weight:600;margin-inline-start:auto}
 .qrow input:focus{border-color:#1a8cff !important;background:#fff;outline:0}
+/* sticky grand total + collapsible section chevrons */
+.qsticky{position:sticky;bottom:-2px;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#143f63;color:#fff !important;border-radius:11px;padding:13px 18px;margin-top:14px;box-shadow:0 -4px 16px rgba(16,30,54,.14)}
+.qsticky .qst-lbl{font-weight:700;font-size:13.5px;color:#cfe0ef !important}
+.qsticky b,.qsticky #qStickyVal{font-size:21px;font-weight:800;color:#fff !important}
+.qsec-chev{margin-inline-start:auto;color:#8aa0b5;font-size:12px;font-weight:700}
+.qsec-h.qcollapsed{opacity:.92}
 </style>
 <script id="zoho-theme-js">
 (function(){
