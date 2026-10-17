@@ -11115,6 +11115,23 @@ nav a.on,.side a.on,.navlink.on{background:#e8f2ff !important;color:#1763c7 !imp
 .qsticky b,.qsticky #qStickyVal{font-size:21px;font-weight:800;color:#fff !important}
 .qsec-chev{margin-inline-start:auto;color:#8aa0b5;font-size:12px;font-weight:700}
 .qsec-h.qcollapsed{opacity:.92}
+/* ===== Night-mode (dark) corrections — keep text/background contrast correct =====
+   The light theme above uses !important, which in dark mode would force white cards
+   + light text (unreadable). These dark-scoped rules restore dark surfaces so every
+   text stays light-on-dark in night mode, while day mode is untouched. */
+body.dark{background:#0e1620 !important;}
+body.dark .card{background:#16242f !important;border-color:#2a3744 !important;}
+body.dark .dstat{background:#16242f !important;border-color:#2a3744 !important;}
+body.dark .dstat, body.dark .dstat *{color:#e6edf3 !important;}
+body.dark .dstat .val, body.dark .dstat .n{color:#ffffff !important;}
+body.dark .qrow{background:#16242f !important;border-color:#2a3744 !important;}
+body.dark .qr-name,body.dark .qr-code,body.dark .qr-brand,body.dark .qr-desc,body.dark .qr-f input{background:#0f1c26 !important;color:#e6edf3 !important;border-color:#33414e !important;}
+body.dark .qr-line b{color:#e6edf3 !important;}
+body.dark .qr-img{background:#0f1c26 !important;}
+body.dark .qapanel{background:#16242f !important;border-color:#2a3744 !important;}
+body.dark .qapanel, body.dark .qapanel *{color:#e6edf3 !important;}
+body.dark .qa-item:hover{background:#1d2e3c !important;}
+body.dark .qa-ic{background:rgba(26,140,255,.18) !important;}
 </style>
 <script id="zoho-theme-js">
 (function(){
