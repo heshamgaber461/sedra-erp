@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>Sedra — حسابات العملاء</title>
+<title>Sedra â Ø­Ø³Ø§Ø¨Ø§Øª Ø§ÙØ¹ÙÙØ§Ø¡</title>
 <style>
   :root{--navy:#143F63;--navy2:#0E2C49;--cyan:#36C5E0;--ink:#16242f;--line:#e6eaef;--muted:#5A6B7B;--bg:#f4f6f9}
   *{box-sizing:border-box}
@@ -36,6 +36,7 @@
   .pill{font-size:12px;padding:2px 9px;border-radius:20px;font-weight:600}
   .pill.on{background:#e7f6ec;color:#176b38}.pill.off{background:#fdeaea;color:#a12626}
   .mini{background:#eef2f6;color:var(--navy);border:0;padding:5px 10px;border-radius:7px;cursor:pointer;font:inherit;font-size:12px}
+  .mini.danger{background:#fdecef;color:#c0392b}
   .hide{display:none}
   .gate{max-width:380px;margin:60px auto}
   .brand{display:flex;align-items:center;gap:10px}
@@ -46,21 +47,21 @@
 <body>
 
 <header>
-  <div class="brand"><div class="logo">S</div><h1>سيدرا — حسابات العملاء</h1></div>
-  <div class="who"><span id="whoTxt"></span> <button id="logoutBtn" class="mini hide" onclick="doLogout()">خروج</button></div>
+  <div class="brand"><div class="logo">S</div><h1>Ø³ÙØ¯Ø±Ø§ â Ø­Ø³Ø§Ø¨Ø§Øª Ø§ÙØ¹ÙÙØ§Ø¡</h1></div>
+  <div class="who"><span id="whoTxt"></span> <button id="logoutBtn" class="mini hide" onclick="doLogout()">Ø®Ø±ÙØ¬</button></div>
 </header>
 
 <!-- LOGIN GATE -->
 <div id="gate" class="wrap gate">
   <div class="card">
-    <h2>دخول الأدمن</h2>
-    <label>الإيميل</label>
+    <h2>Ø¯Ø®ÙÙ Ø§ÙØ£Ø¯ÙÙ</h2>
+    <label>Ø§ÙØ¥ÙÙÙÙ</label>
     <input id="g_email" type="email" autocomplete="username" placeholder="admin@email.com">
-    <label>كلمة المرور</label>
-    <input id="g_pass" type="password" autocomplete="current-password" placeholder="••••••••">
-    <div style="margin-top:14px"><button id="g_btn" class="btn" onclick="doLogin()">دخول</button></div>
+    <label>ÙÙÙØ© Ø§ÙÙØ±ÙØ±</label>
+    <input id="g_pass" type="password" autocomplete="current-password" placeholder="â¢â¢â¢â¢â¢â¢â¢â¢">
+    <div style="margin-top:14px"><button id="g_btn" class="btn" onclick="doLogin()">Ø¯Ø®ÙÙ</button></div>
     <div id="g_note" class="note"></div>
-    <p style="margin-top:12px"><small class="hint">الصفحة دي لإدارة حسابات عملاء التطبيق — للأدمن فقطق.</small></p>
+    <p style="margin-top:12px"><small class="hint">Ø§ÙØµÙØ­Ø© Ø¯Ù ÙØ¥Ø¯Ø§Ø±Ø© Ø­Ø³Ø§Ø¨Ø§Øª Ø¹ÙÙØ§Ø¡ Ø§ÙØªØ·Ø¨ÙÙ â ÙÙØ£Ø¯ÙÙ ÙÙØ·.</small></p>
   </div>
 </div>
 
@@ -68,63 +69,63 @@
 <div id="app" class="wrap hide">
 
   <div class="card">
-    <h2>إنشاء حساب عميل جديد</h2>
+    <h2>Ø¥ÙØ´Ø§Ø¡ Ø­Ø³Ø§Ø¨ Ø¹ÙÙÙ Ø¬Ø¯ÙØ¯</h2>
     <div class="row">
-      <div><label>اسم العميل *</label><input id="c_name" placeholder="الاسم بالكامل"></div>
-      <div><label>الفرع</label>
-        <select id="c_branch"><option value="Egypt">مصر</option><option value="UAE">الإمارات</option><option value="KSA">السعودية</option></select>
+      <div><label>Ø§Ø³Ù Ø§ÙØ¹ÙÙÙ *</label><input id="c_name" placeholder="Ø§ÙØ§Ø³Ù Ø¨Ø§ÙÙØ§ÙÙ"></div>
+      <div><label>Ø§ÙÙØ±Ø¹</label>
+        <select id="c_branch"><option value="Egypt">ÙØµØ±</option><option value="UAE">Ø§ÙØ¥ÙØ§Ø±Ø§Øª</option><option value="KSA">Ø§ÙØ³Ø¹ÙØ¯ÙØ©Ø©</option></select>
       </div>
     </div>
     <div class="row">
-      <div><label>الإيميل * <small class="hint">(هيسجّل بيه الدخول)</small></label><input id="c_email" type="email" placeholder="client@email.com"></div>
-      <div><label>التليفون</label><input id="c_phone" placeholder="01xxxxxxxxx"></div>
+      <div><label>Ø§ÙØ¥ÙÙÙÙ * <small class="hint">(ÙÙØ³ÙÙ Ø¨ÙÙ Ø§ÙØ¯Ø®ÙÙ)</small></label><input id="c_email" type="email" placeholder="client@email.com"></div>
+      <div><label>Ø§ÙØªÙÙÙÙÙ</label><input id="c_phone" placeholder="01xxxxxxxxx"></div>
     </div>
     <div class="row">
-      <div><label>كلمة المرور *</label><input id="c_pass" placeholder="٨ حروف على الأقل"></div>
-      <div style="display:flex;align-items:flex-end"><button class="btn sec" type="button" onclick="genPass()" style="width:100%">توليد كلمة مرور</button></div>
+      <div><label>ÙÙÙØ© Ø§ÙÙØ±ÙØ± *</label><input id="c_pass" placeholder="Ù¨ Ø­Ø±ÙÙ Ø¹ÙÙ Ø§ÙØ£ÙÙ"></div>
+      <div style="display:flex;align-items:flex-end"><button class="btn sec" type="button" onclick="genPass()" style="width:100%">ØªÙÙÙØ¯ ÙÙÙØ© ÙØ±ÙØ±</button></div>
     </div>
 
-    <h2 style="margin-top:20px;font-size:14px">🏠 بيانات الفيلا / العقار</h2>
+    <h2 style="margin-top:20px;font-size:14px">ð  Ø¨ÙØ§ÙØ§Øª Ø§ÙÙÙÙØ§ / Ø§ÙØ¹ÙØ§Ø±</h2>
     <div class="row">
-      <div><label>العنوان</label><input id="v_addr" placeholder="المدينة / الكمبوند / العنوان"></div>
-      <div><label>النوع</label>
-        <select id="v_type"><option value="Villa">فيلا</option><option value="Apartment">شقة</option><option value="Company">شركة</option><option value="Other">أخرى</option></select>
+      <div><label>Ø§ÙØ¹ÙÙØ§Ù</label><input id="v_addr" placeholder="Ø§ÙÙØ¯ÙÙØ© / Ø§ÙÙÙØ¨ÙÙØ¯ / Ø§ÙØ¹ÙÙØ§Ù"></div>
+      <div><label>Ø§ÙÙÙØ¹</label>
+        <select id="v_type"><option value="Villa">ÙÙÙØ§</option><option value="Apartment">Ø´ÙØ©</option><option value="Company">Ø´Ø±ÙØ©</option><option value="Other">Ø£Ø®Ø±Ù</option></select>
       </div>
     </div>
     <div class="row">
-      <div><label>المساحة / عدد الغرف</label><input id="v_area" placeholder="مثال: 300م² · 5 غرف"></div>
-      <div><label>تاريخ التركيبت</label><input id="v_install" type="date"></div>
+      <div><label>Ø§ÙÙØ³Ø§Ø­Ø© / Ø¹Ø¯Ø¯ Ø§ÙØºØ±Ù</label><input id="v_area" placeholder="ÙØ«Ø§Ù: 300ÙÂ² Â· 5 ØºØ±Ù"></div>
+      <div><label>ØªØ§Ø±ÙØ® Ø§ÙØªØ±ÙÙØ¨</label><input id="v_install" type="date"></div>
     </div>
-    <label>الأنظمة المركّبة</label>
+    <label>Ø§ÙØ£ÙØ¸ÙØ© Ø§ÙÙØ±ÙÙØ¨Ø©</label>
     <div class="chkgrid">
-      <label class="chk"><input type="checkbox" class="sys" value="Home Automation"> أتمتة المنزل</label>
-      <label class="chk"><input type="checkbox" class="sys" value="Security"> أنظمة الأمان</label>
-      <label class="chk"><input type="checkbox" class="sys" value="Solar"> الطاقة الشمسية</label>
+      <label class="chk"><input type="checkbox" class="sys" value="Home Automation"> Ø£ØªÙØªØ© Ø§ÙÙÙØ²Ù</label>
+      <label class="chk"><input type="checkbox" class="sys" value="Security"> Ø£ÙØ¸ÙØ© Ø§ÙØ£ÙØ§Ù</label>
+      <label class="chk"><input type="checkbox" class="sys" value="Solar"> Ø§ÙØ·Ø§ÙØ© Ø§ÙØ´ÙØ³ÙØ©</label>
       <label class="chk"><input type="checkbox" class="sys" value="MEP"> MEP</label>
-      <label class="chk"><input type="checkbox" class="sys" value="Networking"> الشبكات</label>
-      <label class="chk"><input type="checkbox" class="sys" value="Audio/Video"> الصوت والصورة</label>
+      <label class="chk"><input type="checkbox" class="sys" value="Networking"> Ø§ÙØ´Ø¨ÙØ§Øª</label>
+      <label class="chk"><input type="checkbox" class="sys" value="Audio/Video"> Ø§ÙØµÙØª ÙØ§ÙØµÙØ±Ø©</label>
     </div>
 
-    <h2 style="margin-top:20px;font-size:14px">📋 العقد والصيانة</h2>
+    <h2 style="margin-top:20px;font-size:14px">ð Ø§ÙØ¹ÙØ¯ ÙØ§ÙØµÙØ§ÙØ©</h2>
     <div class="row3">
-      <div><label>رقم العقد</label><input id="k_num" placeholder="اختياري"></div>
-      <div><label>باقة الصيانة</label>
-        <select id="k_plan"><option value="">بدون</option><option value="Basic">Basic</option><option value="Plus">Plus</option></select>
+      <div><label>Ø±ÙÙ Ø§ÙØ¹ÙØ¯</label><input id="k_num" placeholder="Ø§Ø®ØªÙØ§Ø±Ù"></div>
+      <div><label>Ø¨Ø§ÙØ© Ø§ÙØµÙØ§ÙØ©</label>
+        <select id="k_plan"><option value="">Ø¨Ø¯ÙÙ</option><option value="Basic">Basic</option><option value="Plus">Plus</option></select>
       </div>
-      <div><label>الفرع المسؤول</label><input id="k_team" placeholder="اختياري"></div>
+      <div><label>Ø§ÙÙØ±Ø¹ Ø§ÙÙØ³Ø¤ÙÙ</label><input id="k_team" placeholder="Ø§Ø®ØªÙØ§Ø±Ù"></div>
     </div>
     <div class="row">
-      <div><label>آخر صيانة</label><input id="k_last" type="date"></div>
-      <div><label>الصيانة الجاية</label><input id="k_next" type="date"></div>
+      <div><label>Ø¢Ø®Ø± ØµÙØ§ÙØ©</label><input id="k_last" type="date"></div>
+      <div><label>Ø§ÙØµÙØ§ÙØ© Ø§ÙØ¬Ø§ÙØ©</label><input id="k_next" type="date"></div>
     </div>
 
-    <div style="margin-top:18px"><button id="createBtn" class="btn" onclick="createClient()">✅ إنشاء الحساب وتفعيله</button></div>
+    <div style="margin-top:18px"><button id="createBtn" class="btn" onclick="createClient()">â Ø¥ÙØ´Ø§Ø¡ Ø§ÙØ­Ø³Ø§Ø¨ ÙØªÙØ¹ÙÙÙ</button></div>
     <div id="c_note" class="note"></div>
   </div>
 
   <div class="card">
-    <h2>حسابات العملاء الحالية <button class="mini" onclick="loadList()" style="float:left">تحديث</button></h2>
-    <div id="listWrap"><p style="color:var(--muted)">جارِ التحميل…</p></div>
+    <h2>Ø­Ø³Ø§Ø¨Ø§Øª Ø§ÙØ¹ÙÙØ§Ø¡ Ø§ÙØ­Ø§ÙÙØ© <button class="mini" onclick="loadList()" style="float:left">ØªØ­Ø¯ÙØ«</button></h2>
+    <div id="listWrap"><p style="color:var(--muted)">Ø¬Ø§Ø±Ù Ø§ÙØªØ­ÙÙÙâ¦</p></div>
   </div>
 
 </div>
@@ -155,14 +156,15 @@ async function db(method,path,body){
 /* ---- auth ---- */
 async function doLogin(){
   var em=$('g_email').value.trim(), pw=$('g_pass').value;
-  if(!em||!pw){note('g_note','اكتب الإيميل وكلمة المرور.',false);return;}
+  if(!em||!pw){note('g_note','Ø§ÙØªØ¨ Ø§ÙØ¥ÙÙÙÙ ÙÙÙÙØ© Ø§ÙÙØ±ÙØ±.',false);return;}
   $('g_btn').disabled=true;
   try{ await auth.signInWithEmailAndPassword(em,pw); }
-  catch(e){ note('g_note','تعذّر الدخول. راجع البيانات.',false); $('g_btn').disabled=false; }
+  catch(e){ note('g_note','ØªØ¹Ø°ÙØ± Ø§ÙØ¯Ø®ÙÙ. Ø±Ø§Ø¬Ø¹ Ø§ÙØ¨ÙØ§ÙØ§Øª.',false); $('g_btn').disabled=false; }
 }
 function doLogout(){ auth.signOut(); }
 
 async function resolveAdmin(u){
+  // Super Admin by email, otherwise look up the employee record and check role
   if(String(u.email||'').toLowerCase()===SUPER_ADMIN_EMAIL.toLowerCase()) return {name:'Super Admin',role:'Super Admin'};
   var emps=await db('GET','/employees.json',undefined)||{};
   var found=null;
@@ -175,12 +177,12 @@ auth.onAuthStateChanged(async function(u){
   if(!u){ me=null; T('gate',true); T('app',false); $('whoTxt').textContent=''; $('logoutBtn').classList.add('hide'); return; }
   try{
     me=await resolveAdmin(u);
-    if(!me){ note('g_note','الحساب ده مش مصرّح له بإدارة العملاء.',false); T('gate',true); T('app',false); setTimeout(function(){auth.signOut();},1500); return; }
-    $('whoTxt').textContent=(me.name||u.email)+' · '+me.role;
+    if(!me){ note('g_note','Ø§ÙØ­Ø³Ø§Ø¨ Ø¯Ù ÙØ´ ÙØµØ±ÙØ­ ÙÙ Ø¨Ø¥Ø¯Ø§Ø±Ø© Ø§ÙØ¹ÙÙØ§Ø¡.',false); T('gate',true); T('app',false); setTimeout(function(){auth.signOut();},1500); return; }
+    $('whoTxt').textContent=(me.name||u.email)+' Â· '+me.role;
     $('logoutBtn').classList.remove('hide');
     T('gate',false); T('app',true);
     loadList();
-  }catch(e){ note('g_note','تعذّر التحقق من الصلاحية: '+e.message,false); }
+  }catch(e){ note('g_note','ØªØ¹Ø°ÙØ± Ø§ÙØªØ­ÙÙ ÙÙ Ø§ÙØµÙØ§Ø­ÙØ©: '+e.message,false); }
 });
 
 /* ---- provisioning ---- */
@@ -193,9 +195,9 @@ function sysList(){ return [].slice.call(document.querySelectorAll('.sys:checked
 
 async function createClient(){
   var name=$('c_name').value.trim(), email=$('c_email').value.trim().toLowerCase(), phone=$('c_phone').value.trim(), pass=$('c_pass').value;
-  if(!name||!email||!pass){ note('c_note','الاسم والإيميل وكلمة المرور مطلوبين.',false); return; }
-  if(pass.length<8){ note('c_note','كلمة المرور لازم ٨ حروف على الأقل.',false); return; }
-  $('createBtn').disabled=true; note('c_note','جارِ الإنشاءؠ*',true);
+  if(!name||!email||!pass){ note('c_note','Ø§ÙØ§Ø³Ù ÙØ§ÙØ¥ÙÙÙÙ ÙÙÙÙØ© Ø§ÙÙØ±ÙØ± ÙØ·ÙÙØ¨ÙÙ.',false); return; }
+  if(pass.length<8){ note('c_note','ÙÙÙØ© Ø§ÙÙØ±ÙØ± ÙØ§Ø²Ù Ù¨ Ø­Ø±ÙÙ Ø¹ÙÙ Ø§ÙØ£ÙÙ.',false); return; }
+  $('createBtn').disabled=true; note('c_note','Ø¬Ø§Ø±Ù Ø§ÙØ¥ÙØ´Ø§Ø¡â¦',true);
   var sec=null, uid=null;
   try{
     try{ sec=firebase.app('prov'); }catch(e){ sec=firebase.initializeApp(firebaseConfig,'prov'); }
@@ -204,7 +206,7 @@ async function createClient(){
       uid=cr.user.uid;
       try{ await cr.user.updateProfile({displayName:name}); }catch(_e){}
     }catch(e){
-      if(e&&e.code==='auth/email-already-in-use'){ note('c_note','الإيميل در له حساب بالفعل. استخدم "استعادة كلمة المرور" من التطبيق أو إيميل تاني.',false); $('createBtn').disabled=false; return; }
+      if(e&&e.code==='auth/email-already-in-use'){ note('c_note','Ø§ÙØ¥ÙÙÙÙ Ø¯Ù ÙÙ Ø­Ø³Ø§Ø¨ Ø¨Ø§ÙÙØ¹Ù. Ø§Ø³ØªØ®Ø¯Ù "Ø§Ø³ØªØ¹Ø§Ø¯Ø© ÙÙÙØ© Ø§ÙÙØ±ÙØ±" ÙÙ Ø§ÙØªØ·Ø¨ÙÙ Ø£Ù Ø¥ÙÙÙÙ ØªØ§ÙÙ.',false); $('createBtn').disabled=false; return; }
       throw e;
     }
     await sec.auth().signOut();
@@ -217,11 +219,11 @@ async function createClient(){
     };
     await db('PUT','/clientspace/'+uid+'/profile.json',profile);
     await db('PUT','/clientaccounts/'+uid+'.json',{uid:uid,name:name,email:email,phone:phone,branch:profile.branch,plan:profile.contract.plan,active:true,createdAt:profile.createdAt});
-    note('c_note','✅ اتعمل حساب العميل وتفعّل: '+email,true);
+    note('c_note','â Ø§ØªØ¹ÙÙ Ø­Ø³Ø§Ø¨ Ø§ÙØ¹ÙÙÙ ÙØªÙØ¹ÙÙ: '+email,true);
     clearForm();
     loadList();
   }catch(e){
-    note('c_note','حصل خطأ: '+(e&&e.message||e),false);
+    note('c_note','Ø­ØµÙ Ø®Ø·Ø£: '+(e&&e.message||e),false);
   }finally{ $('createBtn').disabled=false; }
 }
 
@@ -231,21 +233,21 @@ function clearForm(){
 }
 
 async function loadList(){
-  var w=$('listWrap'); w.innerHTML='<p style="color:var(--muted)">جارِ التحميل…</p>';
+  var w=$('listWrap'); w.innerHTML='<p style="color:var(--muted)">Ø¬Ø§Ø±Ù Ø§ÙØªØ­ÙÙÙâ¦</p>';
   try{
     var o=await db('GET','/clientaccounts.json',undefined)||{};
     var arr=[]; for(var k in o){ if(o[k]) arr.push(Object.assign({_id:k},o[k])); }
     arr.sort(function(a,b){ return (b.createdAt||'').localeCompare(a.createdAt||''); });
-    if(!arr.length){ w.innerHTML='<p style="color:var(--muted)">لسه مفيش حسابات عملاء.</p>'; return; }
-    var h='<table><tr><th>الاسم</th><th>الإيميل</th><th>الفرع</th><th>الباقة</th><th>الحالة</th><th></th></tr>';
+    if(!arr.length){ w.innerHTML='<p style="color:var(--muted)">ÙØ³Ù ÙÙÙØ´ Ø­Ø³Ø§Ø¨Ø§Øª Ø¹ÙÙØ§Ø¡.</p>'; return; }
+    var h='<table><tr><th>Ø§ÙØ§Ø³Ù</th><th>Ø§ÙØ¥ÙÙÙÙ</th><th>Ø§ÙÙØ±Ø¹</th><th>Ø§ÙØ¨Ø§ÙØ©</th><th>Ø§ÙØ­Ø§ÙØ©</th><th></th></tr>';
     arr.forEach(function(c){
-      h+='<tr><td>'+esc(c.name)+'</td><td>'+esc(c.email)+'</td><td>'+esc(c.branch||'')+'</td><td>'+esc(c.plan||'—')+'</td>'
-        +'<td><span class="pill '+(c.active?'on':'off')+'">'+(c.active?'مُفعّل':'موقوف')+'</span></td>'
-        +'<td><button class="mini" onclick="toggleActive(\''+c._id+'\','+(c.active?'false':'true')+')">'+(c.active?'إيقاف':'تفعيل')+'</button></td></tr>';
+      h+='<tr><td>'+esc(c.name)+'</td><td>'+esc(c.email)+'</td><td>'+esc(c.branch||'')+'</td><td>'+esc(c.plan||'â')+'</td>'
+        +'<td><span class="pill '+(c.active?'on':'off')+'">'+(c.active?'ÙÙÙØ¹ÙÙ':'ÙÙÙÙÙ')+'</span></td>'
+        +'<td><button class="mini" onclick="toggleActive(\''+c._id+'\','+(c.active?'false':'true')+')">'+(c.active?'Ø¥ÙÙØ§Ù':'ØªÙØ¹ÙÙ')+'</button> <button class="mini danger" onclick="delClient(\''+c._id+'\')">ð Ø­Ø°Ù</button></td></tr>';
     });
     h+='</table>';
     w.innerHTML=h;
-  }catch(e){ w.innerHTML='<p style="color:#a12626">تعذّر التحميل: '+esc(e.message)+'</p>'; }
+  }catch(e){ w.innerHTML='<p style="color:#a12626">ØªØ¹Ø°ÙØ± Ø§ÙØªØ­ÙÙÙ: '+esc(e.message)+'</p>'; }
 }
 
 async function toggleActive(uid,to){
@@ -254,7 +256,17 @@ async function toggleActive(uid,to){
     await db('PATCH','/clientspace/'+uid+'/profile.json',{active:to});
     await db('PATCH','/clientaccounts/'+uid+'.json',{active:to});
     loadList();
-  }catch(e){ alert('تعذّر التعديل: '+e.message); }
+  }catch(e){ alert('ØªØ¹Ø°ÙØ± Ø§ÙØªØ¹Ø¯ÙÙ: '+e.message); }
+}
+
+async function delClient(uid){
+  if(!confirm('Ø­Ø°Ù Ø§ÙØ¹ÙÙÙ ÙÙØ§Ø¦ÙÙØ§Ø\nÙÙØªØ´Ø§Ù Ø­Ø³Ø§Ø¨Ù ÙÙÙ Ø¨ÙØ§ÙØ§ØªÙ (Ø§ÙØ¨Ø±ÙÙØ§ÙÙ ÙØ§ÙØ·ÙØ¨Ø§Øª) ÙÙ Ø§ÙÙØ¸Ø§ÙØ ÙÙØ´ ÙÙÙØ¯Ø± ÙØ³Ø¬ÙÙ Ø¯Ø®ÙÙ Ø¨Ø¹Ø¯ ÙØ¯Ù.\n\n(ÙÙ Ø¹Ø§ÙØ² ØªÙÙÙÙ ÙØ¤ÙØªÙØ§ Ø¨Ø³ ÙÙ ØºÙØ± Ø­Ø°ÙØ Ø§Ø³ØªØ®Ø¯Ù Â«Ø¥ÙÙØ§ÙÂ».)'))return;
+  try{
+    await db('DELETE','/clientspace/'+uid+'.json',undefined);
+    await db('DELETE','/clientaccounts/'+uid+'.json',undefined);
+    loadList();
+    alert('ØªÙ Ø­Ø°Ù Ø§ÙØ¹ÙÙÙ ÙÙÙ Ø¨ÙØ§ÙØ§ØªÙ.');
+  }catch(e){ alert('ØªØ¹Ø°ÙØ± Ø§ÙØ­Ø°Ù: '+e.message); }
 }
 
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
