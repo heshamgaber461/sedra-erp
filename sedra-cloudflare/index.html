@@ -6261,7 +6261,7 @@ function vChat(){
   markChannelRead(ch);
   const msgs=messages.filter(m=>m.channel===ch).sort((a,b)=>num(a.ts)-num(b.ts));
   h+=`<div class="card" style="padding:0;overflow:hidden;margin-top:10px">
-    <div style="background:var(--navy);color:#fff;padding:10px 14px;font-weight:700">${header}</div>
+    <div style="background:#143F63;color:#fff;padding:10px 14px;font-weight:700">${header}</div>
     <div id="chatMsgs" style="height:44vh;overflow-y:auto;padding:14px;background:#f6f9fc">${msgs.length?msgs.map(m=>chatBubble(m,myEmail)).join(''):'<div class="empty">No messages yet. Say hello 👋</div>'}</div>
     <div style="display:flex;gap:8px;padding:10px;border-top:1px solid var(--mist)">
       <input id="chatInput" placeholder="Type a message…" style="flex:1" value="${esc(chatDraft)}" oninput="chatDraft=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();sendChat();}">
@@ -11235,6 +11235,9 @@ body.dark .qa-ic{background:rgba(26,140,255,.18) !important;}
 /* table zebra striping: even rows were white (#fbfdfe) with no dark variant → light-on-white. */
 body.dark table tbody tr:nth-child(even) td{background:#15293f !important;}
 body.dark table tbody tr:hover td{background:#1d3350 !important;}
+/* Night-mode text contrast: JS marks dark/navy text that sits on a DARK surface with .zltx;
+   lighten only those (navy text on a light box is left dark, so it stays readable there). */
+body.dark .zltx{color:#e6edf3 !important;}
 </style>
 <script id="zoho-theme-js">
 (function(){
@@ -11252,10 +11255,29 @@ body.dark table tbody tr:hover td{background:#1d3350 !important;}
       t.setAttribute('data-acc','1');
     });
   }
+  function zLum(m){ return 0.2126*(+m[0])+0.7152*(+m[1])+0.0722*(+m[2]); }
+  function zFixText(){
+    if(!document.body.classList.contains('dark')) return;
+    var app=document.getElementById('app'); if(!app) return;
+    var els=app.getElementsByTagName('*');
+    for(var i=0;i<els.length;i++){ var e=els[i];
+      if(e.getAttribute('data-ztx')) continue;
+      var cm=(getComputedStyle(e).color||'').match(/[0-9.]+/g);
+      if(!cm){ e.setAttribute('data-ztx','1'); continue; }
+      if(zLum(cm)>120){ e.setAttribute('data-ztx','1'); continue; }   // text already light enough
+      var p=e,g=0,bg=null;
+      while(p&&g<8){ var bm=(getComputedStyle(p).backgroundColor||'').match(/[0-9.]+/g); if(bm&&(bm[3]==null|| +bm[3]>0.5)){ bg=bm; break; } p=p.parentElement; g++; }
+      if(!bg) bg=['14','22','32'];
+      if(zLum(bg)<120){ e.classList.add('zltx'); }                    // dark text on dark surface
+      e.setAttribute('data-ztx','1');
+    }
+  }
   var pend=false;
-  function schedule(){ if(pend)return; pend=true; setTimeout(function(){pend=false; try{cap();}catch(e){}},120); }
+  function schedule(){ if(pend)return; pend=true; setTimeout(function(){pend=false; try{cap();}catch(e){} try{zFixText();}catch(e){}},120); }
   if(document.readyState!=='loading') schedule(); else document.addEventListener('DOMContentLoaded',schedule);
   try{ new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true}); }catch(e){}
+  /* re-run when the day/night class on <body> is toggled (a class change isn't a childList mutation) */
+  try{ new MutationObserver(schedule).observe(document.body,{attributes:true,attributeFilter:['class']}); }catch(e){}
   /* Datalist re-pick is handled by the global _dlStashClear handlers in the main script. */
   /* Protect work-in-progress: if an edit window (modal) is open and the page is about to
      refresh / close / navigate away, ask first — so an accidental reload doesn't wipe an
