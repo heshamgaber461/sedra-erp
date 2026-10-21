@@ -2641,6 +2641,10 @@ function tableView(key, rows, head, rowFn, opts){
   opts=opts||{}; rows=rows||[];
   const state=(TV[key]&&TV[key].state)||tvLoad(key);
   TV[key]={rows:rows,head:head,rowFn:rowFn,opts:opts,state:state};
+  // Self-heal: drop any persisted filter value that is no longer a valid option
+  // (e.g. a stale value left over after the filter layout changed). Prevents a
+  // saved filter from silently hiding every row while the dropdown shows "All".
+  try{ let _ch=false; if(state.f)(opts.filters||[]).forEach((f,fi)=>{ const v=state.f[fi]; if(v&&f.opts&&f.opts.indexOf(v)<0){ state.f[fi]=''; _ch=true; } }); if(_ch)tvSave(key); }catch(e){}
   const filters=opts.filters||[];
   let bar=`<div class="tvbar"><input class="tvq" type="search" placeholder="${esc(opts.placeholder||'🔍 Search…')}" value="${esc(state.q)}" oninput="tvSearch('${key}',this.value)">`;
   filters.forEach((f,fi)=>{ const cur=(state.f&&state.f[fi])||'';
@@ -2657,7 +2661,7 @@ function tableView(key, rows, head, rowFn, opts){
 function tvData(key){
   const t=TV[key]; if(!t)return []; let data=t.rows.slice(); const st=t.state, opts=t.opts;
   if(st.q){ const q=st.q.toLowerCase(); const sf=opts.search; data=data.filter(r=>(sf?(sf(r)||''):JSON.stringify(r)).toString().toLowerCase().indexOf(q)>=0); }
-  (opts.filters||[]).forEach((f,fi)=>{ const v=st.f&&st.f[fi]; if(v)data=data.filter(r=>f.match(r,v)); });
+  (opts.filters||[]).forEach((f,fi)=>{ let v=st.f&&st.f[fi]; if(v&&f.opts&&f.opts.indexOf(v)<0)v=''; if(v)data=data.filter(r=>f.match(r,v)); });
   if(opts.sorts&&opts.sorts.length){ const si=(st.s!==undefined&&st.s!=='')?num(st.s):0; const so=opts.sorts[si]; if(so&&so.fn){ try{ data.sort(so.fn); }catch(e){} } }
   return data;
 }
