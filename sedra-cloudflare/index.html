@@ -513,7 +513,7 @@
   <div id="gChange" class="hide">
     <h2>Set your new password</h2>
     <p>First time — please choose your own password.</p>
-    <input id="cpNew" type="password" placeholder="New password (min 6)">
+    <input id="cpNew" type="password" placeholder="New password (min 8, letters + numbers)">
     <input id="cpConf" type="password" placeholder="Confirm new password">
     <button class="btn" onclick="doChangePass()">Save & continue</button>
     <div class="gerr" id="cpErr"></div>
@@ -808,6 +808,9 @@ let stockcounts=[];
 /* ===================== HELPERS ===================== */
 const g=id=>document.getElementById(id);
 const esc=s=>(s||'').toString().replace(/[&<>"'`]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[c]));
+/* Strong-password policy (added by Claude): min 8 chars, with at least one letter AND one number. */
+function strongPw(p){ p=String(p==null?'':p); return p.length>=8 && /[A-Za-z]/.test(p) && /[0-9]/.test(p); }
+function pwRule(ar){ return ar?'كلمة المرور لازم ٨ حروف على الأقل وتحتوي على حروف وأرقام.':'Password must be at least 8 characters and include letters and numbers.'; }
 const today=()=>{ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const nowT=()=>new Date().toTimeString().slice(0,5);
 const num=v=>{ if(typeof v==='number') return isFinite(v)?v:0; if(v==null) return 0; const n=parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isFinite(n)?n:0; };
@@ -1729,7 +1732,7 @@ function doLogin(){
     // Firebase email-enumeration protection returns 'invalid-credential' for BOTH a missing account and a wrong password.
     const maybeNoAccount = code==='auth/user-not-found' || code==='auth/invalid-credential' || code==='auth/invalid-login-credentials';
     if(maybeNoAccount && email===SUPER_ADMIN_EMAIL){
-      if(pass.length<6){ hideLoad(); g('liErr').textContent='First time? Choose a password of at least 6 characters.'; return; }
+      if(!strongPw(pass)){ hideLoad(); g('liErr').textContent=pwRule(typeof lang!=='undefined'&&lang==='ar'); return; }
       // Try to create the admin account; if it already exists, the password was simply wrong.
       auth.createUserWithEmailAndPassword(email,pass)
         .then(()=>{ /* resolveMe will create the admin profile */ })
@@ -1753,7 +1756,7 @@ function doForgot(){
 }
 function doChangePass(){
   const np=g('cpNew').value, cf=g('cpConf').value; g('cpErr').textContent='';
-  if(np.length<6){ g('cpErr').textContent='Password must be at least 6 characters.'; return; }
+  if(!strongPw(np)){ g('cpErr').textContent=pwRule(typeof lang!=='undefined'&&lang==='ar'); return; }
   if(np!==cf){ g('cpErr').textContent='Passwords do not match.'; return; }
   auth.currentUser.updatePassword(np).then(()=>{
     return apiMerge('employees', me.id, {mustChangePass:false});
@@ -1897,9 +1900,11 @@ function loadClientAccts(){
   }).catch(function(e){ window.__clientAcctsLoaded=true; window.__clientAcctsErr=(e&&e.message)||(''+e); if(curView==='customers'&&custTab==='portal'){ try{render();}catch(_e){} } });
 }
 function genClientPass(){
-  var cs='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789', p='';
-  for(var i=0;i<10;i++) p+=cs[Math.floor(Math.random()*cs.length)];
-  var e=g('cl_pass'); if(e)e.value=p;
+  var L='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz', D='23456789', all=L+D;
+  var arr=[L[Math.floor(Math.random()*L.length)], D[Math.floor(Math.random()*D.length)]];
+  for(var i=0;i<8;i++) arr.push(all[Math.floor(Math.random()*all.length)]);
+  for(var j=arr.length-1;j>0;j--){ var k=Math.floor(Math.random()*(j+1)), t=arr[j]; arr[j]=arr[k]; arr[k]=t; }
+  var p=arr.join(''); var e=g('cl_pass'); if(e)e.value=p;
 }
 function newClientLogin(){
   var ar=(typeof lang!=='undefined'&&lang==='ar');
@@ -1918,7 +1923,7 @@ function newClientLogin(){
     function(){
       var name=val('cl_name').trim(), email=val('cl_email').trim().toLowerCase(), pass=val('cl_pass'), phone=val('cl_phone').trim();
       if(!name||!email||!pass){ alert(ar?'الاسم والإيميل وكلمة المرور مطلوبين.':'Name, email and password are required.'); return false; }
-      if(pass.length<8){ alert(ar?'كلمة المرور لازم ٨ حروف على الأقل.':'Password must be at least 8 characters.'); return false; }
+      if(!strongPw(pass)){ alert(pwRule(ar)); return false; }
       if(!secondary){ try{ secondary=firebase.initializeApp(firebaseConfig,'sec'); }catch(e){ secondary=firebase.app('sec'); } }
       var branch=val('cl_branch');
       var profile={ role:'customer', active:true, name:name, email:email, phone:phone, branch:branch,
@@ -6562,7 +6567,7 @@ function addUser(){
   openModal('Add team member',
     `<div style="font-weight:700;color:var(--navy);margin:2px 0 6px">👤 Account</div>`+
     `<div class="row2">${fEl('Full name','u_name','')}${fEl('Email','u_email','','email')}</div>`+
-    fEl('Temporary password (min 6 characters)','u_pass','','text')+
+    fEl('Temporary password (min 8, letters + numbers)','u_pass','','text')+
     `<div style="font-weight:700;color:var(--navy);margin:14px 0 6px;border-top:1px solid var(--mist);padding-top:10px">💼 Job details</div>`+
     `<div class="row2">${selEl('Department','u_dept',DEPTS,'Sales')}${selEl('Role','u_role',ROLES,'Member')}</div>`+
     `<div class="row2">${fEl('Job title','u_title','')}<div class="fld"><label>Reporting line (manager)</label><input id="u_mgr" list="emp_dl" value=""></div></div>`+empDatalist()+
@@ -6579,7 +6584,8 @@ function addUser(){
     fEl('Laptop serial number','u_laptop','')+
     deptChips([]),
     ()=>{ const name=val('u_name'),email=val('u_email').trim().toLowerCase(),pass=val('u_pass'),dept=val('u_dept'),role=val('u_role'),phone=val('u_phone'),salary=num(val('u_salary')),branches=readChips(),accessModules=readDChips();
-      if(!name||!email||pass.length<6){alert('Name, email, and a temp password (min 6) are required.');return false;}
+      if(!name||!email){alert('Name and email are required.');return false;}
+      if(!strongPw(pass)){alert(pwRule(typeof lang!=='undefined'&&lang==='ar'));return false;}
       if(employees.find(e=>(e.email||'').toLowerCase()===email)){alert('This email already exists.');return false;}
       if(!secondary){ try{ secondary=firebase.initializeApp(firebaseConfig,'sec'); }catch(e){ secondary=firebase.app('sec'); } }
       const prof={name,email,dept,role,phone,salary,accessModules,branches:role==='Super Admin'?BRANCHES.slice():branches,scope:val('u_scope'),title:val('u_title'),manager:val('u_mgr'),code:val('u_code'),hireDate:val('u_hire'),birthDate:val('u_birth'),socialInsNo:val('u_sins'),medicalIns:val('u_medins'),allowances:num(val('u_allow')),leaveEntitlement:num(val('u_ent')),iban:val('u_iban'),laptopSerial:val('u_laptop'),mustChangePass:true,active:true,created:today()};
@@ -6822,7 +6828,7 @@ function vProfile(){
   h+=`<div class="card"><div style="font-size:16px;font-weight:700;color:var(--navy);margin-bottom:8px">👤 My profile</div>
     <p><b>Name:</b> ${esc(me.name||'')}</p><p><b>Email:</b> ${esc(me.email||'')}</p><p><b>Department:</b> ${esc(me.dept||'')}</p><p><b>Role:</b> ${esc(me.role||'')}</p><p><b>Branches:</b> ${me.role==='Super Admin'?'All':((me.branches||[]).join(', ')||'—')}</p>
     <div style="border-top:1px solid var(--mist);margin-top:12px;padding-top:12px"><div style="font-weight:600;margin-bottom:8px">Language / اللغة</div><button class="btn ${lang==='en'?'':'gh'}" onclick="setLang('en')">English</button> <button class="btn ${lang==='ar'?'':'gh'}" onclick="setLang('ar')">العربية</button></div>
-    <div style="border-top:1px solid var(--mist);margin-top:12px;padding-top:12px"><div style="font-weight:600;margin-bottom:8px">Change my password</div><input id="pf_new" type="password" placeholder="New password (min 6)" style="width:100%;margin:5px 0"><input id="pf_conf" type="password" placeholder="Confirm" style="width:100%;margin:5px 0"><button class="btn" style="margin-top:8px" onclick="profileChangePass()">Update password</button><div class="gerr" id="pf_err"></div></div></div>`;
+    <div style="border-top:1px solid var(--mist);margin-top:12px;padding-top:12px"><div style="font-weight:600;margin-bottom:8px">Change my password</div><input id="pf_new" type="password" placeholder="New password (min 8, letters + numbers)" style="width:100%;margin:5px 0"><input id="pf_conf" type="password" placeholder="Confirm" style="width:100%;margin:5px 0"><button class="btn" style="margin-top:8px" onclick="profileChangePass()">Update password</button><div class="gerr" id="pf_err"></div></div></div>`;
   let ss=`<div>`;
   ss+=`<div class="card"><div class="ch-t">🌴 My leave balance</div><div style="font-size:26px;font-weight:800;color:${bal>0?'var(--ok)':'var(--bad)'}">${Math.round(bal)} <span style="font-size:13px;color:var(--muted)">days left</span></div><div class="mini">Entitlement ${leaveEntitlementFor(meE)} · used ${leaveDaysYear(me.email)} this year</div><button class="btn cy sm" style="margin-top:6px" onclick="curView='hr';hrTab='leave';render();setTimeout(editLeave,60)">Request leave</button></div>`;
   ss+=`<div class="card" style="margin-top:12px"><div class="ch-t">💵 My latest payslip</div>${slip?`<div>${esc(slip.month)} — net <b>${nfmt(slip.net)}</b></div><button class="btn gh sm" style="margin-top:6px" onclick="printPayslip('${slip.id}')">View payslip</button>`:'<div class="mini">No payslip yet.</div>'}</div>`;
@@ -6834,7 +6840,7 @@ function vProfile(){
 }
 function profileChangePass(){
   const np=g('pf_new').value,cf=g('pf_conf').value; g('pf_err').textContent='';
-  if(np.length<6){g('pf_err').textContent='At least 6 characters.';return;}
+  if(!strongPw(np)){g('pf_err').textContent=pwRule(typeof lang!=='undefined'&&lang==='ar');return;}
   if(np!==cf){g('pf_err').textContent='Passwords do not match.';return;}
   auth.currentUser.updatePassword(np).then(()=>{g('pf_err').style.color='var(--ok)';g('pf_err').textContent='Password updated.';g('pf_new').value='';g('pf_conf').value='';})
     .catch(e=>{g('pf_err').textContent=e.message+' (sign out and back in, then retry).';});
@@ -7689,7 +7695,7 @@ const TXT = {
   '🎫 Tickets':'🎫 التذاكر','🛠️ Field service':'🛠️ خدمة ميدانية','⏱️ Timesheets':'⏱️ سجل الساعات','🗂️ Task board':'🗂️ لوحة المهام','Support tickets':'تذاكر الدعم','Field service schedule':'جدول الخدمة الميدانية','Time log':'سجل الوقت','+ New ticket':'+ تذكرة جديدة','+ Schedule job':'+ جدولة مهمة','+ Log time':'+ تسجيل وقت','Advance':'تقديم',
   // top bar / gate
   '🔎 Search…':'🔎 بحث…','Sign out':'تسجيل الخروج','🌐 All branches':'🌐 كل الفروع','Connecting…':'جارٍ الاتصال…','🟢 Online · shared':'🟢 متصل · مشترك',
-  'Company Management System':'نظام إدارة الشركة','Sign in with your company account to continue.':'سجّل الدخول بحساب الشركة للمتابعة.','Email':'البريد الإلكتروني','Password':'كلمة المرور','Sign in':'تسجيل الدخول','Set your new password':'عيّن كلمة مرور جديدة','First time — please choose your own password.':'أول مرة — اختر كلمة المرور الخاصة بك.','New password (min 6)':'كلمة مرور جديدة (٦ أحرف على الأقل)','Confirm new password':'تأكيد كلمة المرور','Save & continue':'حفظ ومتابعة','Choose a branch':'اختر الفرع','Select the branch you want to work in.':'اختر الفرع اللي عايز تشتغل فيه.','Access':'الصلاحية',
+  'Company Management System':'نظام إدارة الشركة','Sign in with your company account to continue.':'سجّل الدخول بحساب الشركة للمتابعة.','Email':'البريد الإلكتروني','Password':'كلمة المرور','Sign in':'تسجيل الدخول','Set your new password':'عيّن كلمة مرور جديدة','First time — please choose your own password.':'أول مرة — اختر كلمة المرور الخاصة بك.','New password (min 8, letters + numbers)':'كلمة مرور جديدة (٨ أحرف على الأقل، حروف وأرقام)','Confirm new password':'تأكيد كلمة المرور','Save & continue':'حفظ ومتابعة','Choose a branch':'اختر الفرع','Select the branch you want to work in.':'اختر الفرع اللي عايز تشتغل فيه.','Access':'الصلاحية',
   // tabs
   '📊 Overview':'📊 نظرة عامة','Overview':'نظرة عامة','Leads pipeline':'مسار العملاء المحتملين','Campaigns':'الحملات','🗓️ Content calendar':'🗓️ تقويم المحتوى','Content calendar':'تقويم المحتوى','Invoices':'الفواتير','Expenses':'المصروفات','🔁 Contracts (AMC)':'🔁 العقود (AMC)','Items':'الأصناف','Stock movements':'حركة المخزون','Suppliers':'الموردون','Purchase orders':'أوامر الشراء','👥 Directory':'👥 الدليل','🌴 Leave':'🌴 الإجازات','💵 Payroll':'💵 الرواتب','🏢 Company':'🏢 الشركة','💬 Direct':'💬 رسائل خاصة','👥 Groups':'👥 المجموعات','All tasks':'كل المهام','My tasks':'مهامي','Users & Access':'المستخدمون والصلاحيات','Office locations':'مواقع المكاتب','Social links':'روابط السوشيال','Import & Backup':'الاستيراد والنسخ','Activity log':'سجل النشاط',
   // section headers
