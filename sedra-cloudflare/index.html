@@ -833,7 +833,7 @@ function basePaid(v){ return num(v.paid)*fxOf(v); }
 function baseOut(v){ return (num(v.amount)-num(v.paid))*fxOf(v); }
 function isForeign(v){ return v.currency && v.currency!==(CUR[v.branch]||''); }
 function allowedBranches(){ if(!me)return[]; return (roleRank(me.role)>=ROLE_RANK['Director']||me.role==='Viewer')?BRANCHES.slice():(me.branches&&me.branches.length?me.branches:BRANCHES.slice()); }
-function inBranch(item){ const a=allowedBranches(); if(curBranch!=='All'&&item.branch!==curBranch)return false; return a.includes(item.branch); }
+function inBranch(item){ const a=allowedBranches(); const b=item&&item.branch; if(!b)return true; /* no branch = shared/catalog item, always visible */ if(curBranch!=='All'&&b!==curBranch)return false; return a.includes(b); }
 var LOCK_PERSONAL=['hub','dashboard','profile','myhr','todo','calendar','sitecheck','announcements','leavecal','birthdays','suggestions','chat','training'];
 var DEPT_HOME={Sales:'sales',Marketing:'marketing',Operations:'projects',Technical:'projects',Accounting:'accounting',Inventory:'inventory',HR:'hr',Management:'dashboard'};
 var SENSITIVE_MODS=['hr','accounting','finance','payroll','payslips','loans'];
@@ -2294,7 +2294,7 @@ function code39svg(text){
   return `<svg viewBox="0 0 ${x} ${h+18}" style="width:100%;max-width:360px;height:auto;background:#fff" fill="#16242f"><g>${bars}</g><text x="${(x/2).toFixed(1)}" y="${h+14}" text-anchor="middle" font-size="12" font-family="monospace" fill="#16242f">${esc(text)}</text></svg>`;
 }
 function poRenderItems(){
-  const br=val('po_branch')||defBranch(); const opts=inventory.filter(i=>i.branch===br);
+  const br=val('po_branch')||defBranch(); const opts=inventory.filter(i=>!i.branch||i.branch===br);
   g('poItems').innerHTML=`<table class="items"><thead><tr><th>Item</th><th style="width:60px">Qty</th><th style="width:90px">Unit cost</th><th style="width:80px">Total</th><th></th></tr></thead><tbody>`+
     _poitems.map((it,i)=>`<tr>
       <td><select onchange="poPick(${i},this.value)"><option value="">— select —</option>${opts.map(o=>`<option value="${o.id}" ${o.id===it.itemId?'selected':''}>${esc(o.name)}</option>`).join('')}</select></td>
