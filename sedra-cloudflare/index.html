@@ -316,6 +316,8 @@
   .dkslide .dkt{font-weight:700;font-size:15px}
   .dkslide .dkb{min-height:90px;font-size:13px}
   tbody tr:nth-child(even) td{background:#fbfdfe}
+  /* responsive: wide list tables scroll inside their card, not the whole page (fixes mobile/tablet sideways scroll) */
+  .tvwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
   tr:hover td{background:#f1f8fd!important}
   .card{transition:box-shadow .15s}
   .card:hover{box-shadow:0 4px 14px rgba(20,63,99,.07)}
@@ -4454,7 +4456,7 @@ function printQuote(id,opts){
     <div class="ap-top"><img src="${LOGO}" style="height:56px;width:auto"><div class="ap-title">Who We Are</div><div class="ap-rule"></div>
     <div class="ap-lead">Sedra Electric is a leader in smart automation, low-current systems and renewable energy — driving positive change across Egypt, the UAE and Saudi Arabia with innovative, reliable solutions that maximise efficiency and elevate everyday living.</div></div>
     <div class="ap-pillars">
-      <div class="ap-pill"><b>2013</b><span>Established in Egypt</span></div>
+      <div class="ap-pill"><b>2014</b><span>Established in Egypt</span></div>
       <div class="ap-pill"><b>3</b><span>Branches · Egypt · UAE · KSA</span></div>
       <div class="ap-pill"><b>KNX</b><span>Global smart-home standards</span></div>
       <div class="ap-pill"><b>1</b><span>One-stop · MEP to smart luxury</span></div>
