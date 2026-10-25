@@ -1579,7 +1579,12 @@ function ensureAdminDoc(u){
 function pickBranch(b){ curBranch=b; localStorage.setItem('sedra_branch',b); enterApp(); }
 function enterApp(){ appReady=true; lastSig=''; hideLoad(); hideGate(); g('app').classList.remove('hide'); buildNav();
   try{ var _dh=DEPT_HOME[me.dept]||'hub'; var _dm=MODULES.find(function(x){return x.id===_dh;}); curView=(_dm&&canSee(_dm))?_dh:'hub'; var _sv=null; try{_sv=localStorage.getItem('orbit_view');}catch(e2){} if(_sv){ var _svm=MODULES.find(function(x){return x.id===_sv;}); if(_svm&&canSee(_svm)) curView=_sv; } }catch(e){ curView='hub'; }
-  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); migrateStagesOnce(); importAdelOnce(); importProductImagesOnce(); importZohoProductsOnce(); importZohoCrmSyncOnce(); cleanProductDashesOnce(); _setupUpdateCheck(); try{ purgeOldTrash(); }catch(e){} }
+  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); _setupUpdateCheck(); try{ purgeOldTrash(); }catch(e){} }
+  /* NOTE: the one-time Zoho→DB import/migration routines (migrateStagesOnce, importAdelOnce,
+     importProductImagesOnce, importZohoProductsOnce, importZohoCrmSyncOnce, cleanProductDashesOnce)
+     were removed from startup. Their migration already completed and the data is reconciled on the
+     current database; re-running them here froze the app on first load and churned thousands of
+     records. Re-enable a specific one deliberately only if a fresh migration is actually needed. */
 
 /* ---- "My Tasks" pop-up on first open each day (Phase 1) ---- */
 function maybeTasksPopup(){
