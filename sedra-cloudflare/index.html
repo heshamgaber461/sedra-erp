@@ -565,12 +565,13 @@
 <script>
 /* ===================== CONFIG ===================== */
 const firebaseConfig = {
-  apiKey: "AIzaSyBAz-utB_Wbu6J7CQ8hy7mBCMlJvYjsUw4",
-  authDomain: "sedra-crm.firebaseapp.com",
-  projectId: "sedra-crm",
-  storageBucket: "sedra-crm.firebasestorage.app",
-  messagingSenderId: "501278440253",
-  appId: "1:501278440253:web:fd2f5783242afb2d15a354"
+  apiKey: "AIzaSyD1rQISHoqL7YxEGbe7AloGmK-bM1ix6EA",
+  authDomain: "sedra-erp-5c4d8.firebaseapp.com",
+  databaseURL: "https://sedra-erp-5c4d8-default-rtdb.firebaseio.com",
+  projectId: "sedra-erp-5c4d8",
+  storageBucket: "sedra-erp-5c4d8.firebasestorage.app",
+  messagingSenderId: "418869773634",
+  appId: "1:418869773634:web:da1ed77ed18086fc8e74db"
 };
 const SUPER_ADMIN_EMAIL = "heshamgaber461@gmail.com";
 const BRANCHES = ['Egypt','UAE','KSA'];
@@ -1345,8 +1346,8 @@ function startData(){ if(started)return; started=true;
       });
     }catch(e){ if(n<20){ setTimeout(function(){ boot(n+1); }, 3000); } }
   })(0);
-  setInterval(function(){ if(document.visibilityState!=='hidden' && !_modalOpen()) refreshLight(); }, 120000);
-  setInterval(function(){ if(document.visibilityState!=='hidden' && curView==='chat' && !_modalOpen()) refreshLight(); }, 6000);
+  setInterval(function(){ if(document.visibilityState!=='hidden' && !_modalOpen()) refreshLight(); }, 300000);
+  setInterval(function(){ if(document.visibilityState!=='hidden' && curView==='chat' && !_modalOpen()) refreshLight(); }, 20000);
   document.addEventListener('visibilitychange', function(){ if(document.visibilityState!=='hidden' && appReady && Date.now()-lastRefresh>15000) refreshAll(); });
 }
 var _lightSig='';

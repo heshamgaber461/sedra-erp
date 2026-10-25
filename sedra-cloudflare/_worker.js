@@ -22,7 +22,7 @@
 //
 // KILL SWITCH: set ENFORCE=false to revert to a plain pass-through proxy instantly.
 
-const RTDB = 'https://sedra-crm-default-rtdb.firebaseio.com';
+const RTDB = 'https://sedra-erp-5c4d8-default-rtdb.firebaseio.com';
 const SUPER_ADMIN = 'heshamgaber461@gmail.com';
 const ENFORCE = true;
 
@@ -131,7 +131,7 @@ function b64urlToU8(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%
 // SECURITY: we must not trust the email inside a token we haven't verified. A Firebase
 // ID token is a JWT signed (RS256) with Google's rotating public keys. We verify the
 // signature against those keys and check aud / iss / exp before trusting any claim.
-const PROJECT_ID = 'sedra-crm';
+const PROJECT_ID = 'sedra-erp-5c4d8';
 const JWK_URL = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
 let JWK_CACHE = null, JWK_EXP = 0;
 async function getGoogleJWKs(force){
@@ -281,16 +281,6 @@ return r.status;
 export default {
 async fetch(request, env) {
 const url = new URL(request.url);
-
-// ── TEMP DIAGNOSTIC (remove after fix) ─────────────────────────────────────
-if (url.pathname === '/diag') {
-const out = {};
-try{ const r=await fetch(JWK_URL); out.jwk_status=r.status; const j=await r.json(); out.jwk_keyCount=(j.keys||[]).length; out.jwk_kids=(j.keys||[]).map(k=>k.kid).slice(0,6); }catch(e){ out.jwk_err=String(e&&e.message||e); }
-out.sa_configured=!!getSAKey(env);
-try{ const sa=await getSAToken(env); out.sa_token_ok=!!sa; }catch(e){ out.sa_err=String(e&&e.message||e); }
-if (request.method==='POST'){ try{ const p=await request.json(); if(p.token){ const parts=String(p.token).split('.'); const hdr=JSON.parse(b64urlToStr(parts[0])); const pl=JSON.parse(b64urlToStr(parts[1])); out.tok_kid=hdr.kid; out.tok_alg=hdr.alg; out.tok_aud=pl.aud; out.tok_iss=pl.iss; out.tok_email=pl.email; out.tok_verified=await verifyIdToken(p.token); } else { out.note='POST a {token} to test verification'; } }catch(e){ out.tok_err=String(e&&e.message||e); } }
-return new Response(JSON.stringify(out),{status:200,headers:CORS});
-}
 
 // ── Automatic backup endpoint (secret-protected, SA-credentialed) ──────────
 // GET /backup?key=<BACKUP_SECRET> → full DB JSON. Called daily by a Google
