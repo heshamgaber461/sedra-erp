@@ -1197,7 +1197,7 @@ function initBackend(){
   try{ firebase.initializeApp(firebaseConfig); auth=firebase.auth(); }
   catch(e){ g('statusPill').textContent='🟡 Offline'; return; }
   online=true; setPill(true);
-  auth.onAuthStateChanged(u=>{ if(u){ showLoad('Loading your workspace…'); startData(); clearTimeout(window.__authWatch); window.__authWatch=setTimeout(function(){ if(!appReady && !employeesLoaded){ try{auth.signOut();}catch(_){}} }, 15000); clearInterval(window.__resolveRetry); window.__rrN=0; window.__resolveRetry=setInterval(function(){ if(appReady){ try{ if(!window.__heavyLoaded&&!window.__heavyLoading) loadHeavy(); }catch(_){} clearInterval(window.__resolveRetry); return; } window.__rrN=(window.__rrN||0)+1; if(window.__rrN>40){ clearInterval(window.__resolveRetry); return; } if(employeesLoaded && auth && auth.currentUser){ try{ afterData(); }catch(_){} } }, 1500); } else { clearTimeout(window.__authWatch); clearInterval(window.__resolveRetry); me=null; started=false; appReady=false; lastSig=''; hideLoad(); showGate('gHub'); } });
+  auth.onAuthStateChanged(u=>{ if(u){ showLoad('Loading your workspace…'); startData(); clearTimeout(window.__authWatch); window.__authWatch=setTimeout(function(){ if(!appReady && !employeesLoaded){ try{auth.signOut();}catch(_){}} }, 15000); clearInterval(window.__resolveRetry); window.__rrN=0; window.__resolveRetry=setInterval(function(){ if(appReady){ clearInterval(window.__resolveRetry); return; } window.__rrN=(window.__rrN||0)+1; if(window.__rrN>40){ clearInterval(window.__resolveRetry); return; } if(employeesLoaded && auth && auth.currentUser){ try{ afterData(); }catch(_){} } }, 1500); } else { clearTimeout(window.__authWatch); clearInterval(window.__resolveRetry); me=null; started=false; appReady=false; lastSig=''; hideLoad(); showGate('gHub'); } });
 }
 function showLoad(t){ const L=g('loading'); if(!L)return; if(t)L.querySelector('.ltxt').textContent=t; L.classList.add('show'); }
 function hideLoad(){ const L=g('loading'); if(L)L.classList.remove('show'); }
@@ -1421,24 +1421,33 @@ async function loadAllExceptBlobs(){
   var all={}; names.forEach(function(k,i){ if(res[i]!==undefined&&res[i]!==null) all[k]=res[i]; });
   return all;
 }
-/* Background load of the HEAVY collections, after the app is already open & interactive.
-   Runs once; sets the globals and re-renders. Kept out of the blocking load + offline
-   snapshot so the app opens fast and the first DB read stays small. */
-async function loadHeavy(){
-  if(window.__heavyLoading || window.__heavyLoaded) return;
-  window.__heavyLoading=true;
+/* ON-DEMAND load of a HEAVY collection, triggered when the user opens a view that needs it
+   (see go()). These collections are large (quotes ≈10 MB with its line items), so loading
+   them in the startup read froze the browser and burned the free DB quota. Each loads at
+   most once per session; applyAll never blanks them (it only overwrites when present). */
+window.__heavyLoaded=window.__heavyLoaded||{};
+window.__heavyLoading=window.__heavyLoading||{};
+async function loadHeavy(which){
+  var list = which ? [which] : HEAVY_COLLS;
+  var todo = list.filter(function(k){ return !window.__heavyLoaded[k] && !window.__heavyLoading[k]; });
+  if(!todo.length) return;
+  todo.forEach(function(k){ window.__heavyLoading[k]=true; });
+  try{ showToast && showToast(lang==='ar'?'بحمّل البيانات…':'Loading data…'); }catch(_){}
   try{
-    var res=await Promise.all(HEAVY_COLLS.map(function(k){ return apiCall('GET','/'+k+'.json').catch(function(){return undefined;}); }));
+    var res=await Promise.all(todo.map(function(k){ return apiCall('GET','/'+k+'.json').catch(function(){return undefined;}); }));
     var any=false;
-    HEAVY_COLLS.forEach(function(k,i){
-      var v=res[i]; if(v===undefined) return; any=true;
+    todo.forEach(function(k,i){
+      window.__heavyLoading[k]=false;
+      var v=res[i]; if(v===undefined) return; any=true; window.__heavyLoaded[k]=true;
       if(k==='quotes') quotes=listToArr(v).sort((x,y)=>(y.created||'').localeCompare(x.created||''));
       else if(k==='inventory') inventory=listToArr(v).sort((x,y)=>(x.name||'').localeCompare(y.name||''));
     });
-    if(any){ window.__heavyLoaded=true; try{ if(appReady && typeof render==='function' && !_modalOpen()) render(); }catch(_){} }
-  }catch(e){}
-  finally{ window.__heavyLoading=false; }
+    if(any){ try{ if(appReady && typeof render==='function' && !_modalOpen()) render(); }catch(_){} }
+  }catch(e){ todo.forEach(function(k){ window.__heavyLoading[k]=false; }); }
 }
+/* Which heavy collections each view needs. */
+var VIEW_HEAVY={ quotes:['quotes'], variations:['quotes'], salesorders:['quotes'], quicksale:['quotes','inventory'], inventory:['inventory'], reorder:['inventory'], stockledger:['inventory'], stockcount:['inventory'], invvalue:['inventory'], grn:['inventory'], gatepass:['inventory'], requisitions:['inventory'], purchasereq:['inventory'] };
+function ensureHeavyFor(v){ try{ var need=VIEW_HEAVY[v]; if(need){ need.forEach(function(k){ loadHeavy(k); }); } }catch(_){ } }
 async function refreshAll(quiet){
   if(polling)return; polling=true; lastRefresh=Date.now();
   try{
@@ -1526,7 +1535,6 @@ function applyAll(all){
 }
 function afterData(){
   if(!appReady){ resolveMe(); return; }
-  try{ if(!window.__heavyLoaded && !window.__heavyLoading){ loadHeavy(); } }catch(e){}
   try{ checkChatNotifications(); updateBadges(); }catch(e){}
   try{ runAutomations(); }catch(e){}
   try{ if(!window.__fxChecked){ window.__fxChecked=true; refreshFX(false).then(function(ok){ if(ok && !g('modal').classList.contains('show')) render(); }); } }catch(e){}
@@ -2400,6 +2408,7 @@ function mktContent(){
 }
 function render(){
   if(!me)return;
+  ensureHeavyFor(curView);
   var m=MODULES.find(x=>x.id===curView)||MODULES[0];
   if(!canSee(m)){ curView='hub'; m=MODULES.find(function(x){return x.id==='hub';})||MODULES[0]; }
   g('viewTitle').textContent=m.label;
