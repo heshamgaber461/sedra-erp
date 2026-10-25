@@ -1473,6 +1473,11 @@ async function refreshAll(quiet){
   }
   finally{ polling=false; }
 }
+/* Safety shim: some migrated records store date-ish fields (created/date/month/…) as NUMBERS
+   instead of strings, so `(rec.created||'').localeCompare(…)` threw "localeCompare is not a
+   function" on a number — which aborted applyAll() partway and left every collection after that
+   line empty. Numbers have no localeCompare; give them one that compares as strings. */
+if(!Number.prototype.localeCompare){ try{ Object.defineProperty(Number.prototype,'localeCompare',{ value:function(o){ return String(this).localeCompare(String(o==null?'':o)); }, writable:true, configurable:true }); }catch(_shimErr){} }
 function applyAll(all){
     employees=listToArr(all.employees); employeesLoaded=true;
     leads=listToArr(all.leads).sort((x,y)=>(y.created||'').localeCompare(x.created||''));
