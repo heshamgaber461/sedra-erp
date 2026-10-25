@@ -1409,16 +1409,21 @@ async function loadAllExceptBlobs(){
   }
   // Exclude the heavy collections from the initial blocking load (loaded by loadHeavy after open).
   names=names.filter(function(k){ return HEAVY_COLLS.indexOf(k)<0; });
-  // Tolerant: a single collection that can't be read (denied/missing) is skipped rather than
-  // blanking the whole app. If EVERY read fails on the network, surface it so the offline
-  // snapshot takes over.
-  var netErr=false, anyOk=false;
-  var res=await Promise.all(names.map(function(k){
-    return apiCall('GET','/'+k+'.json').then(function(v){ anyOk=true; return v; })
-      .catch(function(err){ if(err&&err.__net) netErr=true; return undefined; });
-  }));
+  // Read in SMALL SEQUENTIAL BATCHES, not one big parallel burst. Firing ~50 reads at once
+  // overwhelmed the proxy/connection and some collections came back empty or truncated
+  // (customers/contacts loaded partially). Batches of 6 load reliably and fully.
+  // Tolerant: a collection that can't be read is skipped; if EVERY read fails on the network,
+  // surface it so the offline snapshot takes over.
+  var all={}, netErr=false, anyOk=false, BATCH=6;
+  for(var bi=0; bi<names.length; bi+=BATCH){
+    var chunk=names.slice(bi, bi+BATCH);
+    var res=await Promise.all(chunk.map(function(k){
+      return apiCall('GET','/'+k+'.json').then(function(v){ anyOk=true; return v; })
+        .catch(function(err){ if(err&&err.__net) netErr=true; return undefined; });
+    }));
+    chunk.forEach(function(k,j){ if(res[j]!==undefined && res[j]!==null) all[k]=res[j]; });
+  }
   if(!anyOk){ if(netErr){ var e=new Error('network'); e.__net=true; throw e; } return {}; }
-  var all={}; names.forEach(function(k,i){ if(res[i]!==undefined&&res[i]!==null) all[k]=res[i]; });
   return all;
 }
 /* ON-DEMAND load of a HEAVY collection, triggered when the user opens a view that needs it
