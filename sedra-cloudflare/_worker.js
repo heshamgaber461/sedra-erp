@@ -282,6 +282,16 @@ export default {
 async fetch(request, env) {
 const url = new URL(request.url);
 
+// ── TEMP DIAGNOSTIC (remove after fix) ─────────────────────────────────────
+if (url.pathname === '/diag') {
+const out = {};
+try{ const r=await fetch(JWK_URL); out.jwk_status=r.status; const j=await r.json(); out.jwk_keyCount=(j.keys||[]).length; out.jwk_kids=(j.keys||[]).map(k=>k.kid).slice(0,6); }catch(e){ out.jwk_err=String(e&&e.message||e); }
+out.sa_configured=!!getSAKey(env);
+try{ const sa=await getSAToken(env); out.sa_token_ok=!!sa; }catch(e){ out.sa_err=String(e&&e.message||e); }
+if (request.method==='POST'){ try{ const p=await request.json(); if(p.token){ const parts=String(p.token).split('.'); const hdr=JSON.parse(b64urlToStr(parts[0])); const pl=JSON.parse(b64urlToStr(parts[1])); out.tok_kid=hdr.kid; out.tok_alg=hdr.alg; out.tok_aud=pl.aud; out.tok_iss=pl.iss; out.tok_email=pl.email; out.tok_verified=await verifyIdToken(p.token); } else { out.note='POST a {token} to test verification'; } }catch(e){ out.tok_err=String(e&&e.message||e); } }
+return new Response(JSON.stringify(out),{status:200,headers:CORS});
+}
+
 // ── Automatic backup endpoint (secret-protected, SA-credentialed) ──────────
 // GET /backup?key=<BACKUP_SECRET> → full DB JSON. Called daily by a Google
 // Apps Script (server-side) which saves the result to Drive. Uses the service
