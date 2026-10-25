@@ -1196,7 +1196,7 @@ function initBackend(){
   try{ firebase.initializeApp(firebaseConfig); auth=firebase.auth(); }
   catch(e){ g('statusPill').textContent='🟡 Offline'; return; }
   online=true; setPill(true);
-  auth.onAuthStateChanged(u=>{ if(u){ showLoad('Loading your workspace…'); startData(); } else { me=null; started=false; appReady=false; lastSig=''; hideLoad(); showGate('gHub'); } });
+  auth.onAuthStateChanged(u=>{ if(u){ showLoad('Loading your workspace…'); startData(); clearTimeout(window.__authWatch); window.__authWatch=setTimeout(function(){ if(!appReady && !employeesLoaded){ try{auth.signOut();}catch(_){}} }, 15000); } else { clearTimeout(window.__authWatch); me=null; started=false; appReady=false; lastSig=''; hideLoad(); showGate('gHub'); } });
 }
 function showLoad(t){ const L=g('loading'); if(!L)return; if(t)L.querySelector('.ltxt').textContent=t; L.classList.add('show'); }
 function hideLoad(){ const L=g('loading'); if(L)L.classList.remove('show'); }
@@ -1374,7 +1374,7 @@ async function refreshLight(){
     siteLabor=listToArr(m.siteLabor); schedules=listToArr(m.schedules);
     botChats=listToArr(m.botChats).sort((x,y)=>num(y.ts)-num(x.ts)); feedbacks=listToArr(m.feedbacks);
     setPill(true); afterData();
-  }catch(e){ setPill(false); }
+  }catch(e){ setPill(false); if(!appReady){ var _m=String((e&&e.message)||e); if(/\(401\)|\(403\)|expired|Permission denied|Auth|Unauthorized/i.test(_m)){ try{auth.signOut();}catch(_){}} } }
   finally{ polling=false; }
 }
 /* Bulk DB read that EXCLUDES the large-file store ('blobs').
