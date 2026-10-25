@@ -1197,7 +1197,7 @@ function initBackend(){
   try{ firebase.initializeApp(firebaseConfig); auth=firebase.auth(); }
   catch(e){ g('statusPill').textContent='🟡 Offline'; return; }
   online=true; setPill(true);
-  auth.onAuthStateChanged(u=>{ if(u){ showLoad('Loading your workspace…'); startData(); clearTimeout(window.__authWatch); window.__authWatch=setTimeout(function(){ if(!appReady && !employeesLoaded){ try{auth.signOut();}catch(_){}} }, 15000); clearInterval(window.__resolveRetry); window.__rrN=0; window.__resolveRetry=setInterval(function(){ if(appReady){ clearInterval(window.__resolveRetry); return; } window.__rrN=(window.__rrN||0)+1; if(window.__rrN>40){ clearInterval(window.__resolveRetry); return; } if(employeesLoaded && auth && auth.currentUser){ try{ afterData(); }catch(_){} } }, 1500); } else { clearTimeout(window.__authWatch); clearInterval(window.__resolveRetry); me=null; started=false; appReady=false; lastSig=''; hideLoad(); showGate('gHub'); } });
+  auth.onAuthStateChanged(u=>{ if(u){ showLoad('Loading your workspace…'); startData(); clearTimeout(window.__authWatch); window.__authWatch=setTimeout(function(){ if(!appReady && !employeesLoaded){ try{auth.signOut();}catch(_){}} }, 15000); clearInterval(window.__resolveRetry); window.__rrN=0; window.__resolveRetry=setInterval(function(){ if(appReady){ try{ if(!window.__heavyLoaded&&!window.__heavyLoading) loadHeavy(); }catch(_){} clearInterval(window.__resolveRetry); return; } window.__rrN=(window.__rrN||0)+1; if(window.__rrN>40){ clearInterval(window.__resolveRetry); return; } if(employeesLoaded && auth && auth.currentUser){ try{ afterData(); }catch(_){} } }, 1500); } else { clearTimeout(window.__authWatch); clearInterval(window.__resolveRetry); me=null; started=false; appReady=false; lastSig=''; hideLoad(); showGate('gHub'); } });
 }
 function showLoad(t){ const L=g('loading'); if(!L)return; if(t)L.querySelector('.ltxt').textContent=t; L.classList.add('show'); }
 function hideLoad(){ const L=g('loading'); if(L)L.classList.remove('show'); }
@@ -1388,6 +1388,12 @@ async function refreshLight(){
    rules) are loaded on demand, not here. New collections auto-appear once a service account
    is configured again (the shallow discovery below succeeds); until then, add them here. */
 var BULK_COLLS=['_backups','accounts','activities','adcampaigns','announcements','approvals','attendance','audit','bookings','botChats','campaigns','chats','clientaccounts','clientspace','comments','contacts','customers','employees','events','expclaims','feedbacks','goals','groups','imports','inventory','invoices','jobreqs','leads','leaves','messages','meta','mktasks','mktplans','notifications','orbit','payments','paySchedule','payslips','posts','projects','prs','pushsubs','quotes','schedules','servicereqs','sheets','siteLabor','sitevisits','staffEmails','suggestions','suppliers','tasks','tickets','todos','trash','wfappr','workorders'];
+/* HEAVY collections are EXCLUDED from the initial blocking load and loaded in the
+   background right after the app opens (loadHeavy). They are large (e.g. quotes carries
+   inline images, ~10 MB), so pulling them in the first load froze the browser and burned
+   the free DB quota. applyAll only overwrites their globals when they ARE present, so a
+   light refresh never blanks them. */
+var HEAVY_COLLS=['quotes','inventory'];
 /* Bulk DB read that EXCLUDES the large-file store ('blobs').
    Big attachments (up to 50MB) live under /blobs and are fetched on demand only,
    so they never bloat this whole-DB read, the poll, or the offline snapshot. */
@@ -1401,6 +1407,8 @@ async function loadAllExceptBlobs(){
     // Root read denied under the user token → load the known collections one by one.
     names=BULK_COLLS.slice();
   }
+  // Exclude the heavy collections from the initial blocking load (loaded by loadHeavy after open).
+  names=names.filter(function(k){ return HEAVY_COLLS.indexOf(k)<0; });
   // Tolerant: a single collection that can't be read (denied/missing) is skipped rather than
   // blanking the whole app. If EVERY read fails on the network, surface it so the offline
   // snapshot takes over.
@@ -1412,6 +1420,24 @@ async function loadAllExceptBlobs(){
   if(!anyOk){ if(netErr){ var e=new Error('network'); e.__net=true; throw e; } return {}; }
   var all={}; names.forEach(function(k,i){ if(res[i]!==undefined&&res[i]!==null) all[k]=res[i]; });
   return all;
+}
+/* Background load of the HEAVY collections, after the app is already open & interactive.
+   Runs once; sets the globals and re-renders. Kept out of the blocking load + offline
+   snapshot so the app opens fast and the first DB read stays small. */
+async function loadHeavy(){
+  if(window.__heavyLoading || window.__heavyLoaded) return;
+  window.__heavyLoading=true;
+  try{
+    var res=await Promise.all(HEAVY_COLLS.map(function(k){ return apiCall('GET','/'+k+'.json').catch(function(){return undefined;}); }));
+    var any=false;
+    HEAVY_COLLS.forEach(function(k,i){
+      var v=res[i]; if(v===undefined) return; any=true;
+      if(k==='quotes') quotes=listToArr(v).sort((x,y)=>(y.created||'').localeCompare(x.created||''));
+      else if(k==='inventory') inventory=listToArr(v).sort((x,y)=>(x.name||'').localeCompare(y.name||''));
+    });
+    if(any){ window.__heavyLoaded=true; try{ if(appReady && typeof render==='function' && !_modalOpen()) render(); }catch(_){} }
+  }catch(e){}
+  finally{ window.__heavyLoading=false; }
 }
 async function refreshAll(quiet){
   if(polling)return; polling=true; lastRefresh=Date.now();
@@ -1438,8 +1464,8 @@ function applyAll(all){
     adcampaigns=listToArr(all.adcampaigns);
     attachments=listToArr(all.attachments);
     projects=listToArr(all.projects).sort((x,y)=>(y.created||'').localeCompare(x.created||''));
-    quotes=listToArr(all.quotes).sort((x,y)=>(y.created||'').localeCompare(x.created||''));
-    inventory=listToArr(all.inventory).sort((x,y)=>(x.name||'').localeCompare(y.name||''));
+    if(all.quotes!==undefined) quotes=listToArr(all.quotes).sort((x,y)=>(y.created||'').localeCompare(x.created||''));
+    if(all.inventory!==undefined) inventory=listToArr(all.inventory).sort((x,y)=>(x.name||'').localeCompare(y.name||''));
     stockMoves=listToArr(all.stockMoves).sort((x,y)=>(y.date||'').localeCompare(x.date||''));
     attendance=listToArr(all.attendance).sort((x,y)=>(y.date||'').localeCompare(x.date||''));
     invoices=listToArr(all.invoices).sort((x,y)=>(y.date||'').localeCompare(x.date||''));
@@ -1500,6 +1526,7 @@ function applyAll(all){
 }
 function afterData(){
   if(!appReady){ resolveMe(); return; }
+  try{ if(!window.__heavyLoaded && !window.__heavyLoading){ loadHeavy(); } }catch(e){}
   try{ checkChatNotifications(); updateBadges(); }catch(e){}
   try{ runAutomations(); }catch(e){}
   try{ if(!window.__fxChecked){ window.__fxChecked=true; refreshFX(false).then(function(ok){ if(ok && !g('modal').classList.contains('show')) render(); }); } }catch(e){}
