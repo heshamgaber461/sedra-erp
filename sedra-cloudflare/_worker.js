@@ -108,9 +108,19 @@ return SA_TOKEN;
 } catch(e){ return null; }
 }
 // Returns the query param + value to authenticate the RTDB REST call.
+// NOTE: the previously configured service account belonged to the retired Firebase
+// project and cannot authenticate to the current database, so for normal /db traffic
+// the worker authenticates each request with the caller's own cryptographically
+// VERIFIED Firebase ID token — which the current database's security rules (which
+// require an authenticated user) authorize. The server-side role/department
+// enforcement below (verifyIdToken + redaction + write rules) is unchanged and still
+// applies to every request. The /backup and /push endpoints still require a valid SA.
 async function dbCred(env, userToken){
+return { param:'auth', val:userToken };
+}
+async function saCred(env){
 const sa = await getSAToken(env);
-return sa ? { param:'access_token', val:sa } : { param:'auth', val:userToken };
+return sa ? { param:'access_token', val:sa } : { param:'auth', val:'' };
 }
 
 let EMP_CACHE = null, EMP_TS = 0;
@@ -292,7 +302,7 @@ if (url.pathname === '/backup') {
 const key = url.searchParams.get('key') || '';
 if (!env.BACKUP_SECRET || key !== env.BACKUP_SECRET)
 return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: CORS });
-const cred = await dbCred(env, '');
+const cred = await saCred(env);
 if (cred.param !== 'access_token')
 return new Response(JSON.stringify({ error: 'backup requires the service account (SA_KEY) to be configured' }), { status: 500, headers: CORS });
 const r = await fetch(RTDB + '/.json?' + cred.param + '=' + encodeURIComponent(cred.val));
@@ -312,7 +322,7 @@ if (request.method !== 'POST') return new Response(JSON.stringify({ error:'POST 
 let pp; try { pp = await request.json(); } catch(e){ return new Response(JSON.stringify({error:'bad json'}),{status:400,headers:CORS}); }
 const who = await verifyIdToken(pp.token || '');
 if (!who) return new Response(JSON.stringify({ error:'authentication required' }), { status:401, headers:CORS });
-const cred = await dbCred(env, '');
+const cred = await saCred(env);
 if (cred.param !== 'access_token') return new Response(JSON.stringify({ error:'push requires the service account (SA_KEY)' }), { status:500, headers:CORS });
 const targets = (pp.targets || []).map(function(s){ return String(s||'').toLowerCase(); }).filter(Boolean);
 const payload = JSON.stringify({ title: String(pp.title||'Sedra').slice(0,120), body: String(pp.body||'').slice(0,400), url: pp.url || '/', tag: pp.tag || ('n'+Date.now()) });
