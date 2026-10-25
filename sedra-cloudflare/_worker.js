@@ -134,8 +134,8 @@ function b64urlToU8(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%
 const PROJECT_ID = 'sedra-crm';
 const JWK_URL = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
 let JWK_CACHE = null, JWK_EXP = 0;
-async function getGoogleJWKs(){
-if (JWK_CACHE && Date.now() < JWK_EXP) return JWK_CACHE;
+async function getGoogleJWKs(force){
+if (!force && JWK_CACHE && Date.now() < JWK_EXP) return JWK_CACHE;
 try{
 const r = await fetch(JWK_URL);
 if (!r.ok) return JWK_CACHE; // keep last-good cache if refresh fails
@@ -152,8 +152,10 @@ if (!token) return '';
 const parts = token.split('.'); if (parts.length !== 3) return '';
 const header = JSON.parse(b64urlToStr(parts[0]));
 if (header.alg !== 'RS256' || !header.kid) return '';
-const jwks = await getGoogleJWKs(); if (!jwks) return '';
-const jwk = jwks[header.kid]; if (!jwk) return '';
+let jwks = await getGoogleJWKs(); if (!jwks) return '';
+let jwk = jwks[header.kid];
+if (!jwk){ jwks = await getGoogleJWKs(true) || jwks; jwk = jwks && jwks[header.kid]; } // key rotated → force-refresh JWKs once and retry
+if (!jwk) return '';
 const key = await crypto.subtle.importKey('jwk',
 { kty:jwk.kty, n:jwk.n, e:jwk.e, alg:'RS256', ext:true },
 { name:'RSASSA-PKCS1-v1_5', hash:'SHA-256' }, false, ['verify']);
