@@ -1197,7 +1197,7 @@ function initBackend(){
   try{ firebase.initializeApp(firebaseConfig); auth=firebase.auth(); }
   catch(e){ g('statusPill').textContent='🟡 Offline'; return; }
   online=true; setPill(true);
-  auth.onAuthStateChanged(u=>{ if(u){ showLoad('Loading your workspace…'); startData(); clearTimeout(window.__authWatch); window.__authWatch=setTimeout(function(){ if(!appReady && !employeesLoaded){ try{auth.signOut();}catch(_){}} }, 15000); } else { clearTimeout(window.__authWatch); me=null; started=false; appReady=false; lastSig=''; hideLoad(); showGate('gHub'); } });
+  auth.onAuthStateChanged(u=>{ if(u){ showLoad('Loading your workspace…'); startData(); clearTimeout(window.__authWatch); window.__authWatch=setTimeout(function(){ if(!appReady && !employeesLoaded){ try{auth.signOut();}catch(_){}} }, 15000); clearInterval(window.__resolveRetry); window.__rrN=0; window.__resolveRetry=setInterval(function(){ if(appReady){ clearInterval(window.__resolveRetry); return; } window.__rrN=(window.__rrN||0)+1; if(window.__rrN>40){ clearInterval(window.__resolveRetry); return; } if(employeesLoaded && auth && auth.currentUser){ try{ afterData(); }catch(_){} } }, 1500); } else { clearTimeout(window.__authWatch); clearInterval(window.__resolveRetry); me=null; started=false; appReady=false; lastSig=''; hideLoad(); showGate('gHub'); } });
 }
 function showLoad(t){ const L=g('loading'); if(!L)return; if(t)L.querySelector('.ltxt').textContent=t; L.classList.add('show'); }
 function hideLoad(){ const L=g('loading'); if(L)L.classList.remove('show'); }
@@ -1340,6 +1340,7 @@ function startData(){ if(started)return; started=true;
   (function boot(n){
     try{
       Promise.resolve(refreshAll()).then(function(){
+        if(!appReady && employeesLoaded && auth && auth.currentUser){ try{ afterData(); }catch(_){} }
         if(!employeesLoaded && n<20){ setTimeout(function(){ boot(n+1); }, Math.min(2000+n*500, 6000)); }
       }).catch(function(){
         if(n<20){ setTimeout(function(){ boot(n+1); }, Math.min(2000+n*500, 6000)); }
