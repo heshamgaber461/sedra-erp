@@ -1378,19 +1378,37 @@ async function refreshLight(){
   }catch(e){ setPill(false); if(!appReady){ var _m=String((e&&e.message)||e); if(/\(401\)|\(403\)|expired|Permission denied|Auth|Unauthorized/i.test(_m)){ try{auth.signOut();}catch(_){}} } }
   finally{ polling=false; }
 }
+/* Every top-level collection the whole-DB read loads. We read each ONE INDIVIDUALLY
+   (never the DB root) because the Realtime-Database security rules authorise a signed-in
+   user to read each collection but DENY a read at the root ('/.json'). A root read only
+   worked when the worker used the service-account (admin) credential, which bypasses the
+   rules; with the user's own ID token (current setup) the root read is denied, so we use
+   this known list. 'blobs' (big files) and 'attachments'/'attachmentAccess' (own per-user
+   rules) are loaded on demand, not here. New collections auto-appear once a service account
+   is configured again (the shallow discovery below succeeds); until then, add them here. */
+var BULK_COLLS=['_backups','accounts','activities','adcampaigns','announcements','approvals','attendance','audit','bookings','botChats','campaigns','chats','clientaccounts','clientspace','comments','contacts','customers','employees','events','expclaims','feedbacks','goals','groups','imports','inventory','invoices','jobreqs','leads','leaves','messages','meta','mktasks','mktplans','notifications','orbit','payments','paySchedule','payslips','posts','projects','prs','pushsubs','quotes','schedules','servicereqs','sheets','siteLabor','sitevisits','staffEmails','suggestions','suppliers','tasks','tickets','todos','trash','wfappr','workorders'];
 /* Bulk DB read that EXCLUDES the large-file store ('blobs').
    Big attachments (up to 50MB) live under /blobs and are fetched on demand only,
-   so they never bloat this whole-DB read, the 120s poll, or the offline snapshot.
-   Falls back to a plain /.json read if the shallow key list can't be fetched. */
+   so they never bloat this whole-DB read, the poll, or the offline snapshot. */
 async function loadAllExceptBlobs(){
   var keys=null;
   try{ keys=await apiCall('GET','/.json?shallow=true'); }catch(e){ if(e&&e.__net) throw e; keys=null; }
-  if(!keys||typeof keys!=='object'){ return await apiCall('GET','/.json') || {}; }
-  var names=Object.keys(keys).filter(function(k){ return k!=='blobs'; });
-  // ATOMIC: every collection must load. If any fetch fails, reject the whole batch so
-  // refreshAll keeps the last-good data instead of applying a partial DB (which would make
-  // products/images intermittently disappear). Promise.all rejects on the first failure.
-  var res=await Promise.all(names.map(function(k){ return apiCall('GET','/'+k+'.json'); }));
+  var names;
+  if(keys && typeof keys==='object'){
+    names=Object.keys(keys).filter(function(k){ return k!=='blobs'&&k!=='attachments'&&k!=='attachmentAccess'; });
+  } else {
+    // Root read denied under the user token → load the known collections one by one.
+    names=BULK_COLLS.slice();
+  }
+  // Tolerant: a single collection that can't be read (denied/missing) is skipped rather than
+  // blanking the whole app. If EVERY read fails on the network, surface it so the offline
+  // snapshot takes over.
+  var netErr=false, anyOk=false;
+  var res=await Promise.all(names.map(function(k){
+    return apiCall('GET','/'+k+'.json').then(function(v){ anyOk=true; return v; })
+      .catch(function(err){ if(err&&err.__net) netErr=true; return undefined; });
+  }));
+  if(!anyOk){ if(netErr){ var e=new Error('network'); e.__net=true; throw e; } return {}; }
   var all={}; names.forEach(function(k,i){ if(res[i]!==undefined&&res[i]!==null) all[k]=res[i]; });
   return all;
 }
