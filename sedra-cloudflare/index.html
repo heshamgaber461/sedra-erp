@@ -1562,6 +1562,15 @@ function resolveMe(){
   if(!me){ // no profile matched
     if(!employeesLoaded){ showLoad('Loading your workspace…'); return; } // wait until the team list has actually loaded before deciding
     if(email===SUPER_ADMIN_EMAIL){ ensureAdminDoc(u); }
+    else if(window.__justAutoCreated===email && employees && employees.length){
+      // This sign-in just auto-created an account for an email that is NOT a migrated staff member
+      // (and the staff list DID load, so this is a real "not staff", not a load failure) → undo it
+      // so no unauthorized login lingers, and tell them to ask the admin.
+      window.__justAutoCreated=null;
+      var _arb=(typeof lang!=='undefined'&&lang==='ar');
+      try{ u.delete().then(function(){},function(){ try{auth.signOut();}catch(_){} }); }catch(_e){ try{auth.signOut();}catch(_){} }
+      block(_arb?('الإيميل ده ('+email+') مش مسجّل كموظف في النظام. كلّم الأدمن يضيفك الأول.'):('This email ('+email+') is not a registered staff member. Ask the administrator to add you first.'));
+    }
     else { block("Your account ("+email+") is not set up yet. Ask the administrator to add you."); }
     return;
   }
@@ -1805,16 +1814,18 @@ function doLogin(){
     const code=err.code||'';
     // Firebase email-enumeration protection returns 'invalid-credential' for BOTH a missing account and a wrong password.
     const maybeNoAccount = code==='auth/user-not-found' || code==='auth/invalid-credential' || code==='auth/invalid-login-credentials';
-    if(maybeNoAccount && email===SUPER_ADMIN_EMAIL){
+    if(maybeNoAccount){
       if(!strongPw(pass)){ hideLoad(); g('liErr').textContent=pwRule(typeof lang!=='undefined'&&lang==='ar'); return; }
-      // Try to create the admin account; if it already exists, the password was simply wrong.
+      // Self-onboarding: a staff member's FIRST sign-in creates their login with the password typed
+      // now, and resolveMe() then opens the app if the email matches a migrated staff record. If the
+      // account already exists, the password was simply wrong. (resolveMe removes the just-created
+      // account if the email is NOT a registered staff member — see __justAutoCreated there.)
       auth.createUserWithEmailAndPassword(email,pass)
-        .then(()=>{ /* resolveMe will create the admin profile */ })
-        .catch(e=>{ hideLoad(); if(e.code==='auth/email-already-in-use'){ g('liErr').textContent='Wrong password.'; } else { g('liErr').textContent=e.message; } });
+        .then(()=>{ window.__justAutoCreated=email; })
+        .catch(e=>{ hideLoad(); if(e.code==='auth/email-already-in-use'){ g('liErr').textContent=(typeof lang!=='undefined'&&lang==='ar')?'كلمة السر غلط.':'Wrong password.'; } else { g('liErr').textContent=e.message; } });
     }
     else { hideLoad();
       if(code==='auth/wrong-password'){ g('liErr').textContent='Wrong password.'; }
-      else if(maybeNoAccount){ g('liErr').textContent='Wrong email or password. Ask the administrator if your account was added.'; }
       else { g('liErr').textContent=err.message; }
     }
   });
