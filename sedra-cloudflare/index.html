@@ -1595,7 +1595,7 @@ function ensureAdminDoc(u){
 function pickBranch(b){ curBranch=b; localStorage.setItem('sedra_branch',b); enterApp(); }
 function enterApp(){ appReady=true; lastSig=''; hideLoad(); hideGate(); g('app').classList.remove('hide'); buildNav();
   try{ var _dh=DEPT_HOME[me.dept]||'hub'; var _dm=MODULES.find(function(x){return x.id===_dh;}); curView=(_dm&&canSee(_dm))?_dh:'hub'; var _sv=null; try{_sv=localStorage.getItem('orbit_view');}catch(e2){} if(_sv){ var _svm=MODULES.find(function(x){return x.id===_sv;}); if(_svm&&canSee(_svm)) curView=_sv; } }catch(e){ curView='hub'; }
-  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); _setupUpdateCheck(); try{ purgeOldTrash(); }catch(e){} try{ dedupOnce(); }catch(e){} }
+  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); _setupUpdateCheck(); try{ purgeOldTrash(); }catch(e){} try{ dedupOnce(); }catch(e){} try{ dedupLeadsOnce(); }catch(e){} }
 
 /* ONE-TIME de-duplication (2026-10-25). The migration/import duplicated records many times (same
    Zoho record imported repeatedly → identical copies with different push-IDs). Records reference each
@@ -1639,6 +1639,33 @@ async function dedupOnce(){
     try{ showToast && showToast('تنظيف التكرارات تم — حدّث الصفحة لرؤية الأرقام الجديدة.'); }catch(_){}
     try{ synced && synced(); }catch(_){}
   }catch(e){ window.__dedupReport=['FATAL '+((e&&e.message)||e)]; }
+}
+/* ONE-TIME leads de-duplication (2026-10-26). Zoho-imported leads had NO duplicates; the dup leads are
+   the Facebook/app ones. We dedup ONLY by a VALID phone (≥9 digits → same phone = same person), keep the
+   most complete, and leave leads without a valid phone untouched (name alone is too weak). Admin-only,
+   once (settings.dedupLeadsDone). Full backup to /_dedupBackup_20261025/leads first. */
+async function dedupLeadsOnce(){
+  try{
+    if(typeof isAdmin==='function' ? !isAdmin() : true) return;
+    if(settings && settings.dedupLeadsDone) return;
+    if(window.__dedupLeadsRunning) return; window.__dedupLeadsRunning=true;
+    var comp=function(r){var n=0;for(var k in r){var v=r[k]; if(v!=null&&String(v).trim()!=='')n++;} return n;};
+    var obj=await apiCall('GET','/leads.json');
+    if(!obj||typeof obj!=='object'){ window.__dedupLeadsReport='leads:empty'; return; }
+    var ids=Object.keys(obj), groups={};
+    for(var i=0;i<ids.length;i++){ var r=obj[ids[i]]||{}; var z=(r.zohoId||'').toString().trim(); var d=String(r.phone||'').replace(/[^0-9]/g,''); var ph=(d.length>=9)?d.slice(-9):''; var key = z?('z:'+z) : (ph?('p:'+ph):('solo:'+ids[i])); (groups[key]=groups[key]||[]).push(ids[i]); }
+    var del=[];
+    for(var k in groups){ var g=groups[k]; if(g.length<2||k.indexOf('solo:')===0||k.indexOf('z:')===0) continue; var best=g[0],bc=comp(obj[g[0]]); for(var j=1;j<g.length;j++){var c=comp(obj[g[j]]); if(c>bc){bc=c;best=g[j];}} for(var j2=0;j2<g.length;j2++){ if(g[j2]!==best) del.push(g[j2]); } }
+    if(del.length){
+      await apiCall('PUT','/_dedupBackup_20261025/leads.json', obj);
+      var CH=1500; for(var di=0;di<del.length;di+=CH){ var patch={}; var sl=del.slice(di,di+CH); for(var si=0;si<sl.length;si++)patch[sl[si]]=null; await apiCall('PATCH','/leads.json',patch); }
+    }
+    var rep='leads:'+ids.length+'->'+(ids.length-del.length)+'(-'+del.length+')';
+    try{ await apiMerge('meta','settings',{dedupLeadsDone:true, dedupLeadsReport:rep}); if(!settings)settings={}; settings.dedupLeadsDone=true; }catch(_){}
+    window.__dedupLeadsReport=rep;
+    try{ showToast && showToast('تنظيف الـLeads تم: '+rep+' — حدّث الصفحة.'); }catch(_){}
+    try{ synced && synced(); }catch(_){}
+  }catch(e){ window.__dedupLeadsReport='ERR '+((e&&e.message)||e); }
 }
   /* NOTE: the one-time Zoho→DB import/migration routines (migrateStagesOnce, importAdelOnce,
      importProductImagesOnce, importZohoProductsOnce, importZohoCrmSyncOnce, cleanProductDashesOnce)
