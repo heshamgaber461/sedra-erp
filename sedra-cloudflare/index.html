@@ -1595,7 +1595,51 @@ function ensureAdminDoc(u){
 function pickBranch(b){ curBranch=b; localStorage.setItem('sedra_branch',b); enterApp(); }
 function enterApp(){ appReady=true; lastSig=''; hideLoad(); hideGate(); g('app').classList.remove('hide'); buildNav();
   try{ var _dh=DEPT_HOME[me.dept]||'hub'; var _dm=MODULES.find(function(x){return x.id===_dh;}); curView=(_dm&&canSee(_dm))?_dh:'hub'; var _sv=null; try{_sv=localStorage.getItem('orbit_view');}catch(e2){} if(_sv){ var _svm=MODULES.find(function(x){return x.id===_sv;}); if(_svm&&canSee(_svm)) curView=_sv; } }catch(e){ curView='hub'; }
-  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); _setupUpdateCheck(); try{ purgeOldTrash(); }catch(e){} }
+  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); _setupUpdateCheck(); try{ purgeOldTrash(); }catch(e){} try{ dedupOnce(); }catch(e){} }
+
+/* ONE-TIME de-duplication (2026-10-25). The migration/import duplicated records many times (same
+   Zoho record imported repeatedly → identical copies with different push-IDs). Records reference each
+   other by NAME + zohoId (not push-ID), so removing duplicate copies while KEEPING one per zohoId/name
+   does NOT break links. Admin-only, runs once (settings.dedupDone). Backs up each collection in full to
+   /_dedupBackup_20261025/<coll> BEFORE removing anything, then removes the extra copies with chunked
+   PATCH-null writes. Keeper = the most complete copy in each group. Report in settings.dedupReport. */
+async function dedupOnce(){
+  try{
+    if(typeof isAdmin==='function' ? !isAdmin() : true) return;
+    if(settings && settings.dedupDone) return;
+    if(window.__dedupRunning) return; window.__dedupRunning=true;
+    var nn=function(n){return String(n||'').toLowerCase().replace(/\s+/g,' ').trim();};
+    var comp=function(r){var n=0;for(var k in r){var v=r[k]; if(v!=null&&String(v).trim()!=='')n++;} return n;};
+    var TARGETS=[
+      {c:'suppliers', key:function(r){var z=(r.zohoId||'').toString().trim(); return z?('z:'+z):('n:'+nn(r.name));}},
+      {c:'customers', key:function(r){var z=(r.zohoId||'').toString().trim(); return z?('z:'+z):('n:'+nn(r.name));}},
+      {c:'contacts',  key:function(r){var z=(r.zohoId||'').toString().trim(); return z?('z:'+z):('nc:'+nn(r.name)+'|'+nn(r.company));}},
+      {c:'inventory', key:function(r){var z=(r.zohoId||'').toString().trim(); var cd=(r.code||r.sku||'').toString().trim().toLowerCase(); return z?('z:'+z):(cd?('c:'+cd):('n:'+nn(r.name)));}},
+      {c:'quotes',    key:function(r){var z=(r.zohoId||'').toString().trim(); var num=(r.number||'').toString().trim(); return z?('z:'+z):(num?('q:'+num):('u:'+(r.importId||Math.random())));}}
+    ];
+    var report=[];
+    for(var ti=0; ti<TARGETS.length; ti++){
+      var T=TARGETS[ti];
+      try{
+        var obj=await apiCall('GET','/'+T.c+'.json');
+        if(!obj||typeof obj!=='object'){ report.push(T.c+':empty'); continue; }
+        var ids=Object.keys(obj), groups={};
+        for(var ii=0; ii<ids.length; ii++){ var id=ids[ii]; var gk=T.key(obj[id]||{}); (groups[gk]=groups[gk]||[]).push(id); }
+        var del=[];
+        for(var k2 in groups){ var gids=groups[k2]; if(gids.length<2) continue; var best=gids[0], bc=comp(obj[gids[0]]); for(var j=1;j<gids.length;j++){ var cc=comp(obj[gids[j]]); if(cc>bc){bc=cc;best=gids[j];} } for(var j2=0;j2<gids.length;j2++){ if(gids[j2]!==best) del.push(gids[j2]); } }
+        if(!del.length){ report.push(T.c+':'+ids.length+' ok'); continue; }
+        await apiCall('PUT','/_dedupBackup_20261025/'+T.c+'.json', obj);
+        var CH=1500;
+        for(var di=0; di<del.length; di+=CH){ var patch={}; var sl=del.slice(di,di+CH); for(var si=0;si<sl.length;si++) patch[sl[si]]=null; await apiCall('PATCH','/'+T.c+'.json', patch); }
+        report.push(T.c+':'+ids.length+'->'+(ids.length-del.length)+'(-'+del.length+')');
+      }catch(e){ report.push(T.c+':ERR '+((e&&e.message)||e)); }
+    }
+    try{ await apiMerge('meta','settings',{dedupDone:true, dedupAt:today(), dedupReport:report.join(' ; ')}); if(!settings)settings={}; settings.dedupDone=true; }catch(_){}
+    window.__dedupReport=report;
+    try{ showToast && showToast('تنظيف التكرارات تم — حدّث الصفحة لرؤية الأرقام الجديدة.'); }catch(_){}
+    try{ synced && synced(); }catch(_){}
+  }catch(e){ window.__dedupReport=['FATAL '+((e&&e.message)||e)]; }
+}
   /* NOTE: the one-time Zoho→DB import/migration routines (migrateStagesOnce, importAdelOnce,
      importProductImagesOnce, importZohoProductsOnce, importZohoCrmSyncOnce, cleanProductDashesOnce)
      were removed from startup. Their migration already completed and the data is reconciled on the
