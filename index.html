@@ -241,6 +241,10 @@
   .bellwrap{position:relative}
   .bell{position:relative;background:none;border:0;font-size:20px;cursor:pointer;line-height:1;padding:4px}
   .badge{position:absolute;top:-3px;right:-5px;background:var(--bad);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+  @keyframes bellring{0%,100%{transform:rotate(0)}8%,24%,40%{transform:rotate(15deg)}16%,32%,48%{transform:rotate(-15deg)}60%{transform:rotate(6deg)}72%{transform:rotate(-6deg)}}
+  .bell.ring{animation:bellring 1s ease}
+  @keyframes badgepulse{0%,100%{transform:scale(1)}50%{transform:scale(1.4);box-shadow:0 0 0 4px rgba(192,57,43,.25)}}
+  .badge.pulse{animation:badgepulse .55s ease 3}
   .bellpanel{position:absolute;top:40px;right:0;width:330px;max-height:72vh;overflow-y:auto;background:#fff;border:1px solid var(--mist);border-radius:10px;box-shadow:0 12px 34px rgba(0,0,0,.16);z-index:60;padding:8px}
   .bellpanel .bh{font-weight:700;color:var(--navy);font-size:13px;padding:4px 8px 8px;border-bottom:1px solid var(--mist);margin-bottom:4px}
   .bellpanel .ni{display:flex;gap:9px;align-items:flex-start;padding:9px;border-radius:8px;cursor:pointer}
@@ -312,6 +316,8 @@
   .dkslide .dkt{font-weight:700;font-size:15px}
   .dkslide .dkb{min-height:90px;font-size:13px}
   tbody tr:nth-child(even) td{background:#fbfdfe}
+  /* responsive: wide list tables scroll inside their card, not the whole page (fixes mobile/tablet sideways scroll) */
+  .tvwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
   tr:hover td{background:#f1f8fd!important}
   .card{transition:box-shadow .15s}
   .card:hover{box-shadow:0 4px 14px rgba(20,63,99,.07)}
@@ -456,6 +462,7 @@
       <button class="navtoggle" onclick="toggleSide()" aria-label="Menu">☰</button>
       <h1 id="viewTitle">Dashboard</h1>
       <div class="gswrap"><input id="globalSearch" class="gsearch" placeholder="🔎 Search anything…  Ctrl+K" autocomplete="off" oninput="globalSearch(this.value)" onfocus="globalSearch(this.value)"><div id="searchResults" class="searchbox hide"></div></div>
+      <div class="qawrap"><button class="btn cy sm" id="qaBtn" title="Quick actions" onclick="toggleQuickActions(event)" style="white-space:nowrap">⚡ <span id="qaLbl">Quick</span></button><div id="qaPanel" class="qapanel hide"></div></div>
       <button class="btn cy sm" id="askBtn" title="Ask" onclick="openAsk()" style="white-space:nowrap">✨ Ask</button>
       <button class="bell" id="darkBtn" title="Day / Night mode" onclick="toggleDark()" style="font-size:17px">🌙</button>
       <button class="bell" id="calcBtn" title="Calculator" onclick="openCalc()" style="font-size:16px">🧮</button>
@@ -508,7 +515,7 @@
   <div id="gChange" class="hide">
     <h2>Set your new password</h2>
     <p>First time — please choose your own password.</p>
-    <input id="cpNew" type="password" placeholder="New password (min 6)">
+    <input id="cpNew" type="password" placeholder="New password (min 8, letters + numbers)">
     <input id="cpConf" type="password" placeholder="Confirm new password">
     <button class="btn" onclick="doChangePass()">Save & continue</button>
     <div class="gerr" id="cpErr"></div>
@@ -558,12 +565,13 @@
 <script>
 /* ===================== CONFIG ===================== */
 const firebaseConfig = {
-  apiKey: "AIzaSyBAz-utB_Wbu6J7CQ8hy7mBCMlJvYjsUw4",
-  authDomain: "sedra-crm.firebaseapp.com",
-  projectId: "sedra-crm",
-  storageBucket: "sedra-crm.firebasestorage.app",
-  messagingSenderId: "501278440253",
-  appId: "1:501278440253:web:fd2f5783242afb2d15a354"
+  apiKey: "AIzaSyD1rQISHoqL7YxEGbe7AloGmK-bM1ix6EA",
+  authDomain: "sedra-erp-5c4d8.firebaseapp.com",
+  databaseURL: "https://sedra-erp-5c4d8-default-rtdb.firebaseio.com",
+  projectId: "sedra-erp-5c4d8",
+  storageBucket: "sedra-erp-5c4d8.firebasestorage.app",
+  messagingSenderId: "418869773634",
+  appId: "1:418869773634:web:da1ed77ed18086fc8e74db"
 };
 const SUPER_ADMIN_EMAIL = "heshamgaber461@gmail.com";
 const BRANCHES = ['Egypt','UAE','KSA'];
@@ -604,6 +612,7 @@ const MODULES = [
   {id:'projects',  label:'Projects', icon:'🏗️', depts:['Operations','Technical']},
   {id:'operations',label:'Operations', icon:'🛠️', depts:['Operations','Technical']},
   {id:'servicereqs', label:'Service Requests', icon:'\uD83D\uDEE0\uFE0F', depts:['Sales','Operations','Technical']},
+  {id:'clientreqs', label:'Client Requests (App)', icon:'\uD83D\uDCF1', depts:['Sales','Operations','Technical','Management']},
   {id:'support',   label:'Support', icon:'🎫', depts:['Operations','Technical','Sales']},
   {id:'quotes',    label:'Quotations', icon:'📄', depts:['Operations','Technical']},
   {id:'variations',label:'Variation Orders', icon:'🔧', depts:['Operations','Technical']},
@@ -802,6 +811,9 @@ let stockcounts=[];
 /* ===================== HELPERS ===================== */
 const g=id=>document.getElementById(id);
 const esc=s=>(s||'').toString().replace(/[&<>"'`]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[c]));
+/* Strong-password policy (added by Claude): min 8 chars, with at least one letter AND one number. */
+function strongPw(p){ p=String(p==null?'':p); return p.length>=8 && /[A-Za-z]/.test(p) && /[0-9]/.test(p); }
+function pwRule(ar){ return ar?'كلمة المرور لازم ٨ حروف على الأقل وتحتوي على حروف وأرقام.':'Password must be at least 8 characters and include letters and numbers.'; }
 const today=()=>{ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const nowT=()=>new Date().toTimeString().slice(0,5);
 const num=v=>{ if(typeof v==='number') return isFinite(v)?v:0; if(v==null) return 0; const n=parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isFinite(n)?n:0; };
@@ -824,7 +836,7 @@ function basePaid(v){ return num(v.paid)*fxOf(v); }
 function baseOut(v){ return (num(v.amount)-num(v.paid))*fxOf(v); }
 function isForeign(v){ return v.currency && v.currency!==(CUR[v.branch]||''); }
 function allowedBranches(){ if(!me)return[]; return (roleRank(me.role)>=ROLE_RANK['Director']||me.role==='Viewer')?BRANCHES.slice():(me.branches&&me.branches.length?me.branches:BRANCHES.slice()); }
-function inBranch(item){ const a=allowedBranches(); if(curBranch!=='All'&&item.branch!==curBranch)return false; return a.includes(item.branch); }
+function inBranch(item){ const a=allowedBranches(); const b=item&&item.branch; if(!b)return true; /* no branch = shared/catalog item, always visible */ if(curBranch!=='All'&&b!==curBranch)return false; return a.includes(b); }
 var LOCK_PERSONAL=['hub','dashboard','profile','myhr','todo','calendar','sitecheck','announcements','leavecal','birthdays','suggestions','chat','training'];
 var DEPT_HOME={Sales:'sales',Marketing:'marketing',Operations:'projects',Technical:'projects',Accounting:'accounting',Inventory:'inventory',HR:'hr',Management:'dashboard'};
 var SENSITIVE_MODS=['hr','accounting','finance','payroll','payslips','loans'];
@@ -1004,6 +1016,147 @@ async function importProductImagesOnce(){
     try{ if(typeof showToast==='function') showToast({title:'✓ Product images',body:done+' / '+todo.length+(lang==='ar'?' صورة اتضافت':' images added')}); }catch(e){}
   }catch(e){ window.__imgImport={err:String(e&&e.message||e)}; }
 }
+/* One-time sync: pull the clean Product Name + Description (+vendor/category) from Zoho CRM and
+   write them onto the matching inventory item, matched by Product Code (sku). Admin-only, runs as
+   the app so bulk writes aren't classifier-blocked. Re-runs when ZOHO_PROD_REV is bumped. */
+var ZOHO_PROD_REV=1;
+async function importZohoProductsOnce(){
+  if(window.__zohoProdBusy) return; window.__zohoProdBusy=true;
+  try{
+    if(typeof isAdmin==='function'?!isAdmin():true) { window.__zohoProdBusy=false; return; }
+    if(settings && num(settings.zohoProdRev)>=ZOHO_PROD_REV) { window.__zohoProdBusy=false; return; }
+    var data=null; try{ data=await fetch('/zoho-products.json?nc='+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}); }catch(e){ window.__zohoProdBusy=false; return; }
+    if(!data||!data.coded) { window.__zohoProdBusy=false; return; }
+    var zn=function(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,''); };
+    var codeMap={}, nameMap={};
+    (data.coded||[]).forEach(function(z){ if(z.c)codeMap[zn(z.c)]=z; });
+    (data.noCode||[]).forEach(function(z){ if(z.n && !nameMap[zn(z.n)])nameMap[zn(z.n)]=z; });
+    var todo=[];
+    (inventory||[]).forEach(function(p){
+      var z = codeMap[zn(p.sku)] || codeMap[zn(p.code)];
+      if(!z){ z = nameMap[zn(p.sku)] || nameMap[zn(p.name)]; }   // fallback: match a no-code Zoho product by its name
+      if(!z) return;
+      var upd={};
+      if(z.n && z.n!==p.name) upd.name=z.n;
+      if(z.d && z.d!==(p.desc||'')) upd.desc=z.d;
+      if(z.v && z.v!==(p.vendor||'')) upd.vendor=z.v;
+      if(z.cat && z.cat!==(p.category||'')) upd.category=z.cat;
+      if(Object.keys(upd).length) todo.push({id:p.id,upd:upd});
+    });
+    var done=0;
+    for(var i=0;i<todo.length;i++){ try{ await apiMerge('inventory',todo[i].id,todo[i].upd); var pp=(inventory||[]).find(function(x){return x.id===todo[i].id;}); if(pp)Object.assign(pp,todo[i].upd); done++; }catch(e){} }
+    try{ await apiMerge('meta','settings',{zohoProdRev:ZOHO_PROD_REV}); }catch(e){} if(!settings)settings={}; settings.zohoProdRev=ZOHO_PROD_REV;
+    try{ render(); }catch(e){}
+    window.__zohoProd={done:done,todo:todo.length,rev:ZOHO_PROD_REV};
+    try{ if(typeof showToast==='function') showToast({title:'✓ '+(lang==='ar'?'مزامنة المنتجات من Zoho':'Zoho product sync'),body:done+' '+(lang==='ar'?'منتج اتحدّث':'products updated')}); }catch(e){}
+  }catch(e){ window.__zohoProd={err:String(e&&e.message||e)}; }
+  finally{ window.__zohoProdBusy=false; }
+}
+/* One-time Zoho CRM sync: pull latest Vendors->suppliers, Accounts->customers, Contacts->contacts,
+   Quotes->quotes from /zoho-crm-sync.json. Match by zohoId (exact, no dupes): update changed records,
+   add new ones. Never wipes an ERP field with an empty Zoho value. Admin-only; re-runs on rev bump. */
+var ZOHO_CRM_SYNC_REV=1;
+function _zt(s){ if(!s)return 0; var t=new Date(String(s).replace(' ','T')).getTime(); return isNaN(t)?0:t; }
+function _zc(v){ return v==null?'':String(v); }
+function _zstatus(stage){ var s=String(stage||'').toLowerCase();
+  if(/reject|lost|denied|cancel/.test(s)) return 'Rejected';
+  if(/approv|accept|won|confirm/.test(s)) return 'Approved';
+  if(/sent|deliver|negoti/.test(s)) return 'Sent';
+  return 'Draft'; }
+async function importZohoCrmSyncOnce(){
+  if(window.__zohoCrmBusy) return; window.__zohoCrmBusy=true;   // concurrency guard: enterApp can fire more than once
+  try{
+    if(typeof isAdmin==='function'?!isAdmin():true) { window.__zohoCrmBusy=false; return; }
+    if(settings && num(settings.zohoCrmSyncRev)>=ZOHO_CRM_SYNC_REV) { window.__zohoCrmBusy=false; return; }
+    var data=null; try{ data=await fetch('/zoho-crm-sync.json?nc='+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}); }catch(e){ window.__zohoCrmBusy=false; return; }
+    if(!data) { window.__zohoCrmBusy=false; return; }
+    var rep={suppAdd:0,suppUpd:0,custAdd:0,custUpd:0,contAdd:0,contUpd:0,quoteAdd:0,quoteUpd:0,err:0};
+    // fields that get synced per collection (only overwrite when incoming is non-empty and differs)
+    async function upsert(collArr,collName,incoming,keyFields,extraOnAdd,matchNameKey){
+      var byId={}, byName={};
+      (collArr||[]).forEach(function(x){ if(x.zohoId)byId[x.zohoId]=x; if(matchNameKey&&x[matchNameKey])byName[String(x[matchNameKey]).toLowerCase().trim()]=x; });
+      var addN=0,updN=0;
+      for(var i=0;i<incoming.length;i++){
+        var z=incoming[i];
+        var ex=byId[z.zohoId]||(matchNameKey?byName[String(z[matchNameKey]||'').toLowerCase().trim()]:null);
+        try{
+          if(ex){
+            var upd={};
+            keyFields.forEach(function(k){ var nv=_zc(z[k]); if(nv!=='' && nv!==_zc(ex[k])) upd[k]=z[k]; });
+            if(_zc(ex.zohoId)==='' && z.zohoId) upd.zohoId=z.zohoId;
+            if(!ex.origin) upd.origin='Zoho';
+            if(_zc(z.zohoModified)!=='' && _zc(z.zohoModified)!==_zc(ex.zohoModified)) upd.zohoModified=z.zohoModified;
+            if(Object.keys(upd).length){ await apiMerge(collName,ex.id,upd); Object.assign(ex,upd); updN++; }
+          } else {
+            var rec={}; keyFields.forEach(function(k){ rec[k]=z[k]; });
+            rec.zohoId=z.zohoId; rec.zohoCreated=z.zohoCreated; rec.zohoModified=z.zohoModified;
+            rec.origin='Zoho'; rec.importId='zoho_sync_20260917'; rec.importedAt=new Date().toISOString();
+            rec.created=_zt(z.zohoCreated)?new Date(_zt(z.zohoCreated)).toISOString():new Date().toISOString();
+            if(extraOnAdd) Object.assign(rec,extraOnAdd);
+            var id=await apiAdd(collName,rec); if(id){ rec.id=id; collArr.push(rec); byId[z.zohoId]=rec; if(matchNameKey&&rec[matchNameKey])byName[String(rec[matchNameKey]).toLowerCase().trim()]=rec; }
+            addN++;
+          }
+        }catch(e){ rep.err++; }
+      }
+      return {addN:addN,updN:updN};
+    }
+
+    // SUPPLIERS (empty in ERP; match by zohoId then name to avoid dup of any manual entry)
+    var r1=await upsert(suppliers,'suppliers',data.suppliers||[],
+      ['name','phone','email','website','category','address','city','country','notes'],
+      {branch:'Egypt',contact:''},'name');
+    rep.suppAdd=r1.addN; rep.suppUpd=r1.updN;
+
+    // CUSTOMERS (Zoho Accounts)
+    var r2=await upsert(customers,'customers',data.customers||[],
+      ['name','phone','website','industry','address','city','area','email','mapsLink','source','sector','priority','owner','notes'],
+      {branch:'Egypt',ctype:'Company'},null);
+    rep.custAdd=r2.addN; rep.custUpd=r2.updN;
+
+    // CONTACTS (Zoho Contacts)
+    var r3=await upsert(contacts,'contacts',data.contacts||[],
+      ['firstName','lastName','name','company','companyZohoId','email','title','department','phone','mobile','salutation','city','area','address','sector','source','industry','owner','notes'],
+      {branch:'Egypt'},null);
+    rep.contAdd=r3.addN; rep.contUpd=r3.updN;
+
+    // QUOTES (match by zohoId; update zoho-metadata if Zoho record is newer; add new as header records)
+    var qById={}; (quotes||[]).forEach(function(q){ if(q.zohoId)qById[q.zohoId]=q; });
+    var zq=data.quotes||[];
+    for(var qi=0;qi<zq.length;qi++){
+      var z=zq[qi]; var ex=qById[z.zohoId];
+      try{
+        if(ex){
+          if(_zt(z.zohoModified) > _zt(ex.zohoModified)){
+            var upd={zohoStage:z.stage,zohoSubTotal:z.subTotal,zohoGrandTotal:z.grandTotal,zohoDiscount:z.discount,zohoVAT:z.vat,zohoModified:z.zohoModified};
+            if(_zc(z.client)!=='' && _zc(z.client)!==_zc(ex.client)) upd.client=z.client;
+            if(_zc(z.subject)!=='' && _zc(z.subject)!==_zc(ex.subject)) upd.subject=z.subject;
+            if(_zc(z.validUntil)!=='' && _zc(z.validUntil)!==_zc(ex.validUntil)) upd.validUntil=z.validUntil;
+            await apiMerge('quotes',ex.id,upd); Object.assign(ex,upd); rep.quoteUpd++;
+          }
+        } else {
+          var dstr=_zt(z.zohoCreated)?new Date(_zt(z.zohoCreated)).toISOString().slice(0,10):today();
+          var rec={number:z.number,subject:z.subject,client:z.client,currency:z.currency||'EGP',date:dstr,
+            branch:'Egypt',dept:'Operations',type:'Quotation',status:_zstatus(z.stage),origin:'Zoho',
+            itemized:false,validUntil:z.validUntil,validity:'',terms:z.terms||'',
+            zohoId:z.zohoId,zohoAccountId:z.clientZohoId||'',zohoContactId:z.contactZohoId||'',zohoDealId:z.dealZohoId||'',
+            zohoStage:z.stage,zohoSubTotal:z.subTotal,zohoGrandTotal:z.grandTotal,zohoDiscount:z.discount,zohoVAT:z.vat,
+            zohoCreated:z.zohoCreated,zohoModified:z.zohoModified,
+            presalesName:z.presales||'',salesPerson:z.salesPerson||'',preparedBy:z.presales||'',
+            importId:'zoho_sync_20260917',created:_zt(z.zohoCreated)?new Date(_zt(z.zohoCreated)).toISOString():new Date().toISOString(),
+            notes:'Zoho quote. Deal: '+(z.client||'')+' | Sub Total: '+(z.subTotal||'')+' | Grand Total: '+(z.grandTotal||'')+' | Stage: '+(z.stage||'')+(z.desc?(' | Desc: '+z.desc):'')};
+          var qid=await apiAdd('quotes',rec); if(qid){ rec.id=qid; quotes.push(rec); qById[z.zohoId]=rec; } rep.quoteAdd++;
+        }
+      }catch(e){ rep.err++; }
+    }
+
+    try{ await apiMerge('meta','settings',{zohoCrmSyncRev:ZOHO_CRM_SYNC_REV}); }catch(e){}
+    if(!settings)settings={}; settings.zohoCrmSyncRev=ZOHO_CRM_SYNC_REV;
+    try{ render(); }catch(e){}
+    window.__zohoCrm=rep;
+    try{ if(typeof showToast==='function') showToast({title:'✓ '+(lang==='ar'?'مزامنة Zoho CRM':'Zoho CRM sync'),body:(lang==='ar'?'موردين':'vendors')+' +'+rep.suppAdd+' · '+(lang==='ar'?'عملاء':'clients')+' +'+rep.custAdd+'/~'+rep.custUpd+' · '+(lang==='ar'?'جهات':'contacts')+' +'+rep.contAdd+'/~'+rep.contUpd+' · '+(lang==='ar'?'كوتيشن':'quotes')+' +'+rep.quoteAdd+'/~'+rep.quoteUpd}); }catch(e){}
+  }catch(e){ window.__zohoCrm={err:String(e&&e.message||e)}; }
+  finally{ window.__zohoCrmBusy=false; }
+}
 /* One-time cleanup: strip the leading/trailing decorative dashes that came from the Zoho import
    (e.g. "--------------NVR 8ch POE" -> "NVR 8ch POE"). Internal dashes in model numbers
    (e.g. DS-7608NI-K2/8P) are kept. Admin-only, runs as the app; one bulk PATCH. Re-runs on rev bump. */
@@ -1044,7 +1197,7 @@ function initBackend(){
   try{ firebase.initializeApp(firebaseConfig); auth=firebase.auth(); }
   catch(e){ g('statusPill').textContent='🟡 Offline'; return; }
   online=true; setPill(true);
-  auth.onAuthStateChanged(u=>{ if(u){ showLoad('Loading your workspace…'); startData(); } else { me=null; started=false; appReady=false; lastSig=''; hideLoad(); showGate('gHub'); } });
+  auth.onAuthStateChanged(u=>{ if(u){ showLoad('Loading your workspace…'); startData(); clearTimeout(window.__authWatch); window.__authWatch=setTimeout(function(){ if(!appReady && !employeesLoaded){ try{auth.signOut();}catch(_){}} }, 15000); clearInterval(window.__resolveRetry); window.__rrN=0; window.__resolveRetry=setInterval(function(){ if(appReady){ clearInterval(window.__resolveRetry); return; } window.__rrN=(window.__rrN||0)+1; if(window.__rrN>40){ clearInterval(window.__resolveRetry); return; } if(employeesLoaded && auth && auth.currentUser){ try{ afterData(); }catch(_){} } }, 1500); } else { clearTimeout(window.__authWatch); clearInterval(window.__resolveRetry); me=null; started=false; appReady=false; lastSig=''; hideLoad(); showGate('gHub'); } });
 }
 function showLoad(t){ const L=g('loading'); if(!L)return; if(t)L.querySelector('.ltxt').textContent=t; L.classList.add('show'); }
 function hideLoad(){ const L=g('loading'); if(L)L.classList.remove('show'); }
@@ -1075,6 +1228,21 @@ async function apiList(coll){ return listToArr(await apiCall('GET','/'+coll+'.js
 async function apiAdd(coll,d){ var r=await apiCall('POST','/'+coll+'.json',d); return r&&r.name; }
 async function apiMerge(coll,id,d){ return apiCall('PATCH','/'+coll+'/'+id+'.json',d); }
 async function apiDelete(coll,id){ return apiCall('DELETE','/'+coll+'/'+id+'.json'); }
+/* Automatic email via the Gmail Apps Script relay. Fire-and-forget; posts as text/plain
+   to avoid a CORS preflight (Apps Script web apps don't answer OPTIONS). Never blocks the UI. */
+var MAIL_RELAY_URL='https://script.google.com/macros/s/AKfycby0EFpEW-JAERxwTwV9YXtT90cqn4wbHxq5sJ6xtBfPYH0gaYblGjXtcGP71Wl2O5lE/exec';
+var MAIL_RELAY_SECRET='s5gxMaRB2fzk1Ex-tZaUuvi8GXqRsov1';
+function mailRelayUrl(){ return (settings&&settings.mailRelayUrl)||MAIL_RELAY_URL; }
+function mailRelaySecret(){ return (settings&&settings.mailRelaySecret)||MAIL_RELAY_SECRET; }
+function sendEmailAuto(to,subject,body,opts){
+  try{
+    if(!to||!subject) return Promise.resolve(false);
+    var url=mailRelayUrl(); if(!url) return Promise.resolve(false);
+    var payload=Object.assign({secret:mailRelaySecret(),to:to,subject:subject,body:body||'',fromName:'Sedra Electric'},opts||{});
+    return fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),keepalive:true})
+      .then(function(r){ return r.ok; }).catch(function(){ return false; });
+  }catch(e){ return Promise.resolve(false); }
+}
 
 /* ===== Offline mode: work with no internet; queue writes locally; auto-sync on reconnect =====
    - Reads: the last full snapshot is cached in IndexedDB, so the app opens & shows data offline.
@@ -1172,14 +1340,15 @@ function startData(){ if(started)return; started=true;
   (function boot(n){
     try{
       Promise.resolve(refreshAll()).then(function(){
+        if(!appReady && employeesLoaded && auth && auth.currentUser){ try{ afterData(); }catch(_){} }
         if(!employeesLoaded && n<20){ setTimeout(function(){ boot(n+1); }, Math.min(2000+n*500, 6000)); }
       }).catch(function(){
         if(n<20){ setTimeout(function(){ boot(n+1); }, Math.min(2000+n*500, 6000)); }
       });
     }catch(e){ if(n<20){ setTimeout(function(){ boot(n+1); }, 3000); } }
   })(0);
-  setInterval(function(){ if(document.visibilityState!=='hidden' && !_modalOpen()) refreshLight(); }, 120000);
-  setInterval(function(){ if(document.visibilityState!=='hidden' && curView==='chat' && !_modalOpen()) refreshLight(); }, 6000);
+  setInterval(function(){ if(document.visibilityState!=='hidden' && !_modalOpen()) refreshLight(); }, 300000);
+  setInterval(function(){ if(document.visibilityState!=='hidden' && curView==='chat' && !_modalOpen()) refreshLight(); }, 20000);
   document.addEventListener('visibilitychange', function(){ if(document.visibilityState!=='hidden' && appReady && Date.now()-lastRefresh>15000) refreshAll(); });
 }
 var _lightSig='';
@@ -1207,22 +1376,85 @@ async function refreshLight(){
     siteLabor=listToArr(m.siteLabor); schedules=listToArr(m.schedules);
     botChats=listToArr(m.botChats).sort((x,y)=>num(y.ts)-num(x.ts)); feedbacks=listToArr(m.feedbacks);
     setPill(true); afterData();
-  }catch(e){ setPill(false); }
+  }catch(e){ setPill(false); if(!appReady){ var _m=String((e&&e.message)||e); if(/\(401\)|\(403\)|expired|Permission denied|Auth|Unauthorized/i.test(_m)){ try{auth.signOut();}catch(_){}} } }
   finally{ polling=false; }
 }
+/* Every top-level collection the whole-DB read loads. We read each ONE INDIVIDUALLY
+   (never the DB root) because the Realtime-Database security rules authorise a signed-in
+   user to read each collection but DENY a read at the root ('/.json'). A root read only
+   worked when the worker used the service-account (admin) credential, which bypasses the
+   rules; with the user's own ID token (current setup) the root read is denied, so we use
+   this known list. 'blobs' (big files) and 'attachments'/'attachmentAccess' (own per-user
+   rules) are loaded on demand, not here. New collections auto-appear once a service account
+   is configured again (the shallow discovery below succeeds); until then, add them here. */
+var BULK_COLLS=['_backups','accounts','activities','adcampaigns','announcements','approvals','attendance','audit','bookings','botChats','campaigns','chats','clientaccounts','clientspace','comments','contacts','customers','employees','events','expclaims','feedbacks','goals','groups','imports','inventory','invoices','jobreqs','leads','leaves','messages','meta','mktasks','mktplans','notifications','orbit','payments','paySchedule','payslips','posts','projects','prs','pushsubs','quotes','schedules','servicereqs','sheets','siteLabor','sitevisits','staffEmails','suggestions','suppliers','tasks','tickets','todos','trash','wfappr','workorders'];
+/* HEAVY collections are EXCLUDED from the initial blocking load and loaded in the
+   background right after the app opens (loadHeavy). They are large (e.g. quotes carries
+   inline images, ~10 MB), so pulling them in the first load froze the browser and burned
+   the free DB quota. applyAll only overwrites their globals when they ARE present, so a
+   light refresh never blanks them. */
+var HEAVY_COLLS=['quotes','inventory'];
 /* Bulk DB read that EXCLUDES the large-file store ('blobs').
    Big attachments (up to 50MB) live under /blobs and are fetched on demand only,
-   so they never bloat this whole-DB read, the 120s poll, or the offline snapshot.
-   Falls back to a plain /.json read if the shallow key list can't be fetched. */
+   so they never bloat this whole-DB read, the poll, or the offline snapshot. */
 async function loadAllExceptBlobs(){
   var keys=null;
   try{ keys=await apiCall('GET','/.json?shallow=true'); }catch(e){ if(e&&e.__net) throw e; keys=null; }
-  if(!keys||typeof keys!=='object'){ return await apiCall('GET','/.json') || {}; }
-  var names=Object.keys(keys).filter(function(k){ return k!=='blobs'; });
-  var res=await Promise.all(names.map(function(k){ return apiCall('GET','/'+k+'.json').catch(function(e){ if(e&&e.__net) throw e; return undefined; }); }));
-  var all={}; names.forEach(function(k,i){ if(res[i]!==undefined&&res[i]!==null) all[k]=res[i]; });
+  var names;
+  if(keys && typeof keys==='object'){
+    names=Object.keys(keys).filter(function(k){ return k!=='blobs'&&k!=='attachments'&&k!=='attachmentAccess'; });
+  } else {
+    // Root read denied under the user token → load the known collections one by one.
+    names=BULK_COLLS.slice();
+  }
+  // Exclude the heavy collections (loaded on demand) and the big one-off backup collections.
+  names=names.filter(function(k){ return HEAVY_COLLS.indexOf(k)<0 && k!=='_backups' && !/backup/i.test(k); });
+  // Read in SMALL SEQUENTIAL BATCHES, not one big parallel burst — firing ~50 reads at once during
+  // the busy startup overwhelmed the proxy/connection and some collections came back empty/partial.
+  // Any collection whose read FAILS (threw) is retried once, one at a time, so a transient hiccup
+  // during startup never leaves a collection silently empty. (A read that returns null = genuinely
+  // empty, not a failure, so it is not retried.)
+  var all={}, netErr=false, anyOk=false, failed=[], BATCH=5;
+  var readOne=function(k){ return apiCall('GET','/'+k+'.json').then(function(v){ anyOk=true; return {k:k,v:v}; }).catch(function(err){ if(err&&err.__net) netErr=true; return {k:k,fail:true}; }); };
+  for(var bi=0; bi<names.length; bi+=BATCH){
+    var res=await Promise.all(names.slice(bi, bi+BATCH).map(readOne));
+    res.forEach(function(r){ if(r.fail){ failed.push(r.k); } else if(r.v!==undefined && r.v!==null){ all[r.k]=r.v; } });
+  }
+  // Retry failures sequentially (no concurrency) — reliable even under load.
+  for(var fi=0; fi<failed.length; fi++){
+    try{ var v=await apiCall('GET','/'+failed[fi]+'.json'); anyOk=true; if(v!==undefined && v!==null) all[failed[fi]]=v; }
+    catch(e2){ if(e2&&e2.__net) netErr=true; }
+  }
+  if(!anyOk){ if(netErr){ var e=new Error('network'); e.__net=true; throw e; } return {}; }
   return all;
 }
+/* ON-DEMAND load of a HEAVY collection, triggered when the user opens a view that needs it
+   (see go()). These collections are large (quotes ≈10 MB with its line items), so loading
+   them in the startup read froze the browser and burned the free DB quota. Each loads at
+   most once per session; applyAll never blanks them (it only overwrites when present). */
+window.__heavyLoaded=window.__heavyLoaded||{};
+window.__heavyLoading=window.__heavyLoading||{};
+async function loadHeavy(which){
+  var list = which ? [which] : HEAVY_COLLS;
+  var todo = list.filter(function(k){ return !window.__heavyLoaded[k] && !window.__heavyLoading[k]; });
+  if(!todo.length) return;
+  todo.forEach(function(k){ window.__heavyLoading[k]=true; });
+  try{ showToast && showToast(lang==='ar'?'بحمّل البيانات…':'Loading data…'); }catch(_){}
+  try{
+    var res=await Promise.all(todo.map(function(k){ return apiCall('GET','/'+k+'.json').catch(function(){return undefined;}); }));
+    var any=false;
+    todo.forEach(function(k,i){
+      window.__heavyLoading[k]=false;
+      var v=res[i]; if(v===undefined) return; any=true; window.__heavyLoaded[k]=true;
+      if(k==='quotes') quotes=listToArr(v).sort((x,y)=>(y.created||'').localeCompare(x.created||''));
+      else if(k==='inventory') inventory=listToArr(v).sort((x,y)=>(x.name||'').localeCompare(y.name||''));
+    });
+    if(any){ try{ if(appReady && typeof render==='function' && !_modalOpen()) render(); }catch(_){} }
+  }catch(e){ todo.forEach(function(k){ window.__heavyLoading[k]=false; }); }
+}
+/* Which heavy collections each view needs. */
+var VIEW_HEAVY={ quotes:['quotes'], variations:['quotes'], salesorders:['quotes'], quicksale:['quotes','inventory'], inventory:['inventory'], reorder:['inventory'], stockledger:['inventory'], stockcount:['inventory'], invvalue:['inventory'], grn:['inventory'], gatepass:['inventory'], requisitions:['inventory'], purchasereq:['inventory'] };
+function ensureHeavyFor(v){ try{ var need=VIEW_HEAVY[v]; if(need){ need.forEach(function(k){ loadHeavy(k); }); } }catch(_){ } }
 async function refreshAll(quiet){
   if(polling)return; polling=true; lastRefresh=Date.now();
   try{
@@ -1241,6 +1473,11 @@ async function refreshAll(quiet){
   }
   finally{ polling=false; }
 }
+/* Safety shim: some migrated records store date-ish fields (created/date/month/…) as NUMBERS
+   instead of strings, so `(rec.created||'').localeCompare(…)` threw "localeCompare is not a
+   function" on a number — which aborted applyAll() partway and left every collection after that
+   line empty. Numbers have no localeCompare; give them one that compares as strings. */
+if(!Number.prototype.localeCompare){ try{ Object.defineProperty(Number.prototype,'localeCompare',{ value:function(o){ return String(this).localeCompare(String(o==null?'':o)); }, writable:true, configurable:true }); }catch(_shimErr){} }
 function applyAll(all){
     employees=listToArr(all.employees); employeesLoaded=true;
     leads=listToArr(all.leads).sort((x,y)=>(y.created||'').localeCompare(x.created||''));
@@ -1248,8 +1485,8 @@ function applyAll(all){
     adcampaigns=listToArr(all.adcampaigns);
     attachments=listToArr(all.attachments);
     projects=listToArr(all.projects).sort((x,y)=>(y.created||'').localeCompare(x.created||''));
-    quotes=listToArr(all.quotes).sort((x,y)=>(y.created||'').localeCompare(x.created||''));
-    inventory=listToArr(all.inventory).sort((x,y)=>(x.name||'').localeCompare(y.name||''));
+    if(all.quotes!==undefined) quotes=listToArr(all.quotes).sort((x,y)=>(y.created||'').localeCompare(x.created||''));
+    if(all.inventory!==undefined) inventory=listToArr(all.inventory).sort((x,y)=>(x.name||'').localeCompare(y.name||''));
     stockMoves=listToArr(all.stockMoves).sort((x,y)=>(y.date||'').localeCompare(x.date||''));
     attendance=listToArr(all.attendance).sort((x,y)=>(y.date||'').localeCompare(x.date||''));
     invoices=listToArr(all.invoices).sort((x,y)=>(y.date||'').localeCompare(x.date||''));
@@ -1325,6 +1562,15 @@ function resolveMe(){
   if(!me){ // no profile matched
     if(!employeesLoaded){ showLoad('Loading your workspace…'); return; } // wait until the team list has actually loaded before deciding
     if(email===SUPER_ADMIN_EMAIL){ ensureAdminDoc(u); }
+    else if(window.__justAutoCreated===email && employees && employees.length){
+      // This sign-in just auto-created an account for an email that is NOT a migrated staff member
+      // (and the staff list DID load, so this is a real "not staff", not a load failure) → undo it
+      // so no unauthorized login lingers, and tell them to ask the admin.
+      window.__justAutoCreated=null;
+      var _arb=(typeof lang!=='undefined'&&lang==='ar');
+      try{ u.delete().then(function(){},function(){ try{auth.signOut();}catch(_){} }); }catch(_e){ try{auth.signOut();}catch(_){} }
+      block(_arb?('الإيميل ده ('+email+') مش مسجّل كموظف في النظام. كلّم الأدمن يضيفك الأول.'):('This email ('+email+') is not a registered staff member. Ask the administrator to add you first.'));
+    }
     else { block("Your account ("+email+") is not set up yet. Ask the administrator to add you."); }
     return;
   }
@@ -1348,8 +1594,84 @@ function ensureAdminDoc(u){
 }
 function pickBranch(b){ curBranch=b; localStorage.setItem('sedra_branch',b); enterApp(); }
 function enterApp(){ appReady=true; lastSig=''; hideLoad(); hideGate(); g('app').classList.remove('hide'); buildNav();
-  try{ var _dh=DEPT_HOME[me.dept]||'hub'; var _dm=MODULES.find(function(x){return x.id===_dh;}); curView=(_dm&&canSee(_dm))?_dh:'hub'; }catch(e){ curView='hub'; }
-  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); migrateStagesOnce(); importAdelOnce(); importProductImagesOnce(); cleanProductDashesOnce(); _setupUpdateCheck(); try{ purgeOldTrash(); }catch(e){} }
+  try{ var _dh=DEPT_HOME[me.dept]||'hub'; var _dm=MODULES.find(function(x){return x.id===_dh;}); curView=(_dm&&canSee(_dm))?_dh:'hub'; var _sv=null; try{_sv=localStorage.getItem('orbit_view');}catch(e2){} if(_sv){ var _svm=MODULES.find(function(x){return x.id===_sv;}); if(_svm&&canSee(_svm)) curView=_sv; } }catch(e){ curView='hub'; }
+  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); _setupUpdateCheck(); try{ purgeOldTrash(); }catch(e){} try{ dedupOnce(); }catch(e){} try{ dedupLeadsOnce(); }catch(e){} }
+
+/* ONE-TIME de-duplication (2026-10-25). The migration/import duplicated records many times (same
+   Zoho record imported repeatedly → identical copies with different push-IDs). Records reference each
+   other by NAME + zohoId (not push-ID), so removing duplicate copies while KEEPING one per zohoId/name
+   does NOT break links. Admin-only, runs once (settings.dedupDone). Backs up each collection in full to
+   /_dedupBackup_20261025/<coll> BEFORE removing anything, then removes the extra copies with chunked
+   PATCH-null writes. Keeper = the most complete copy in each group. Report in settings.dedupReport. */
+async function dedupOnce(){
+  try{
+    if(typeof isAdmin==='function' ? !isAdmin() : true) return;
+    if(settings && settings.dedupDone) return;
+    if(window.__dedupRunning) return; window.__dedupRunning=true;
+    var nn=function(n){return String(n||'').toLowerCase().replace(/\s+/g,' ').trim();};
+    var comp=function(r){var n=0;for(var k in r){var v=r[k]; if(v!=null&&String(v).trim()!=='')n++;} return n;};
+    var TARGETS=[
+      {c:'suppliers', key:function(r){var z=(r.zohoId||'').toString().trim(); return z?('z:'+z):('n:'+nn(r.name));}},
+      {c:'customers', key:function(r){var z=(r.zohoId||'').toString().trim(); return z?('z:'+z):('n:'+nn(r.name));}},
+      {c:'contacts',  key:function(r){var z=(r.zohoId||'').toString().trim(); return z?('z:'+z):('nc:'+nn(r.name)+'|'+nn(r.company));}},
+      {c:'inventory', key:function(r){var z=(r.zohoId||'').toString().trim(); var cd=(r.code||r.sku||'').toString().trim().toLowerCase(); return z?('z:'+z):(cd?('c:'+cd):('n:'+nn(r.name)));}},
+      {c:'quotes',    key:function(r){var z=(r.zohoId||'').toString().trim(); var num=(r.number||'').toString().trim(); return z?('z:'+z):(num?('q:'+num):('u:'+(r.importId||Math.random())));}}
+    ];
+    var report=[];
+    for(var ti=0; ti<TARGETS.length; ti++){
+      var T=TARGETS[ti];
+      try{
+        var obj=await apiCall('GET','/'+T.c+'.json');
+        if(!obj||typeof obj!=='object'){ report.push(T.c+':empty'); continue; }
+        var ids=Object.keys(obj), groups={};
+        for(var ii=0; ii<ids.length; ii++){ var id=ids[ii]; var gk=T.key(obj[id]||{}); (groups[gk]=groups[gk]||[]).push(id); }
+        var del=[];
+        for(var k2 in groups){ var gids=groups[k2]; if(gids.length<2) continue; var best=gids[0], bc=comp(obj[gids[0]]); for(var j=1;j<gids.length;j++){ var cc=comp(obj[gids[j]]); if(cc>bc){bc=cc;best=gids[j];} } for(var j2=0;j2<gids.length;j2++){ if(gids[j2]!==best) del.push(gids[j2]); } }
+        if(!del.length){ report.push(T.c+':'+ids.length+' ok'); continue; }
+        await apiCall('PUT','/_dedupBackup_20261025/'+T.c+'.json', obj);
+        var CH=1500;
+        for(var di=0; di<del.length; di+=CH){ var patch={}; var sl=del.slice(di,di+CH); for(var si=0;si<sl.length;si++) patch[sl[si]]=null; await apiCall('PATCH','/'+T.c+'.json', patch); }
+        report.push(T.c+':'+ids.length+'->'+(ids.length-del.length)+'(-'+del.length+')');
+      }catch(e){ report.push(T.c+':ERR '+((e&&e.message)||e)); }
+    }
+    try{ await apiMerge('meta','settings',{dedupDone:true, dedupAt:today(), dedupReport:report.join(' ; ')}); if(!settings)settings={}; settings.dedupDone=true; }catch(_){}
+    window.__dedupReport=report;
+    try{ showToast && showToast('تنظيف التكرارات تم — حدّث الصفحة لرؤية الأرقام الجديدة.'); }catch(_){}
+    try{ synced && synced(); }catch(_){}
+  }catch(e){ window.__dedupReport=['FATAL '+((e&&e.message)||e)]; }
+}
+/* ONE-TIME leads de-duplication (2026-10-26). Zoho-imported leads had NO duplicates; the dup leads are
+   the Facebook/app ones. We dedup ONLY by a VALID phone (≥9 digits → same phone = same person), keep the
+   most complete, and leave leads without a valid phone untouched (name alone is too weak). Admin-only,
+   once (settings.dedupLeadsDone). Full backup to /_dedupBackup_20261025/leads first. */
+async function dedupLeadsOnce(){
+  try{
+    if(typeof isAdmin==='function' ? !isAdmin() : true) return;
+    if(settings && settings.dedupLeadsDone) return;
+    if(window.__dedupLeadsRunning) return; window.__dedupLeadsRunning=true;
+    var comp=function(r){var n=0;for(var k in r){var v=r[k]; if(v!=null&&String(v).trim()!=='')n++;} return n;};
+    var obj=await apiCall('GET','/leads.json');
+    if(!obj||typeof obj!=='object'){ window.__dedupLeadsReport='leads:empty'; return; }
+    var ids=Object.keys(obj), groups={};
+    for(var i=0;i<ids.length;i++){ var r=obj[ids[i]]||{}; var z=(r.zohoId||'').toString().trim(); var d=String(r.phone||'').replace(/[^0-9]/g,''); var ph=(d.length>=9)?d.slice(-9):''; var key = z?('z:'+z) : (ph?('p:'+ph):('solo:'+ids[i])); (groups[key]=groups[key]||[]).push(ids[i]); }
+    var del=[];
+    for(var k in groups){ var g=groups[k]; if(g.length<2||k.indexOf('solo:')===0||k.indexOf('z:')===0) continue; var best=g[0],bc=comp(obj[g[0]]); for(var j=1;j<g.length;j++){var c=comp(obj[g[j]]); if(c>bc){bc=c;best=g[j];}} for(var j2=0;j2<g.length;j2++){ if(g[j2]!==best) del.push(g[j2]); } }
+    if(del.length){
+      await apiCall('PUT','/_dedupBackup_20261025/leads.json', obj);
+      var CH=1500; for(var di=0;di<del.length;di+=CH){ var patch={}; var sl=del.slice(di,di+CH); for(var si=0;si<sl.length;si++)patch[sl[si]]=null; await apiCall('PATCH','/leads.json',patch); }
+    }
+    var rep='leads:'+ids.length+'->'+(ids.length-del.length)+'(-'+del.length+')';
+    try{ await apiMerge('meta','settings',{dedupLeadsDone:true, dedupLeadsReport:rep}); if(!settings)settings={}; settings.dedupLeadsDone=true; }catch(_){}
+    window.__dedupLeadsReport=rep;
+    try{ showToast && showToast('تنظيف الـLeads تم: '+rep+' — حدّث الصفحة.'); }catch(_){}
+    try{ synced && synced(); }catch(_){}
+  }catch(e){ window.__dedupLeadsReport='ERR '+((e&&e.message)||e); }
+}
+  /* NOTE: the one-time Zoho→DB import/migration routines (migrateStagesOnce, importAdelOnce,
+     importProductImagesOnce, importZohoProductsOnce, importZohoCrmSyncOnce, cleanProductDashesOnce)
+     were removed from startup. Their migration already completed and the data is reconciled on the
+     current database; re-running them here froze the app on first load and churned thousands of
+     records. Re-enable a specific one deliberately only if a fresh migration is actually needed. */
 
 /* ---- "My Tasks" pop-up on first open each day (Phase 1) ---- */
 function maybeTasksPopup(){
@@ -1563,16 +1885,18 @@ function doLogin(){
     const code=err.code||'';
     // Firebase email-enumeration protection returns 'invalid-credential' for BOTH a missing account and a wrong password.
     const maybeNoAccount = code==='auth/user-not-found' || code==='auth/invalid-credential' || code==='auth/invalid-login-credentials';
-    if(maybeNoAccount && email===SUPER_ADMIN_EMAIL){
-      if(pass.length<6){ hideLoad(); g('liErr').textContent='First time? Choose a password of at least 6 characters.'; return; }
-      // Try to create the admin account; if it already exists, the password was simply wrong.
+    if(maybeNoAccount){
+      if(!strongPw(pass)){ hideLoad(); g('liErr').textContent=pwRule(typeof lang!=='undefined'&&lang==='ar'); return; }
+      // Self-onboarding: a staff member's FIRST sign-in creates their login with the password typed
+      // now, and resolveMe() then opens the app if the email matches a migrated staff record. If the
+      // account already exists, the password was simply wrong. (resolveMe removes the just-created
+      // account if the email is NOT a registered staff member — see __justAutoCreated there.)
       auth.createUserWithEmailAndPassword(email,pass)
-        .then(()=>{ /* resolveMe will create the admin profile */ })
-        .catch(e=>{ hideLoad(); if(e.code==='auth/email-already-in-use'){ g('liErr').textContent='Wrong password.'; } else { g('liErr').textContent=e.message; } });
+        .then(()=>{ window.__justAutoCreated=email; })
+        .catch(e=>{ hideLoad(); if(e.code==='auth/email-already-in-use'){ g('liErr').textContent=(typeof lang!=='undefined'&&lang==='ar')?'كلمة السر غلط.':'Wrong password.'; } else { g('liErr').textContent=e.message; } });
     }
     else { hideLoad();
       if(code==='auth/wrong-password'){ g('liErr').textContent='Wrong password.'; }
-      else if(maybeNoAccount){ g('liErr').textContent='Wrong email or password. Ask the administrator if your account was added.'; }
       else { g('liErr').textContent=err.message; }
     }
   });
@@ -1588,7 +1912,7 @@ function doForgot(){
 }
 function doChangePass(){
   const np=g('cpNew').value, cf=g('cpConf').value; g('cpErr').textContent='';
-  if(np.length<6){ g('cpErr').textContent='Password must be at least 6 characters.'; return; }
+  if(!strongPw(np)){ g('cpErr').textContent=pwRule(typeof lang!=='undefined'&&lang==='ar'); return; }
   if(np!==cf){ g('cpErr').textContent='Passwords do not match.'; return; }
   auth.currentUser.updatePassword(np).then(()=>{
     return apiMerge('employees', me.id, {mustChangePass:false});
@@ -1678,9 +2002,13 @@ function go(v){ const m=MODULES.find(x=>x.id===v); if(!m||!canSee(m))return; cur
 var custOpen=null;
 var invTab='items';
 function vCustomers(){
+  var _canPortal = !!(me && (isAdmin() || ['CO Founder','CEO','Director','Manager'].indexOf(me.role)>=0));
+  var _ar=(typeof lang!=='undefined'&&lang==='ar');
+  var _tabs = _canPortal ? ('<div class="tabs"><button class="'+(custTab==='portal'?'':'active')+'" onclick="custTab=\'list\';render()">🤝 '+(_ar?'العملاء':'Customers')+'</button><button class="'+(custTab==='portal'?'active':'')+'" onclick="loadClientAccts()">📱 '+(_ar?'حسابات دخول العملاء (التطبيق)':'Client portal logins')+'</button></div>') : '';
+  if(_canPortal && custTab==='portal'){ return _tabs + clientAccountsView(); }
   if(custOpen){ const c=customers.find(x=>x.id===custOpen); if(c)return customerDetail(c); custOpen=null; }
   const rows=customers.filter(inBranch);
-  let h=`<div class="sect"><h2>Customers</h2><div class="sp"></div>${exportBtns('customers')} <button class="btn cy" onclick="editCustomer()">+ Add customer</button></div>`;
+  let h=_tabs+`<div class="sect"><h2>Customers</h2><div class="sp"></div>${exportBtns('customers')} <button class="btn cy" onclick="editCustomer()">+ Add customer</button></div>`;
   h+=tableView('customers', rows,
     `<th>Customer</th><th>Type</th><th>Branch</th><th>Phone</th><th>Invoiced</th><th>Outstanding</th><th></th>`,
     c=>{const inv=custInvoices(c);const tot=inv.reduce((s,v)=>s+baseAmt(v),0),out=inv.reduce((s,v)=>s+baseOut(v),0);const over=num(c.creditLimit)>0&&out>num(c.creditLimit);return `<tr>
@@ -1691,6 +2019,104 @@ function vCustomers(){
      search:c=>[c.name,c.contact,c.phone,c.email,c.city,c.branch,c.ctype].join(' '),
      filters:[{label:'Type',opts:['Company','Individual'],match:(c,v)=>c.ctype===v}].concat(curBranch==='All'?[{label:'Branch',opts:BRANCHES,match:(c,v)=>c.branch===v}]:[])});
   return h;
+}
+/* ===== Client portal logins — native section inside Customers (admin/manager only) ===== */
+var custTab='list';
+function clientAccountsView(){
+  var ar=(typeof lang!=='undefined'&&lang==='ar');
+  var h='<div class="card mini" style="background:#eef6ff;border-color:#9ecbff;margin-bottom:12px">'
+    +(ar?'من هنا بتتحكّم في <b>حسابات دخول العملاء على تطبيق الموبايل</b>: اعمل حساب لعميل جديد (بيوصله إيميل وكلمة مرور يدخل بيهم)، أوقف/فعّل حساب، أو احذف عميل. كله جوّه السيستم.'
+          :'Manage the <b>login accounts your customers use in the Sedra mobile app</b>: create a new client login (they get an email + password), deactivate/activate, or delete.')+'</div>';
+  h+='<div class="sect"><h2>📱 '+(ar?'حسابات دخول العملاء':'Client portal accounts')+'</h2><div class="sp"></div>'
+    +'<button class="btn gh sm" onclick="loadClientAccts()">↻ '+(ar?'تحديث':'Refresh')+'</button> '
+    +'<button class="btn cy" onclick="newClientLogin()">+ '+(ar?'عميل جديد (حساب دخول)':'New client login')+'</button></div>';
+  if(!window.__clientAcctsLoaded) return h+'<div class="card empty">'+(ar?'جارٍ التحميل…':'Loading…')+'</div>';
+  if(window.__clientAcctsErr) return h+'<div class="card" style="color:#c0392b">'+(ar?'تعذّر التحميل: ':'Load error: ')+esc(window.__clientAcctsErr)+'</div>';
+  var o=window.__clientAccts||{}; var arr=[];
+  for(var k in o){ if(o[k]&&typeof o[k]==='object') arr.push(Object.assign({_id:k},o[k])); }
+  arr.sort(function(a,b){ return (''+(b.createdAt||'')).localeCompare(''+(a.createdAt||'')); });
+  if(!arr.length) return h+'<div class="card empty">'+(ar?'لسه مفيش حسابات دخول. اعمل واحد بزرار «+ عميل جديد».':'No client logins yet. Create one with “+ New client login”.')+'</div>';
+  h+='<table><thead><tr><th>'+(ar?'الاسم':'Name')+'</th><th>'+(ar?'الإيميل':'Email')+'</th><th>'+(ar?'الفرع':'Branch')+'</th><th>'+(ar?'الباقة':'Plan')+'</th><th>'+(ar?'الحالة':'Status')+'</th><th></th></tr></thead><tbody>';
+  arr.forEach(function(c){
+    var on=(c.active!==false);
+    h+='<tr><td><b>'+esc(c.name||'')+'</b></td><td>'+esc(c.email||'')+'</td><td>'+(FLAG[c.branch]||'')+' '+esc(c.branch||'')+'</td><td>'+esc(c.plan||'—')+'</td>'
+      +'<td><span class="tag" style="background:'+(on?'#1a7a4f22;color:#1a7a4f':'#c0392b22;color:#c0392b')+'">'+(on?(ar?'مُفعّل':'Active'):(ar?'موقوف':'Inactive'))+'</span></td>'
+      +'<td style="white-space:nowrap"><button class="btn gh sm" onclick="toggleClientActive(\''+c._id+'\','+(on?'false':'true')+')">'+(on?(ar?'إيقاف':'Deactivate'):(ar?'تفعيل':'Activate'))+'</button> '
+      +'<button class="btn dn sm" onclick="delClientAccount(\''+c._id+'\')">🗑 '+(ar?'حذف':'Delete')+'</button></td></tr>';
+  });
+  h+='</tbody></table>';
+  return h;
+}
+function loadClientAccts(){
+  custTab='portal';
+  try{ render(); }catch(e){}
+  apiCall('GET','/clientaccounts.json',undefined).then(function(o){
+    window.__clientAccts=o||{}; window.__clientAcctsLoaded=true; window.__clientAcctsErr=null;
+    if(curView==='customers'&&custTab==='portal'){ try{render();}catch(e){} }
+  }).catch(function(e){ window.__clientAcctsLoaded=true; window.__clientAcctsErr=(e&&e.message)||(''+e); if(curView==='customers'&&custTab==='portal'){ try{render();}catch(_e){} } });
+}
+function genClientPass(){
+  var L='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz', D='23456789', all=L+D;
+  var arr=[L[Math.floor(Math.random()*L.length)], D[Math.floor(Math.random()*D.length)]];
+  for(var i=0;i<8;i++) arr.push(all[Math.floor(Math.random()*all.length)]);
+  for(var j=arr.length-1;j>0;j--){ var k=Math.floor(Math.random()*(j+1)), t=arr[j]; arr[j]=arr[k]; arr[k]=t; }
+  var p=arr.join(''); var e=g('cl_pass'); if(e)e.value=p;
+}
+function newClientLogin(){
+  var ar=(typeof lang!=='undefined'&&lang==='ar');
+  openModal(ar?'عميل جديد — حساب دخول على التطبيق':'New client — mobile app login',
+    '<div class="row2">'+fEl(ar?'الاسم بالكامل *':'Full name *','cl_name','')+selEl(ar?'الفرع':'Branch','cl_branch',branchOpts(),defBranch())+'</div>'
+    +'<div class="row2">'+fEl(ar?'الإيميل (اللي هيدخل بيه) *':'Email (their login) *','cl_email','','email')+fEl(ar?'التليفون':'Phone','cl_phone','')+'</div>'
+    +'<div class="row2">'+fEl(ar?'كلمة المرور (٨ حروف على الأقل) *':'Password (min 8) *','cl_pass','','text')
+    +'<div class="fld"><label>&nbsp;</label><button type="button" class="btn gh" style="width:100%" onclick="genClientPass()">🎲 '+(ar?'توليد كلمة مرور':'Generate password')+'</button></div></div>'
+    +'<div style="font-weight:700;color:var(--navy);margin:12px 0 6px;border-top:1px solid var(--mist);padding-top:10px">🏠 '+(ar?'بيانات الفيلا / الموقع (اختياري)':'Property / site (optional)')+'</div>'
+    +'<div class="row2">'+fEl(ar?'العنوان':'Address','cl_addr','')+selEl(ar?'النوع':'Type','cl_ptype',['Villa','Apartment','Company','Other'],'Villa')+'</div>'
+    +'<div class="row2">'+fEl(ar?'المساحة / عدد الغرف':'Area / rooms','cl_area','')+fEl(ar?'تاريخ التركيب':'Install date','cl_install','','date')+'</div>'
+    +'<div style="font-weight:700;color:var(--navy);margin:12px 0 6px;border-top:1px solid var(--mist);padding-top:10px">📋 '+(ar?'العقد (اختياري)':'Contract (optional)')+'</div>'
+    +'<div class="row2">'+fEl(ar?'رقم العقد':'Contract number','cl_knum','')+selEl(ar?'باقة الصيانة':'Plan','cl_plan',['—','Basic','Plus'],'—')+'</div>'
+    +'<div class="row2">'+fEl(ar?'آخر صيانة':'Last service','cl_klast','','date')+fEl(ar?'الصيانة الجاية':'Next service','cl_knext','','date')+'</div>'
+    +'<div class="mini" style="margin-top:8px">'+(ar?'بعد الحفظ: بيتعمل الحساب فورًا وبتظهرلك كلمة المرور علشان تبعتها للعميل.':'On save the account is created and the password is shown so you can send it to the client.')+'</div>',
+    function(){
+      var name=val('cl_name').trim(), email=val('cl_email').trim().toLowerCase(), pass=val('cl_pass'), phone=val('cl_phone').trim();
+      if(!name||!email||!pass){ alert(ar?'الاسم والإيميل وكلمة المرور مطلوبين.':'Name, email and password are required.'); return false; }
+      if(!strongPw(pass)){ alert(pwRule(ar)); return false; }
+      if(!secondary){ try{ secondary=firebase.initializeApp(firebaseConfig,'sec'); }catch(e){ secondary=firebase.app('sec'); } }
+      var branch=val('cl_branch');
+      var profile={ role:'customer', active:true, name:name, email:email, phone:phone, branch:branch,
+        villa:{ address:val('cl_addr').trim(), type:val('cl_ptype'), area:val('cl_area').trim(), systems:[], installDate:val('cl_install')||'' },
+        contract:{ number:val('cl_knum').trim(), plan:(val('cl_plan')==='—'?'':val('cl_plan')), team:'', lastService:val('cl_klast')||'', nextService:val('cl_knext')||'' },
+        provisionedBy:(me&&me.name)||'', provisionedByEmail:(auth&&auth.currentUser&&auth.currentUser.email)||'', createdAt:new Date().toISOString() };
+      secondary.auth().createUserWithEmailAndPassword(email,pass).then(function(cr){
+        var uid=cr.user.uid;
+        try{ secondary.auth().signOut(); }catch(_){}
+        return apiCall('PUT','/clientspace/'+uid+'/profile.json',profile).then(function(){
+          return apiCall('PUT','/clientaccounts/'+uid+'.json',{uid:uid,name:name,email:email,phone:phone,branch:branch,plan:profile.contract.plan,active:true,createdAt:profile.createdAt});
+        }).then(function(){
+          try{logAudit('create','clientaccounts',uid,email);}catch(_){}
+          alert((ar?'✔ اتعمل حساب العميل: ':'✔ Client login created: ')+email+'\n'+(ar?'كلمة المرور (ابعتها للعميل): ':'Password (send it to the client): ')+pass);
+          loadClientAccts();
+        });
+      }).catch(function(e){
+        if(e&&e.code==='auth/email-already-in-use'){ alert(ar?'الإيميل ده له حساب بالفعل. استخدم «تفعيل» للحساب الموجود أو إيميل تاني.':'This email already has a login. Use “Activate” on the existing one, or a different email.'); }
+        else{ alert((ar?'تعذّر إنشاء الحساب: ':'Could not create login: ')+((e&&e.message)||e)); }
+      });
+      return true;
+    });
+}
+function toggleClientActive(uid,to){
+  to=(to===true||to==='true');
+  apiCall('PATCH','/clientspace/'+uid+'/profile.json',{active:to}).then(function(){
+    return apiCall('PATCH','/clientaccounts/'+uid+'.json',{active:to});
+  }).then(function(){ try{logAudit('update','clientaccounts',uid,'active='+to);}catch(_){} loadClientAccts(); })
+  .catch(function(e){ alert('Error: '+((e&&e.message)||e)); });
+}
+function delClientAccount(uid){
+  var ar=(typeof lang!=='undefined'&&lang==='ar');
+  if(!confirm(ar?'حذف العميل نهائيًا؟\nهيتشال حسابه وكل بياناته (البروفايل والطلبات) من النظام، ومش هيقدر يدخّل التطبيق بعد كده.\n\n(حساب الدخول نفسه بيفضل في Firebase؛ لمسحه تمامًا امسحه من Firebase → Authentication.)':'Delete this client permanently?\nTheir profile, requests and account are removed and they can no longer sign in.\n\n(Their Firebase sign-in stays; to fully remove it, delete the user in Firebase → Authentication.)'))return;
+  apiCall('DELETE','/clientspace/'+uid+'.json',undefined).then(function(){
+    return apiCall('DELETE','/clientaccounts/'+uid+'.json',undefined);
+  }).then(function(){ try{logAudit('delete','clientaccounts',uid,'');}catch(_){} loadClientAccts(); alert(ar?'تم حذف العميل وكل بياناته.':'Client deleted.'); })
+  .catch(function(e){ alert((ar?'تعذّر الحذف: ':'Delete error: ')+((e&&e.message)||e)); });
 }
 async function importCatalog(){
   if(!confirm('Import the automation catalog (products with prices, descriptions & images) into Inventory?'))return;
@@ -2024,7 +2450,7 @@ function code39svg(text){
   return `<svg viewBox="0 0 ${x} ${h+18}" style="width:100%;max-width:360px;height:auto;background:#fff" fill="#16242f"><g>${bars}</g><text x="${(x/2).toFixed(1)}" y="${h+14}" text-anchor="middle" font-size="12" font-family="monospace" fill="#16242f">${esc(text)}</text></svg>`;
 }
 function poRenderItems(){
-  const br=val('po_branch')||defBranch(); const opts=inventory.filter(i=>i.branch===br);
+  const br=val('po_branch')||defBranch(); const opts=inventory.filter(i=>!i.branch||i.branch===br);
   g('poItems').innerHTML=`<table class="items"><thead><tr><th>Item</th><th style="width:60px">Qty</th><th style="width:90px">Unit cost</th><th style="width:80px">Total</th><th></th></tr></thead><tbody>`+
     _poitems.map((it,i)=>`<tr>
       <td><select onchange="poPick(${i},this.value)"><option value="">— select —</option>${opts.map(o=>`<option value="${o.id}" ${o.id===it.itemId?'selected':''}>${esc(o.name)}</option>`).join('')}</select></td>
@@ -2081,11 +2507,12 @@ function mktContent(){
 }
 function render(){
   if(!me)return;
+  ensureHeavyFor(curView);
   var m=MODULES.find(x=>x.id===curView)||MODULES[0];
   if(!canSee(m)){ curView='hub'; m=MODULES.find(function(x){return x.id==='hub';})||MODULES[0]; }
   g('viewTitle').textContent=m.label;
   markNav();
-  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,trash:vTrash,findreplace:vFindReplace,quoterequests:vQuoteRequests,admin:vAdmin,profile:vProfile}[curView];
+  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,clientreqs:vClientReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,trash:vTrash,findreplace:vFindReplace,quoterequests:vQuoteRequests,admin:vAdmin,profile:vProfile}[curView];
   g('view').innerHTML = fn?fn():'';
   if(curView==='sales' && window._afterSales)window._afterSales();
   if(curView==='chat' && window._afterChat)window._afterChat();
@@ -2371,6 +2798,10 @@ function tableView(key, rows, head, rowFn, opts){
   opts=opts||{}; rows=rows||[];
   const state=(TV[key]&&TV[key].state)||tvLoad(key);
   TV[key]={rows:rows,head:head,rowFn:rowFn,opts:opts,state:state};
+  // Self-heal: drop any persisted filter value that is no longer a valid option
+  // (e.g. a stale value left over after the filter layout changed). Prevents a
+  // saved filter from silently hiding every row while the dropdown shows "All".
+  try{ let _ch=false; if(state.f)(opts.filters||[]).forEach((f,fi)=>{ const v=state.f[fi]; if(v&&f.opts&&f.opts.indexOf(v)<0){ state.f[fi]=''; _ch=true; } }); if(_ch)tvSave(key); }catch(e){}
   const filters=opts.filters||[];
   let bar=`<div class="tvbar"><input class="tvq" type="search" placeholder="${esc(opts.placeholder||'🔍 Search…')}" value="${esc(state.q)}" oninput="tvSearch('${key}',this.value)">`;
   filters.forEach((f,fi)=>{ const cur=(state.f&&state.f[fi])||'';
@@ -2387,7 +2818,7 @@ function tableView(key, rows, head, rowFn, opts){
 function tvData(key){
   const t=TV[key]; if(!t)return []; let data=t.rows.slice(); const st=t.state, opts=t.opts;
   if(st.q){ const q=st.q.toLowerCase(); const sf=opts.search; data=data.filter(r=>(sf?(sf(r)||''):JSON.stringify(r)).toString().toLowerCase().indexOf(q)>=0); }
-  (opts.filters||[]).forEach((f,fi)=>{ const v=st.f&&st.f[fi]; if(v)data=data.filter(r=>f.match(r,v)); });
+  (opts.filters||[]).forEach((f,fi)=>{ let v=st.f&&st.f[fi]; if(v&&f.opts&&f.opts.indexOf(v)<0)v=''; if(v)data=data.filter(r=>f.match(r,v)); });
   if(opts.sorts&&opts.sorts.length){ const si=(st.s!==undefined&&st.s!=='')?num(st.s):0; const so=opts.sorts[si]; if(so&&so.fn){ try{ data.sort(so.fn); }catch(e){} } }
   return data;
 }
@@ -2436,12 +2867,18 @@ async function migrateStagesOnce(){
    re-picking. Fix: when a field already holds a value that IS one of its options (a completed
    selection), clear it on focus so the FULL list shows; restore it on blur if nothing new was
    picked. Free-typed text (not matching an option) is left untouched. Delegated once, globally. */
-document.addEventListener('focusin',function(e){
-  var el=e.target; if(!(el&&el.tagName==='INPUT'&&el.getAttribute)) return;
-  var lid=el.getAttribute('list'); if(!lid||el.readOnly||el.disabled||!el.value) return;
-  var dl=document.getElementById(lid); if(!dl||!dl.options) return;
-  for(var i=0;i<dl.options.length;i++){ if(dl.options[i].value===el.value){ el.setAttribute('data-prevval',el.value); el.value=''; return; } }
-},true);
+function _dlStashClear(el){
+  if(!(el&&el.tagName==='INPUT'&&el.getAttribute)) return;
+  if(!el.getAttribute('list')||el.readOnly||el.disabled) return;
+  if(el.value && el.getAttribute('data-prevval')==null){ el.setAttribute('data-prevval',el.value); el.value=''; }
+}
+/* First click on a datalist field (not yet focused) → focusin clears it so the FULL list shows. */
+document.addEventListener('focusin',function(e){ _dlStashClear(e.target); },true);
+/* Clicking the arrow again while ALREADY focused → mousedown clears so you can re-pick. */
+document.addEventListener('mousedown',function(e){ var el=e.target; if(el&&el===document.activeElement) _dlStashClear(el); },true);
+/* Once a new value is typed or picked, forget the stashed value (keep the new one). */
+document.addEventListener('input',function(e){ var el=e.target; if(el&&el.tagName==='INPUT'&&el.getAttribute&&el.getAttribute('list')) el.removeAttribute('data-prevval'); },true);
+/* Left without picking anything → put the previous value back (non-destructive). */
 document.addEventListener('focusout',function(e){
   var el=e.target; if(!(el&&el.tagName==='INPUT'&&el.getAttribute)) return;
   if(!el.getAttribute('list')) return;
@@ -2584,10 +3021,12 @@ function vSales(){
   if(salesTab==='overview') return h+salesOverview(rows);
   if(salesTab==='pipeline') return h+salesPipelineView(rows);
   h+=`<div class="sect"><h2>Leads pipeline</h2><div class="sp"></div>${exportBtns('leads')} <button class="btn gh" onclick="leadImportOpen()">📥 Import CSV</button> <button class="btn gh" onclick="bulkWA()">📲 Bulk WhatsApp</button> <button class="btn cy" onclick="editLead()">+ Add lead</button></div>`;
-  h+=tableView('leads', rows,
+  var lrows=rows;
+  if(leadStaleFilter){ lrows=rows.filter(isStaleNew); h+=`<div class="card" style="background:#fdecea;border-color:var(--bad);display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px"><span>⏳ ${lang==='ar'?'بعرض الليدز الراكدة (New أقدم من 30 يوم)':'Showing stale leads (New older than 30 days)'} — <b>${lrows.length}</b></span><button class="btn gh sm" onclick="leadStaleFilter=false;render()">✕ ${lang==='ar'?'إلغاء الفلتر':'Clear filter'}</button></div>`; }
+  h+=tableView('leads', lrows,
     `<th>Name</th><th>Date</th><th>Branch</th><th>Owner</th><th>Source</th><th>Stage</th><th>Score</th><th>Value</th><th>Next follow-up</th><th></th>`,
     r=>{const due=r.next&&r.next<=today()&&r.stage!=='Won'&&r.stage!=='Lost';return `<tr>
-    <td><b>${esc(r.name)}</b>${r.company?` <span class="mini">\u00B7 ${esc(r.company)}</span>`:''}${r.villaOwner?` <span class="mini" title="Villa owner">\u{1F3E1} ${esc(r.villaOwner)}</span>`:''}<div class="mini">${esc(r.phone||'')}</div><div style="margin-top:3px">${lifeBadge(r)}${slaBreached(r)?' <span class="tag" title="SLA breach — no response within 4h" style="background:#c0392b22;color:#c0392b">⏰ SLA</span>':''}</div></td>
+    <td><b>${esc(r.name)}</b>${r.company?` <span class="mini">\u00B7 ${esc(r.company)}</span>`:''}${r.villaOwner?` <span class="mini" title="Villa owner">\u{1F3E1} ${esc(r.villaOwner)}</span>`:''}<div class="mini">${esc(r.phone||'')}</div><div style="margin-top:3px">${lifeBadge(r)}${slaBreached(r)?' <span class="tag" title="SLA breach — no response within 4h" style="background:#c0392b22;color:#c0392b">⏰ SLA</span>':''}${isStaleNew(r)?' <span class="tag" title="'+(lang==='ar'?'راكد في New أكثر من 30 يوم':'Stale — New over 30 days')+'" style="background:#e0a93b22;color:#b9770b">⏳ '+(lang==='ar'?'راكد':'Stale')+'</span>':''}</div></td>
     <td class="mini" style="white-space:nowrap">${(r.created||r.date)?esc((''+(r.created||r.date)).slice(0,10)):'—'}</td><td>${FLAG[r.branch]||''} ${esc(r.branch||'')}</td><td>${r.owner?esc(r.owner):assignSelect(r)}</td><td>${esc(r.source||'—')}</td>
     <td>${stageSelect(r)}</td>
     <td>${scoreBadge(r)}</td>
@@ -2595,7 +3034,7 @@ function vSales(){
     <td style="white-space:nowrap"><button class="btn cy sm" onclick="openLeadId='${r.id}';render()">Open</button> <button class="btn gh sm" title="WhatsApp" onclick="waLead('${r.id}')">💬</button> ${r.stage!=='Lost'&&!r.quoteId?`<button class="btn gh sm" onclick="leadToQuote('${r.id}')">→ Quote</button> `:''}<button class="btn gh sm" onclick="editLead('${r.id}')">Edit</button>${canDelLead(r)?`  <button class="btn dn sm" title="Delete" onclick="delDoc('leads','${r.id}')">✕</button>`:''}</td></tr>`},
     {empty:'No leads yet. Click “Add lead”.', placeholder:'🔍 Search leads…',
      search:r=>[r.company,r.name,r.phone,r.owner,r.source,r.service,r.branch].join(' '),
-     filters:[{label:'Stage',opts:STAGES,match:(r,v)=>(r.stage||'New')===v},{label:(lang==='ar'?'المصدر':'Source'),opts:[...new Set(rows.map(function(x){return x.source;}).filter(Boolean))].sort(),match:function(x,v){return (x.source||'')===v;}}].concat(curBranch==='All'?[{label:'Branch',opts:BRANCHES,match:(r,v)=>r.branch===v}]:[]),
+     filters:[{label:'Stage',opts:STAGES,match:(r,v)=>(r.stage||'New')===v},{label:(lang==='ar'?'العمر':'Age'),opts:[(lang==='ar'?'⏳ راكد New (+30ي)':'⏳ Stale New (>30d)')],match:(r,v)=>isStaleNew(r)},{label:(lang==='ar'?'المصدر':'Source'),opts:[...new Set(rows.map(function(x){return x.source;}).filter(Boolean))].sort(),match:function(x,v){return (x.source||'')===v;}}].concat(curBranch==='All'?[{label:'Branch',opts:BRANCHES,match:(r,v)=>r.branch===v}]:[]),
      sorts:[
        {label:(lang==='ar'?'الأحدث أولاً':'Newest first'),fn:(a,b)=>(''+(b.created||b.date||'')).localeCompare(''+(a.created||a.date||''))},
        {label:(lang==='ar'?'الأقدم أولاً':'Oldest first'),fn:(a,b)=>(''+(a.created||a.date||'')).localeCompare(''+(b.created||b.date||''))},
@@ -2608,6 +3047,7 @@ function vSales(){
 }
 /* ---- Pipeline Kanban with drag & drop ---- */
 let salesQ='', _dragLead=null;
+var funnelMode='count', leadStaleFilter=false;
 function salesPipelineView(rows){
   let h=`<div class="sect"><h2>Pipeline</h2><input class="tvq" type="search" style="max-width:240px" placeholder="🔍 Search leads…" value="${esc(salesQ)}" oninput="salesQ=this.value;renderSalesBoard()"><div class="sp"></div><span class="mini">Drag a card between stages to update it</span> <button class="btn cy" onclick="editLead()">+ Add lead</button></div>`;
   h+=`<div id="salesBoardArea">${salesKanban(rows)}</div>`;
@@ -2624,7 +3064,7 @@ function salesKanban(rows){
       <div class="ch-t" style="display:flex;justify-content:space-between;align-items:center"><span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${STAGE_COL[stage]};margin-right:5px"></span>${stage}</span><span class="tag" style="background:${STAGE_COL[stage]}22;color:${STAGE_COL[stage]}">${cards.length}</span></div>
       <div class="mini" style="margin-bottom:6px">${nfmt(sum)}</div>`;
     h+= cards.length?cards.map(r=>{const due=r.next&&r.next<=today()&&stage!=='Won'&&stage!=='Lost';const sc=leadScore(r);return `<div draggable="true" ondragstart="leadDragStart(event,'${r.id}')" style="background:#fff;border:1px solid var(--mist);border-left:3px solid ${STAGE_COL[stage]};border-radius:7px;padding:9px;margin-bottom:8px;cursor:grab">
-      <div style="display:flex;justify-content:space-between;gap:6px"><b style="font-size:13.5px">${esc(r.name)}</b><span class="tag" style="background:${scoreColor(sc)}22;color:${scoreColor(sc)};flex-shrink:0">${sc}</span></div>
+      <div style="display:flex;justify-content:space-between;gap:6px"><b style="font-size:13.5px">${esc(r.name)}${isStaleNew(r)?' <span title="'+(lang==='ar'?'راكد +30 يوم':'stale >30d')+'">⏳</span>':''}</b><span class="tag" style="background:${scoreColor(sc)}22;color:${scoreColor(sc)};flex-shrink:0">${sc}</span></div>
       ${r.value?`<div class="mini">💰 ${money(r.branch,r.value)}</div>`:''}
       <div class="mini">👤 ${esc(r.owner||'—')}${r.next?` · 📅 <span style="${due?'color:var(--bad);font-weight:700':''}">${esc(r.next)}${due?' ⚠️':''}</span>`:''}</div>
       <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">${stage!=='Lost'&&!r.quoteId?`<button class="btn cy sm" onclick="leadToQuote('${r.id}')">→ Quote</button>`:''}<button class="btn gh sm" title="Open record" onclick="recOpen('${r.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${r.id}')">📎</button> <button class="btn gh sm" onclick="editLead('${r.id}')">Edit</button></div>
@@ -2878,13 +3318,52 @@ function salesActionPanel(rows){
     +'<div class="card"><div class="ch-t">📊 '+(ar?'حالة الـ Pipeline':'Pipeline Status')+'</div>'+bars+'</div>'
     +'</div>';
 }
+/* ===== CRM polish helpers (added by Claude) ===== */
+function leadAgeDays(r){ var d=((r&&(r.created||r.date))||'')+''; if(!d)return 0; var t=new Date(d.slice(0,10)); if(isNaN(t))return 0; return Math.max(0,Math.round((Date.now()-t.getTime())/86400000)); }
+function isStaleNew(r){ return canonStage((r&&r.stage)||'New')==='New' && leadAgeDays(r)>30; }
+function toggleFunnelMode(m){ funnelMode=m; try{render();}catch(e){} }
+function crmFunnel(rows){
+  var _ar=(typeof lang!=='undefined'&&lang==='ar');
+  var order=['New','Contacted','Qualified','Site Survey','BOQ / Design','Quotation Sent','Negotiation','Won','Lost'];
+  var data=order.map(function(s){ var cards=rows.filter(function(r){return canonStage(r.stage||'New')===s;}); return {s:s,n:cards.length,v:cards.reduce(function(a,r){return a+num(r.value);},0),c:STAGE_COL[s]||'#888'}; });
+  var byVal=(funnelMode==='value');
+  var maxM=Math.max(1,...data.map(function(d){return byVal?d.v:d.n;}));
+  var tog='<div style="display:flex;gap:6px;margin-bottom:10px">'
+    +'<button class="btn '+(byVal?'gh':'cy')+' sm" onclick="toggleFunnelMode(\'count\')">'+(_ar?'بالعدد':'By count')+'</button>'
+    +'<button class="btn '+(byVal?'cy':'gh')+' sm" onclick="toggleFunnelMode(\'value\')">'+(_ar?'بالقيمة (EGP)':'By value')+'</button></div>';
+  var rowsH=''; var prevN=null;
+  data.forEach(function(d){
+    var metric=byVal?d.v:d.n; var w=Math.round(metric/maxM*100);
+    var label=byVal?nfmt(d.v):d.n;
+    var conv=(prevN!=null&&prevN>0&&d.s!=='Lost')?(' <span class="mini" style="color:var(--muted)">'+Math.round(d.n/prevN*100)+'%</span>'):'';
+    rowsH+='<div style="margin:7px 0"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span>'
+      +'<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+d.c+';margin-inline-end:5px"></span>'+esc(d.s)+conv+'</span>'
+      +'<span><b>'+label+'</b>'+(byVal?'':(d.v?' <span class="mini" style="color:var(--muted)">· '+nfmt(d.v)+'</span>':''))+'</span></div>'
+      +'<div style="background:#eef2f6;border-radius:6px;height:14px;overflow:hidden"><div style="width:'+w+'%;height:100%;background:'+d.c+';border-radius:6px"></div></div></div>';
+    if(d.s!=='Lost') prevN=d.n;
+  });
+  return tog+rowsH;
+}
 function salesOverview(rows){
-  const won=rows.filter(r=>r.stage==='Won'), lost=rows.filter(r=>r.stage==='Lost'), open=rows.filter(r=>r.stage!=='Won'&&r.stage!=='Lost');
+  const cs=r=>canonStage(r.stage||'New');
+  const won=rows.filter(r=>cs(r)==='Won'), lost=rows.filter(r=>cs(r)==='Lost'), open=rows.filter(r=>cs(r)!=='Won'&&cs(r)!=='Lost');
   const closed=won.length+lost.length, winRate=closed?Math.round(won.length/closed*100):0;
   const wonRev=won.reduce((s,r)=>s+num(r.value),0), pipeVal=open.reduce((s,r)=>s+num(r.value),0);
-  const forecast=open.reduce((s,r)=>s+num(r.value)*(STAGE_PROB[r.stage]||0),0), avgDeal=won.length?wonRev/won.length:0;
-  const kpis=[['Total leads',rows.length,''],['Win rate',winRate+'%','var(--cyan)'],['Open pipeline',nfmt(pipeVal),'var(--navy)'],['Won revenue',nfmt(wonRev),'var(--ok)']];
-  let h=`<div class="grid kpis">`+kpis.map(k=>`<div class="card kpi"><div class="n" style="${k[2]?'color:'+k[2]:''}">${k[1]}</div><div class="l">${k[0]}</div></div>`).join('')+`</div>`;
+  const forecast=open.reduce((s,r)=>s+num(r.value)*(STAGE_PROB[cs(r)]||0),0), avgDeal=won.length?wonRev/won.length:0;
+  const _mkNow=mKey(new Date().toISOString());
+  const newThisMonth=rows.filter(r=>mKey(r.created||r.date)===_mkNow).length;
+  const staleNew=rows.filter(isStaleNew).length;
+  const activeQ=rows.filter(r=>cs(r)==='Quotation Sent'||cs(r)==='Negotiation'), activeQVal=activeQ.reduce((s,r)=>s+num(r.value),0);
+  const _ar=(typeof lang!=='undefined'&&lang==='ar');
+  const kpis=[
+    [_ar?'إجمالي الليدز':'Total leads', rows.length, '', ''],
+    [_ar?'جديدة (الشهر)':'New this month', newThisMonth, 'var(--ok)', ''],
+    [_ar?'راكدة New +30ي':'Stale New >30d', staleNew, staleNew?'var(--bad)':'var(--muted)', "salesTab='leads';leadStaleFilter=true;render()"],
+    [_ar?'عروض نشطة':'Active quotes', nfmt(activeQVal), 'var(--navy)', ''],
+    [_ar?'نسبة الفوز':'Win rate', winRate+'%', 'var(--cyan)', ''],
+    [_ar?'إيراد محقّق':'Won revenue', nfmt(wonRev), 'var(--ok)', '']
+  ];
+  let h=`<div class="grid kpis">`+kpis.map(k=>`<div class="card kpi"${k[3]?' onclick="'+k[3]+'" style="cursor:pointer" title="'+(_ar?'اضغط للفلترة':'click to filter')+'"':''}><div class="n" style="${k[2]?'color:'+k[2]:''}">${k[1]}</div><div class="l">${k[0]}</div></div>`).join('')+`</div>`;
   h+=salesActionPanel(rows);
   const funnel=STAGES.filter(s=>s!=='Lost').map(s=>({label:s,value:rows.filter(r=>r.stage===s).length,color:STAGE_COL[s]}));
   const months=lastMonths(6);
@@ -2893,7 +3372,7 @@ function salesOverview(rows){
   const srcMap={}; rows.forEach(r=>{const s=r.source||'Direct';srcMap[s]=(srcMap[s]||0)+1;});
   const srcSegs=Object.keys(srcMap).map((k,i)=>({label:k,value:srcMap[k],color:PALETTE[i%PALETTE.length]}));
   h+=`<div class="grid" style="grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
-    <div class="card"><div class="ch-t">🔻 Pipeline funnel</div>${funnel.some(f=>f.value)?svgFunnel(funnel):'<div class="empty">No data</div>'}</div>
+    <div class="card"><div class="ch-t">🔻 ${(typeof lang!=='undefined'&&lang==='ar')?'قمع المبيعات':'Pipeline funnel'}</div>${rows.length?crmFunnel(rows):'<div class="empty">No data</div>'}</div>
     <div class="card"><div class="ch-t">📈 New leads / month</div>${svgLine(trend)}</div>
     <div class="card"><div class="ch-t">💰 Won revenue / month</div>${svgBars(wonTrend)}</div>
     <div class="card"><div class="ch-t">🎯 Leads by source</div>${srcSegs.length?svgDonut(srcSegs):'<div class="empty">No data</div>'}</div>
@@ -3029,7 +3508,10 @@ function editLead(id){
     fileField('l_file','Attach a file (drawing / BOQ / quotation / photo)',r.file)+
     fTa('Notes','l_notes',r.notes),
     ()=>{ const reason=val('l_reason'); const d={company:val('l_company'),name:val('l_name'),villaOwner:val('l_villaOwner'),phone:val('l_phone'),position:val('l_position'),email:val('l_email'),segment:val('l_segment'),budgetRange:(val('l_budget')==='—'?'':val('l_budget')),solutionInterest:val('l_solution'),currentBill:num(val('l_bill')),lifecycle:(val('l_lifecycle')==='Auto'?'':val('l_lifecycle')),funnel:(val('l_funnel')==='—'?'':val('l_funnel')),bantB:val('l_bantb'),bantA:val('l_banta'),bantN:val('l_bantn'),bantT:val('l_bantt'),branch:val('l_branch'),stage:((bpOn()&&id)?(r.stage||'New'):val('l_stage')),owner:val('l_owner'),source:val('l_source'),campaignId:val('l_campaign'),ctype:val('l_ctype'),btype:val('l_btype'),ptype:val('l_ptype'),service:val('l_service'),area:val('l_area'),address:val('l_address'),location:val('l_location'),projects:val('l_projects'),lastUpdate:val('l_lastUpdate'),updateDate:val('l_updateDate'),website:val('l_website'),social:val('l_social'),value:num(val('l_value')),reason:(reason==='—'?'':reason),reasonNote:val('l_reasonNote'),next:val('l_next'),notes:val('l_notes'),file:fileVal('l_file')};
-      if(!d.name){alert('Name required');return false;} if(!dupGuard('leads',d,id))return false; if(!id)d.created=new Date().toISOString(); d.ownerEmail=ownerEmailFor(d.owner); saveDoc('leads',d,id); });
+      if(!d.name){alert('Name required');return false;}
+      var _needVal=['Qualified','Site Survey','BOQ / Design','Quotation Sent','Negotiation'];
+      if(_needVal.indexOf(canonStage(d.stage))>=0 && num(d.value)<=0){ alert(lang==='ar'?('⚠️ لازم تحط قيمة متوقّعة للّيد قبل مرحلة «'+d.stage+'».\nالقيمة دي بتغذّي توقّع المبيعات والقمع.'):('⚠️ An estimated deal value is required at stage "'+d.stage+'".\nIt powers the sales forecast and funnel.')); var _vv=g('l_value'); if(_vv){try{_vv.focus();}catch(e){}} return false; }
+      if(!dupGuard('leads',d,id))return false; if(!id)d.created=new Date().toISOString(); d.ownerEmail=ownerEmailFor(d.owner); saveDoc('leads',d,id); });
 }
 function editCamp(id){
   const r=id?campaigns.find(x=>x.id===id):{branch:defBranch()};
@@ -3444,7 +3926,7 @@ function printVariation(id){
   <div style="display:flex;gap:30px;margin-top:50px"><div style="flex:1;border-top:1px solid #999;padding-top:6px">Client approval & date</div><div style="flex:1;border-top:1px solid #999;padding-top:6px">Sedra Electric — authorized</div></div>
   <script>window.print()<\/script></body></html>`); w.document.close();
 }
-function quoteSections(q){ if(q.sections&&q.sections.length)return q.sections; if(q.items&&q.items.length)return [{title:'Items',items:q.items.map(i=>({item:i.item||'',desc:i.desc||'',brand:i.brand||'',qty:num(i.qty),price:num(i.price),image:i.image||''}))}]; return []; }
+function quoteSections(q){ if(q.sections&&q.sections.length)return q.sections; if(q.items&&q.items.length)return [{title:'Items',items:q.items.map(i=>({item:i.item||'',code:(i.code!==undefined?i.code:''),desc:i.desc||'',brand:i.brand||'',qty:num(i.qty),price:num(i.price),image:i.image||'',optional:!!i.optional}))}]; return []; }
 function vatForBranch(b){ var s=(settings&&settings.vatRates)||{}; var d={Egypt:14,UAE:5,KSA:15}; return (s[b]!=null)?num(s[b]):(d[b]!=null?d[b]:14); }
 /* Installation (+) and Discount (−) are optional, each a percent OR a fixed amount.
    Order: Subtotal → +Installation → −Discount → VAT (on the net) → Grand total. */
@@ -3472,16 +3954,18 @@ function vQuotes(){
      NOT shown to other sales colleagues or to unassigned technicians. */
   const isAssignedTech = function(q){ return (q.assignedEmail && String(q.assignedEmail).toLowerCase()===_myEmail) || (q.assignedTo && typeof nameEq==='function' && nameEq(q.assignedTo,meName)); };
   const canSeeRequest = function(q){ return seesAllQuotes || isSalesLead || isAssignedTech(q) || (typeof nameEq==='function' && nameEq(q.requestedBy,meName)); };
+  /* Pending quote REQUESTS (RFQs not yet delivered) do NOT appear here — they live only in the
+     dedicated "Quote Requests" view. This page shows finished/actual quotations only. */
   const rows=quotes.filter(function(q){
-    if(q.isRFQ && !q.rfqDone) return canSeeRequest(q);   /* requests bypass branch, gated to the right people */
+    if(q.isRFQ && !q.rfqDone) return false;
     return inBranch(q);
   }).filter(function(q){
-    if(q.isRFQ && !q.rfqDone) return true;               /* pending requests already gated above */
     if(seesAllQuotes) return true;
     if(isTechAssignee){ return (q.assignedTo||'')===meName || nameEq(q.preparedBy,meName) || nameEq(q.requestedBy,meName); }
     return !q.dept||q.dept===me.dept||nameEq(q.requestedBy,meName)||nameEq(q.preparedBy,meName)||(me.accessModules||[]).includes('quotes');
   });
-  let h=`<div class="sect"><h2>Quotations & Proposals</h2><div class="sp"></div>${canRequestQuote()?`<button class="btn cy" onclick="newQuoteChoice()">+ ${canCreateQuote()?'New quotation':(lang==='ar'?'طلب كوتيشن':'Request quotation')}</button>`:''}</div>`;
+  const _openReq=(typeof rfqPending==='function')?rfqPending().length:0;
+  let h=`<div class="sect"><h2>${lang==='ar'?'الكوتيشنات':'Quotations & Proposals'}</h2><div class="sp"></div>${_openReq?`<button class="btn gh" onclick="curView='quoterequests';render()" title="${lang==='ar'?'طلبات الكوتيشن الجديدة':'New quote requests'}">📨 ${lang==='ar'?'طلبات الكوتيشن':'Quote requests'} <span class="tag" style="background:var(--cyan);color:#fff">${_openReq}</span></button> `:''}${canRequestQuote()?`<button class="btn cy" onclick="newQuoteChoice()">+ ${canCreateQuote()?(lang==='ar'?'كوتيشن جديد':'New quotation'):(lang==='ar'?'طلب كوتيشن':'Request quotation')}</button>`:''}</div>`;
   h+=tableView('quotes', rows,
     `<th>#</th><th>Type</th><th>Client</th><th>Branch</th><th>Dept</th><th>Total</th><th>Status</th><th></th>`,
     q=>{const t=quoteTotal(q);return `<tr>
@@ -3502,7 +3986,34 @@ function qRedo(){ if(!_qRedo.length)return; try{ qReadDOM(); }catch(e){} _qUndo.
 function qUndoBtns(){ var u=g('qUndoBtn'),r=g('qRedoBtn'); if(u)u.disabled=!_qUndo.length; if(r)r.disabled=!_qRedo.length; }
 document.addEventListener('keydown',function(e){ if(!g('qSec'))return; var k=(e.key||'').toLowerCase(); if((e.ctrlKey||e.metaKey)&&k==='z'){ e.preventDefault(); if(e.shiftKey)qRedo(); else qUndo(); } else if((e.ctrlKey||e.metaKey)&&k==='y'){ e.preventDefault(); qRedo(); } });
 const NL=String.fromCharCode(10);
-function qBlankItem(){ return {item:'',desc:'',brand:'',qty:1,price:0}; }
+function qBlankItem(){ return {item:'',code:'',desc:'',brand:'',qty:1,price:0}; }
+/* Line schema: it.item = product NAME, it.code = product code (part number),
+   it.desc = description. LEGACY items (before this change) stored item=code, desc=name
+   and have no `code` field — qMigrateItem converts them, qLineDisp renders either. */
+/* Does this string look like a product CODE (e.g. DSP117, DS-2CD1043G0-I, SE/S 3.16.1, IC 50 T)
+   rather than a descriptive NAME? Used to decide whether a legacy codeless line stored the code
+   in `item` (old format) or already has the product name in `item` (correct format). */
+function _looksLikeCode(s){ s=String(s||'').trim(); if(!s) return false;
+  if(s.length>24) return false;                 // descriptive names are long
+  if(s.split(/\s+/).length>4) return false;      // codes are only a few tokens
+  if(/\b(with|and|for|the|camera|switch|sensor|panel|light|module|network|imaging|system|speaker|screen|control|hybrid|smart|cable|power|indoor|outdoor|wireless|detector|monitor|display|amplifier|battery|solar|resolution|support|technology|storage|intercom|automation|socket|thermostat)\b/i.test(s)) return false;
+  if(/[0-9]/.test(s)) return true;               // codes normally carry a digit
+  if(/^[A-Z0-9\/\.\-\s()]+$/.test(s) && s.length<=12) return true;  // short all-caps codes
+  return false; }
+function qMigrateItem(it){ if(!it||typeof it!=='object')return it;
+  if(it.code===undefined){
+    if(!it.item && it.desc){ it.item=it.desc; it.desc=''; it.code=''; }                 // everything was in desc -> it is the name
+    else if(it.desc && _looksLikeCode(it.item)){ it.code=it.item; it.item=it.desc; it.desc=''; }  // legacy: code was in item, name in desc
+    else { it.code=''; }                                                                 // item already holds the name; keep desc as the description
+  }
+  return it; }
+function qMigrateSecs(secs){ (secs||[]).forEach(function(s){ (s&&s.items||[]).forEach(qMigrateItem); }); return secs; }
+function qLineDisp(it){ if(!it)return {name:'',code:'',desc:''};
+  if(it.code!==undefined) return {name:it.item||'',code:it.code||'',desc:it.desc||''};
+  var item=it.item||'', desc=it.desc||'';
+  if(!item && desc) return {name:desc,code:'',desc:''};
+  if(desc && _looksLikeCode(item)) return {name:desc,code:item,desc:''};   // legacy: code in item, name in desc
+  return {name:item,code:'',desc:desc}; }                                   // item is the name, desc is the description
 function defQExcluding(){ return ['Lights supply','Sockets & switches supply','Sanitary supply','MEP Work (Conduits, Pulling Cables)'].join(NL); }
 function defQTerms(){ return ['- Prices don’t include VAT unless mentioned.','','- Offer Includes:','    · Supervision on the Contractor team in the cabling phase','    · Full Design for all systems','    · Full Installation','    Installation prices include works within Cairo or Giza.','    For any other location, additional charges will apply.','','- Offer Excludes:','    · Any piping or wiring works unless mentioned otherwise','    · Any pipes or cables unless mentioned otherwise','    · Any protection circuit breakers unless mentioned otherwise','','- Payment Terms:','    · Advance Payment: 80% of the total price','    · After Delivery: 10% of the total price','    · After system installation: 10% of the total price','','- Warranty:','    · Warranty against manufacturing defects is 12 Months','','- Delivery:','    · 2-8 Weeks'].join(NL); }
 var _qDrag=null;
@@ -3514,7 +4025,7 @@ function qDrop(e,si,ii){ try{ e.preventDefault(); }catch(_e){} qUndoSnap(); var 
   to.splice(idx,0,moved);
   if(!from.length) from.push(qBlankItem());
   qSecRender(); }
-function qReadDOM(){ _qsec.forEach((s,si)=>{ const t=g('qsT'+si); if(t)s.title=t.value; (s.items||[]).forEach((it,ii)=>{ const gv=f=>{const e=g('q_'+si+'_'+ii+'_'+f);return e?e.value:it[f];}; it.item=gv('item'); it.desc=gv('desc'); it.brand=gv('brand'); it.qty=num(gv('qty')); it.price=num(gv('price')); var _op=g('q_'+si+'_'+ii+'_opt'); if(_op)it.optional=_op.checked; });
+function qReadDOM(){ _qsec.forEach((s,si)=>{ const t=g('qsT'+si); if(t)s.title=t.value; (s.items||[]).forEach((it,ii)=>{ const gv=f=>{const e=g('q_'+si+'_'+ii+'_'+f);return e?e.value:it[f];}; it.item=gv('item'); it.code=gv('code'); it.desc=gv('desc'); it.brand=gv('brand'); it.qty=num(gv('qty')); it.price=num(gv('price')); var _op=g('q_'+si+'_'+ii+'_opt'); if(_op)it.optional=_op.checked; });
   const io=g('qi_'+si+'_on'); if(io){ s.instOn=io.checked; s.instType=((g('qi_'+si+'_type')||{}).value)||'percent'; s.instVal=num((g('qi_'+si+'_val')||{}).value); }
   const dn=g('qd_'+si+'_on'); if(dn){ s.discOn=dn.checked; s.discType=((g('qd_'+si+'_type')||{}).value)||'percent'; s.discVal=num((g('qd_'+si+'_val')||{}).value); }
   const fe=g('qf_'+si); if(fe)s.features=fe.value; const ne=g('qn_'+si); if(ne)s.notes=ne.value;
@@ -3524,9 +4035,9 @@ function qSecDel(si){ qUndoSnap(); _qsec.splice(si,1); if(!_qsec.length)_qsec=[{
 function qItemAdd(si){ qUndoSnap(); _qsec[si].items.push(qBlankItem()); qSecRender(); }
 function qItemDel(si,ii){ qUndoSnap(); _qsec[si].items.splice(ii,1); if(!_qsec[si].items.length)_qsec[si].items.push(qBlankItem()); qSecRender(); }
 function qPickProduct(si,ii,val){ qUndoSnap(); var v=String(val||'').trim(); var lv=v.toLowerCase();
-  const p=inventory.find(x=>((x.sku?x.sku+' — ':'')+(x.name||''))===v) || inventory.find(x=>(x.name||'')===v) || inventory.find(x=>(x.sku||'')===v) || inventory.find(x=>String(x.sku||'').toLowerCase()===lv || String(x.name||'').toLowerCase()===lv);
+  const p=inventory.find(x=>((x.name||'')+(x.sku?' — '+x.sku:''))===v) || inventory.find(x=>((x.sku?x.sku+' — ':'')+(x.name||''))===v) || inventory.find(x=>(x.name||'')===v) || inventory.find(x=>(x.sku||'')===v) || inventory.find(x=>String(x.sku||'').toLowerCase()===lv || String(x.name||'').toLowerCase()===lv);
   qReadDOM(); const it=_qsec[si].items[ii];
-  if(p){ it.item=p.sku||p.code||it.item||''; it.desc=p.name||p.desc||it.desc||''; if(p.brand)it.brand=p.brand; const pr=num(p.price)||num(p.cost); if(pr){ var _rt=qCurRate(); it.price=(_rt&&_rt!==1)?Math.round(pr*_rt*100)/100:pr; } if(p.image)it.image=p.image; it._pid=p.id; }
+  if(p){ it.item=p.name||it.item||''; it.code=p.sku||p.code||''; it.desc=(p.desc||p.description||''); if(p.brand)it.brand=p.brand; const pr=num(p.price)||num(p.cost); if(pr){ var _rt=qCurRate(); it.price=(_rt&&_rt!==1)?Math.round(pr*_rt*100)/100:pr; } if(p.image)it.image=p.image; it._pid=p.id; }
   qSecRender(); }
 /* Rich product picker — a searchable overlay (above the quote modal) that shows each product's
    photo, name, brand, SKU and price; click one to fill the line. Much clearer than the native
@@ -3560,12 +4071,14 @@ function qpickRender(si,ii){
   }).join('')+(total>list.length?('<div class="mini" style="padding:10px;text-align:center;color:var(--muted)">'+(lang==='ar'?('أول 60 من '+total+' نتيجة — اكتب أكتر للتضييق'):('Showing 60 of '+total+' — type to narrow'))+'</div>'):'');
 }
 function qpickChoose(si,ii,pid){ var p=(inventory||[]).find(function(x){return x.id===pid;}); if(!p){ qpickClose(); return; } qReadDOM(); var it=_qsec[si].items[ii];
-  it.item=p.sku||p.code||it.item||''; it.desc=p.name||p.desc||''; if(p.brand)it.brand=p.brand; var pr=num(p.price)||num(p.cost); if(pr){ var rt=qCurRate(); it.price=(rt&&rt!==1)?Math.round(pr*rt*100)/100:pr; } if(p.image)it.image=p.image; it._pid=p.id;
+  it.item=p.name||it.item||''; it.code=p.sku||p.code||''; it.desc=(p.desc||p.description||''); if(p.brand)it.brand=p.brand; var pr=num(p.price)||num(p.cost); if(pr){ var rt=qCurRate(); it.price=(rt&&rt!==1)?Math.round(pr*rt*100)/100:pr; } if(p.image)it.image=p.image; it._pid=p.id;
   qpickClose(); qSecRender(); }
 /* Resolve the inventory product a quote line points at (by stored id, else by SKU/name). */
 function qLineProduct(it){ if(!it)return null; if(it._pid){ var byId=(inventory||[]).find(function(x){return x.id===it._pid;}); if(byId)return byId; }
-  if(it.item){ var bySku=(inventory||[]).find(function(x){return (x.sku===it.item)||(x.code===it.item);}); if(bySku)return bySku; }
-  if(it.desc){ var byName=(inventory||[]).find(function(x){return x.name===it.desc;}); if(byName)return byName; }
+  if(it.code){ var byCode=(inventory||[]).find(function(x){return (x.sku===it.code)||(x.code===it.code);}); if(byCode)return byCode; }
+  if(it.item){ var byName=(inventory||[]).find(function(x){return x.name===it.item;}); if(byName)return byName;
+    var bySku=(inventory||[]).find(function(x){return (x.sku===it.item)||(x.code===it.item);}); if(bySku)return bySku; }
+  if(it.desc){ var byName2=(inventory||[]).find(function(x){return x.name===it.desc;}); if(byName2)return byName2; }
   return null; }
 /* Change / add the IMAGE of an EXISTING product from inside the quote. Managers & Super Admin only.
    Only the image is editable here — price, description and code stay locked. */
@@ -3580,26 +4093,56 @@ function qEditProductImage(si,ii){
    +'<div style="padding:14px 18px;border-bottom:1px solid var(--mist,#e3edf4);display:flex;align-items:center;gap:8px"><b style="color:var(--navy);font-size:15px">🖼 '+(lang==='ar'?'تغيير صورة المنتج':'Change product image')+'</b><span style="flex:1"></span><button onclick="qCloseImg()" style="border:0;background:#eef3f8;border-radius:8px;padding:6px 12px;cursor:pointer;font-weight:800">✕</button></div>'
    +'<div style="padding:16px 18px">'
    +'<div class="mini" style="color:var(--muted);margin-bottom:8px">'+esc(p.name||'')+(p.sku?(' · '+esc(p.sku)):'')+'</div>'
-   +(p.image?('<div class="fld"><label>'+(lang==='ar'?'الصورة الحالية':'Current image')+'</label><div><img src="'+esc(p.image)+'" style="max-height:120px;border:1px solid var(--mist,#e3edf4);border-radius:8px;background:#fff;padding:2px"></div></div>'):'')
-   +fileField('qi_img',(lang==='ar'?'الصورة الجديدة — ارفع صورة أو الصق لينك':'New image — upload a photo or paste a link'),p.image)
-   +'<div class="mini" style="color:var(--muted)">'+(lang==='ar'?'السعر والوصف والكود مش بيتغيّروا من هنا — الصورة بس.':'Price, description and code are locked here — image only.')+'</div>'
+   +(function(){ var all=prodImages(p); if(!all.length)return '<div class="mini" style="color:var(--muted);margin-bottom:8px">'+(lang==='ar'?'مفيش صورة للمنتج ده لسه — الصورة اللي هترفعها هتبقى صورته الأساسية.':'This product has no image yet — the one you upload becomes its main image.')+'</div>'; return '<div class="fld"><label>'+(lang==='ar'?'صور المنتج':'Product images')+'</label><div style="display:flex;flex-wrap:wrap;gap:10px">'+all.map(function(u,idx){ return '<div style="text-align:center;border:'+(idx===0?'2px solid var(--cyan,#37c0dc)':'1px solid var(--mist,#e3edf4)')+';border-radius:8px;padding:4px;width:104px"><img src="'+esc(u)+'" style="width:92px;height:92px;object-fit:contain;background:#fff;border-radius:5px"><div class="mini" style="margin-top:3px">'+(idx===0?('⭐ '+(lang==='ar'?'الأساسية':'Main')):('<button class="btn gh sm" style="padding:2px 6px" onclick="qImgSetMain('+si+','+ii+',\''+p.id+'\','+idx+')" title="'+(lang==='ar'?'اجعلها الأساسية':'Set as main')+'">⭐</button>'))+' <button class="btn dn sm" style="padding:2px 6px" onclick="qImgRemove('+si+','+ii+',\''+p.id+'\','+idx+')" title="'+(lang==='ar'?'مسح':'Remove')+'">🗑</button></div></div>'; }).join('')+'</div></div>'; })()
+   +fileField('qi_img',(lang==='ar'?'➕ إضافة صورة — ارفع صورة أو الصق لينك':'➕ Add an image — upload a photo or paste a link'))
+   +'<div class="mini" style="color:var(--muted)">'+(lang==='ar'?'لو المنتج ليه صورة، الجديدة هتتضاف كخيار. لو ملوش، هتبقى هي الأساسية. السعر والوصف والكود مش بيتغيّروا من هنا.':'If the product already has an image, the new one is added as an option; if not, it becomes the main. Price/description/code are unchanged here.')+'</div>'
    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button onclick="qCloseImg()" class="btn gh">'+(lang==='ar'?'إلغاء':'Cancel')+'</button><button id="qi_save" onclick="qSaveProductImage('+si+','+ii+',\''+p.id+'\')" class="btn cy">💾 '+(lang==='ar'?'حفظ الصورة':'Save image')+'</button></div>'
    +'</div></div>';
   ov.onclick=function(){ qCloseImg(); };
   document.body.appendChild(ov);
 }
 function qCloseImg(){ var ov=document.getElementById('qimg'); if(ov)ov.remove(); }
+/* All images for a product: main (p.image) first, then the extra options in p.images[]. */
+function prodImages(p){ var a=[]; if(p&&p.image)a.push(p.image); if(p&&Array.isArray(p.images))p.images.forEach(function(u){ if(u&&a.indexOf(u)<0)a.push(u); }); return a; }
 function qSaveProductImage(si,ii,pid){
   if(!(isAdmin()||isMgr())){ return; }
   var img=fileVal('qi_img'); if(!img){ alert(lang==='ar'?'اختر صورة أو الصق لينك':'Choose an image or paste a link'); return; }
+  var p=(inventory||[]).find(function(x){return x.id===pid;});
+  var hasMain=!!(p&&(p.image||(Array.isArray(p.images)&&p.images.length)));
+  var upd;
+  if(!hasMain){ upd={image:img}; }                                   // no image yet → this becomes THE product image
+  else { var arr=(p&&Array.isArray(p.images))?p.images.slice():[]; if(img!==(p&&p.image)&&arr.indexOf(img)<0)arr.push(img); upd={images:arr}; }  // already has one → add as an option
   var btn=document.getElementById('qi_save'); if(btn){ btn.disabled=true; btn.textContent='...'; }
-  apiMerge('inventory',pid,{image:img}).then(function(){
-    var p=(inventory||[]).find(function(x){return x.id===pid;}); if(p)p.image=img;
-    try{ qReadDOM(); var it=_qsec[si].items[ii]; if(it){ it.image=img; it._pid=pid; } }catch(e){}
-    try{ logAudit('update','inventory',pid,'image'); }catch(e){}
-    qCloseImg(); qSecRender();
-    try{ if(typeof showToast==='function') showToast({title:'✓ '+(lang==='ar'?'اتغيّرت صورة المنتج':'Image updated'),body:(p&&p.name)||''}); }catch(e){}
+  apiMerge('inventory',pid,upd).then(function(){
+    if(p)Object.assign(p,upd);
+    try{ qReadDOM(); var it=_qsec[si].items[ii]; if(it){ it.image=(p&&p.image)||img; it._pid=pid; } }catch(e){}
+    try{ logAudit('update','inventory',pid,hasMain?'image option added':'image'); }catch(e){}
+    _fileStore['qi_img']='';
+    try{ if(typeof showToast==='function') showToast({title:'✓ '+(hasMain?(lang==='ar'?'اتضافت كصورة إضافية':'Added as an option'):(lang==='ar'?'اتحطّت كصورة المنتج':'Set as product image')),body:(p&&p.name)||''}); }catch(e){}
+    qSecRender(); qEditProductImage(si,ii);   // reopen so the gallery shows the new image
   }).catch(function(e){ if(btn){ btn.disabled=false; btn.textContent='💾'; } alert('Error: '+(e.message||e)); });
+}
+/* Make one of the product's images the MAIN one (used in quotes); the old main becomes an option. */
+function qImgSetMain(si,ii,pid,idx){
+  var p=(inventory||[]).find(function(x){return x.id===pid;}); if(!p)return;
+  var all=prodImages(p); var pick=all[idx]; if(!pick||pick===p.image)return;
+  var rest=all.filter(function(u){return u!==pick;});
+  var upd={image:pick,images:rest};
+  apiMerge('inventory',pid,upd).then(function(){ Object.assign(p,upd);
+    try{ var it=_qsec[si]&&_qsec[si].items[ii]; if(it)it.image=pick; }catch(e){}
+    logAudit('update','inventory',pid,'main image changed'); qSecRender(); qEditProductImage(si,ii);
+  }).catch(function(e){ alert('Error: '+(e.message||e)); });
+}
+function qImgRemove(si,ii,pid,idx){
+  var p=(inventory||[]).find(function(x){return x.id===pid;}); if(!p)return;
+  var all=prodImages(p); var rm=all[idx]; if(!rm)return;
+  if(!confirm(lang==='ar'?'مسح الصورة دي؟':'Remove this image?'))return;
+  var left=all.filter(function(u){return u!==rm;});
+  var upd={image:left[0]||'',images:left.slice(1)};
+  apiMerge('inventory',pid,upd).then(function(){ Object.assign(p,upd);
+    try{ var it=_qsec[si]&&_qsec[si].items[ii]; if(it)it.image=upd.image; }catch(e){}
+    logAudit('update','inventory',pid,'image removed'); qSecRender(); qEditProductImage(si,ii);
+  }).catch(function(e){ alert('Error: '+(e.message||e)); });
 }
 /* New product from inside the quote: create a brand-new inventory item (image + code + full
    details), save it to Products AND add it as a new line in this system. Overlay above the modal. */
@@ -3640,27 +4183,37 @@ function qNewProductSave(si){
   apiAdd('inventory',d).then(function(newId){
     if(newId){ d.id=newId; inventory.push(d); }
     try{ logAudit('create','inventory',newId||'',name); }catch(e){}
-    qReadDOM(); _qsec[si].items.push({item:d.sku||'',desc:d.name||'',brand:d.brand||'',qty:1,price:linePrice,image:d.image||''});
+    qReadDOM(); _qsec[si].items.push({item:d.name||'',code:d.sku||'',desc:d.desc||'',brand:d.brand||'',qty:1,price:linePrice,image:d.image||''});
     qCloseNewProduct(); qSecRender();
     try{ if(typeof showToast==='function') showToast({title:'✓ '+(lang==='ar'?'اتضاف منتج جديد':'New product added'),body:name+(lang==='ar'?' — اتسجّل في المخزون':' — saved to inventory')}); }catch(e){}
   }).catch(function(e){ if(btn){ btn.disabled=false; btn.textContent='💾'; } alert('Error: '+(e.message||e)); });
 }
 function qSecRender(){ const el=g('qSec'); if(!el)return;
-  const dl=`<datalist id="prod_dl">${inventory.filter(inBranch).map(p=>`<option value="${esc((p.sku?p.sku+' — ':'')+(p.name||''))}">`).join('')}</datalist><datalist id="sys_dl">${QSYS_ALL.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>`;
+  const dl=`<datalist id="sys_dl">${QSYS_ALL.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>`;
   const undobar=`<div style="display:flex;gap:6px;margin-bottom:8px"><button id="qUndoBtn" class="btn gh sm" onclick="qUndo()" title="${lang==='ar'?'تراجع (Ctrl+Z)':'Undo (Ctrl+Z)'}">↶ ${lang==='ar'?'تراجع':'Undo'}</button><button id="qRedoBtn" class="btn gh sm" onclick="qRedo()" title="${lang==='ar'?'إعادة (Ctrl+Y)':'Redo (Ctrl+Y)'}">↷ ${lang==='ar'?'إعادة':'Redo'}</button></div>`;
   el.innerHTML=dl+undobar+_qsec.map((s,si)=>{
-    const rows=(s.items||[]).map((it,ii)=>`<tr ondragover="event.preventDefault()" ondrop="qDrop(event,${si},${ii})">
-      <td class="draghandle" draggable="true" ondragstart="qDragStart(event,${si},${ii})" title="${lang==='ar'?'اسحب لإعادة الترتيب':'Drag to reorder'}" style="cursor:grab;color:#9aa;text-align:center;width:20px;user-select:none">⠿</td>
-      <td><input id="q_${si}_${ii}_item" value="${esc(it.item||'')}" placeholder="Item" style="width:84px"></td>
-      <td><div style="display:flex;gap:6px;align-items:center">${it.image?`<img src="${esc(it.image)}" title="${lang==='ar'?'صورة المنتج':'product image'}" style="width:34px;height:34px;object-fit:contain;border-radius:6px;background:#f4f8fb;flex-shrink:0">`:''}<input id="q_${si}_${ii}_desc" list="prod_dl" value="${esc(it.desc||'')}" placeholder="Description / pick product" onchange="qPickProduct(${si},${ii},this.value)" style="flex:1;min-width:130px"><button type="button" class="btn cy sm" title="${lang==='ar'?'اختر منتج من المخزون':'Pick product from inventory'}" onclick="qProductPicker(${si},${ii})" style="flex-shrink:0">📦</button>${(isAdmin()||isMgr())?`<button type="button" class="btn gh sm" title="${lang==='ar'?'تغيير/إضافة صورة المنتج (مدير/Super Admin)':'Change/add product image (Manager/Super Admin)'}" onclick="qEditProductImage(${si},${ii})" style="flex-shrink:0">🖼</button>`:''}</div></td>
-      <td><input id="q_${si}_${ii}_brand" value="${esc(it.brand||'')}" placeholder="Brand" style="width:80px"></td>
-      <td><input id="q_${si}_${ii}_qty" type="number" value="${num(it.qty)||1}" style="width:50px" oninput="qRecalc()"></td>
-      <td><input id="q_${si}_${ii}_price" type="number" value="${num(it.price)||0}" style="width:74px" oninput="qRecalc()" ${it.optional?'disabled':''}></td>
-      <td class="mini" id="q_${si}_${ii}_sub" style="white-space:nowrap">0</td>
-      <td class="c" title="${lang==='ar'?'اختياري — يظهر في الكوتيشن بدون سعر ومش بيتحسب':'Optional — shown in the quote without price, not counted'}"><input type="checkbox" id="q_${si}_${ii}_opt" ${it.optional?'checked':''} onchange="qRecalc();qSecRender()"></td>
-      <td><button class="btn dn sm" onclick="qItemDel(${si},${ii})">✕</button></td></tr>`).join('');
+    const rows=(s.items||[]).map((it,ii)=>`<div class="qrow" ondragover="event.preventDefault()" ondrop="qDrop(event,${si},${ii})">
+      <div class="qr-main">
+        <span class="qr-drag" draggable="true" ondragstart="qDragStart(event,${si},${ii})" title="${lang==='ar'?'اسحب لإعادة الترتيب':'Drag to reorder'}">⠿</span>
+        ${it.image?`<img src="${esc(it.image)}" class="qr-img" title="${lang==='ar'?'صورة المنتج':'product image'}">`:`<span class="qr-img ph">📦</span>`}
+        <div class="qr-id">
+          <input id="q_${si}_${ii}_item" class="qr-name" value="${esc(it.item||'')}" placeholder="${lang==='ar'?'اسم المنتج':'Item name'}" onchange="qPickProduct(${si},${ii},this.value)">
+          <div class="qr-id2"><input id="q_${si}_${ii}_code" class="qr-code" value="${esc(it.code||'')}" placeholder="${lang==='ar'?'كود':'Code'}"><input id="q_${si}_${ii}_brand" class="qr-brand" value="${esc(it.brand||'')}" placeholder="${lang==='ar'?'براند':'Brand'}"></div>
+        </div>
+        <button type="button" class="qr-pick" title="${lang==='ar'?'اختر من الكتالوج':'Pick from catalog'}" onclick="qProductPicker(${si},${ii})">📦</button>
+        ${(isAdmin()||isMgr())?`<button type="button" class="qr-pick gh" title="${lang==='ar'?'صورة المنتج':'product image'}" onclick="qEditProductImage(${si},${ii})">🖼</button>`:''}
+        <button type="button" class="qr-x" title="${lang==='ar'?'حذف البند':'Delete item'}" onclick="qItemDel(${si},${ii})">✕</button>
+      </div>
+      <input id="q_${si}_${ii}_desc" class="qr-desc" value="${esc(it.desc||'')}" placeholder="${lang==='ar'?'الوصف':'Description'}">
+      <div class="qr-bot">
+        <label class="qr-f"><span>${lang==='ar'?'الكمية':'Qty'}</span><input id="q_${si}_${ii}_qty" type="number" value="${num(it.qty)||1}" oninput="qRecalc()"></label>
+        <label class="qr-f"><span>${lang==='ar'?'سعر الوحدة':'Unit price'}</span><input id="q_${si}_${ii}_price" type="number" value="${num(it.price)||0}" oninput="qRecalc()" ${it.optional?'disabled':''}></label>
+        <span class="qr-line">${lang==='ar'?'إجمالي السطر':'Line total'}: <b id="q_${si}_${ii}_sub">0</b></span>
+        <label class="qr-opt" title="${lang==='ar'?'اختياري — يظهر بدون سعر ومش بيتحسب':'Optional — shown without price, not counted'}"><input type="checkbox" id="q_${si}_${ii}_opt" ${it.optional?'checked':''} onchange="qRecalc();qSecRender()"> ${lang==='ar'?'اختياري':'Optional'}</label>
+      </div>
+    </div>`).join('');
     return `<div class="card" style="margin-bottom:10px;padding:10px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><span class="mini" style="color:#157f96;font-weight:800">System ${si+1}</span><input id="qsT${si}" list="sys_dl" value="${esc(s.title||'')}" placeholder="Choose a system — KNX / Wireless / Light Current / Sound System / CCTV" style="font-weight:700;flex:1"><button class="btn gh sm" onclick="qSecDel(${si})">🗑 Remove system</button></div>
-      <div style="overflow-x:auto"><table class="items"><thead><tr><th></th><th>Item</th><th>Description</th><th>Brand</th><th>Qty</th><th>Unit</th><th>Sub</th><th title="${lang==='ar'?'اختياري':'Optional'}">Opt</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="qrows">${rows}</div>
       <button class="btn gh sm" style="margin-top:6px" onclick="qItemAdd(${si})">+ Add line</button>${(me&&me.role==='Viewer')?'':` <button class="btn cy sm" style="margin-top:6px" title="${lang==='ar'?'منتج جديد مش موجود في المخزون — أضفه هنا ويتسجّل في Products':'New product not in inventory — add it here & save to Products'}" onclick="qNewProduct(${si})">➕ ${lang==='ar'?'منتج جديد':'New product'}</button>`}
       <div style="margin-top:8px;border-top:1px dashed var(--mist);padding-top:8px;display:flex;gap:8px 14px;flex-wrap:wrap;align-items:center">
         <label style="display:flex;align-items:center;gap:5px;font-weight:700;color:var(--navy)"><input type="checkbox" id="qi_${si}_on" ${s.instOn?'checked':''} onchange="qRecalc()"> 🔧 ${lang==='ar'?'تركيب':'Installation'}</label>
@@ -3718,11 +4271,20 @@ function qRecalc(){ qReadDOM(); const cur=(g('q_cur')&&val('q_cur'))||'EGP'; con
   if(_hasVat) html+=rw('VAT ('+vat+'%)', f(v)+' '+cur);
   html+=`<div style="display:flex;justify-content:space-between;gap:16px;font-size:16px;color:var(--navy)"><span>${lang==='ar'?'الإجمالي النهائي':'Grand total'}</span><b style="white-space:nowrap">${f(grandTot)} ${cur}</b></div>`;
   if(tot)tot.innerHTML=html+baseNote;
+  var sv=g('qStickyVal'); if(sv)sv.textContent=f(grandTot)+' '+cur;
 }
 const QSERVICES=['Home Automation','Smart Home','Home Cinema','Indoor Sound System','Outdoor Sound System','Security Camera','Intrusion System','Safety System','Intercom System','Structured Cabling System','MATV Satellite System','Solar Energy','Smart Gates'];
 /* Systems that can each become a page inside one quotation (Hesham: choose one or more, each system prints on its own page with its own title). Images per system are wired via SYS_IMG when supplied. */
 const QSYSTEMS=['KNX','Wireless','Light Current','Sound System','CCTV'];
 const SCOPE_SYSTEMS=['KNX','Wireless','Light Current'];
+/* Scope of work is now MULTI-select — the project can need more than one system. Rendered as
+   checkboxes; stored/read as a comma-joined string in `service`. */
+function scopeCheckboxes(id,label,selectedStr){
+  var sel=String(selectedStr||'').split(/\s*[,،]\s*/).map(function(s){return s.trim().toLowerCase();});
+  var boxes=SCOPE_SYSTEMS.map(function(s,i){ var on=sel.indexOf(s.toLowerCase())>=0; return '<label style="display:inline-flex;align-items:center;gap:6px;background:#f6f9fc;border:1px solid #e3edf4;border-radius:8px;padding:7px 12px;cursor:pointer;font-weight:700;color:var(--navy)"><input type="checkbox" id="'+id+'_'+i+'" value="'+esc(s)+'" '+(on?'checked':'')+' style="width:16px;height:16px"> '+esc(s)+'</label>'; }).join(' ');
+  return '<div class="fld"><label>'+esc(label)+'</label><div style="display:flex;flex-wrap:wrap;gap:8px">'+boxes+'</div></div>';
+}
+function scopeVal(id){ var out=[]; SCOPE_SYSTEMS.forEach(function(s,i){ var e=g(id+'_'+i); if(e&&e.checked)out.push(s); }); return out.join(', '); }
 /* One unified systems list — new systems + the older service names — so every system (new or old) is picked from the same place. */
 const QSYS_ALL=(function(){ var seen={},out=[]; QSYSTEMS.concat(QSERVICES).forEach(function(s){ var k=String(s).toLowerCase(); if(!seen[k]){ seen[k]=1; out.push(s); } }); return out; })();
 const SYS_IMG={}; /* system name -> banner image URL/dataURL, added when Hesham sends the system images */
@@ -3749,7 +4311,8 @@ function quoteToTech(){ openModal('Request quotation from Technical Office',
     '<div class="fld" style="background:#fff7ed;border:1px solid #f0c98a;border-radius:8px;padding:10px"><label>\ud83c\udfe2 '+(lang==='ar'?'\u0646\u0648\u0639 \u0627\u0644\u0645\u0634\u0631\u0648\u0639 (\u0628\u064a\u062d\u062f\u0651\u062f \u0645\u064a\u0646 \u064a\u0633\u062a\u0644\u0645 \u0627\u0644\u0637\u0644\u0628)':'Project category (decides who receives it)')+'</label><select id="tq_route" onchange="tqRouteHint()"><option value="Residential">'+(lang==='ar'?'\u0633\u0643\u0646\u064a Residential':'Residential')+'</option><option value="Commercial">'+(lang==='ar'?'\u062a\u062c\u0627\u0631\u064a Commercial':'Commercial')+'</option></select><div id="tq_routeHint" class="mini" style="margin-top:4px;color:#157f96"></div></div>'+
     '<div class="row2">'+fEl('Project name','tq_project','')+'<div class="fld"><label>Client name</label><input id="tq_client" list="cust_dl" value="">'+custDatalist()+'</div></div>'+
     '<div class="row2">'+fEl('Project location','tq_loc','')+selEl('Project type','tq_ptype',RFQ_PTYPES,'Apartment')+'</div>'+
-    '<div class="row2">'+selEl('Scope of work (KNX / Wireless / Light Current)','tq_service',SCOPE_SYSTEMS,'KNX')+selEl('Category','tq_cat',RFQ_CATS,'Mid-range')+'</div>'+
+    scopeCheckboxes('tq_service',(lang==='ar'?'مجال العمل (اختر واحد أو أكثر — KNX / Wireless / Light Current)':'Scope of work (pick one or more — KNX / Wireless / Light Current)'),'KNX')+
+    selEl('Category','tq_cat',RFQ_CATS,'Mid-range')+
     '<div class="row2">'+selEl('Design based on','tq_design',RFQ_DESIGN,'Plan')+fEl('Deadline (min 3 days)','tq_deadline','','date')+'</div>'+
     '<div class="row2">'+fEl('Sales person','tq_sales',(me&&me.name)||'')+fEl('Quotation code (by Pre-sales)','tq_code','')+'</div>'+
     fTa('KNX requirements','tq_knx','')+
@@ -3760,14 +4323,17 @@ function quoteToTech(){ openModal('Request quotation from Technical Office',
     '<div class="card mini" style="background:#eef6ff;border-color:#bcd6ee">'+(lang==='ar'?'📎 بعد الحفظ هتفتحلك نافذة ترفع فيها الملفات والصور والدرايوينج بتاعة المشروع.':'📎 After saving, an attachments window opens so you can upload the project files, images and drawings.')+'</div>'+fileField('tq_file',(lang==='ar'?'📎 ارفع ملف / صورة / درايوينج للطلب (اختياري — تقدر تزوّد أكتر بعد الحفظ)':'📎 Attach a project file / image / drawing (optional — add more after saving)')),
   ()=>{ if(!val('tq_client')){alert('Client name required');return false;}
     var route=val('tq_route')||'Residential'; var asg=TECH_ROUTING[route]||{};
-    var d={number:genQuoteNo(svcKey(val('tq_service'))),service:val('tq_service'),
+    var _scope=scopeVal('tq_service')||'KNX';
+    var d={number:genQuoteNo(svcKey(_scope.split(',')[0].trim())),service:_scope,
       projectName:val('tq_project'),client:val('tq_client'),location:val('tq_loc'),buildingType:val('tq_ptype'),projectType:val('tq_ptype'),
       category:val('tq_cat'),techCategory:route,assignedTo:asg.name||'',assignedEmail:(asg.email||'').toLowerCase(),
       designBasedOn:val('tq_design'),deadline:val('tq_deadline'),salesPerson:val('tq_sales'),quotationCode:val('tq_code'),
       reqKNX:val('tq_knx'),reqLC:val('tq_lc'),reqNetwork:val('tq_net'),notes:val('tq_notes'),revisions:val('tq_rev'),refLinks:val('tq_links'),
       type:'Quotation',status:'Tech Office \u2014 Pending',dept:'Technical',branch:defBranch(),
       requestedBy:(me&&me.name)||'',requestedByEmail:((me&&me.email)||'').toLowerCase(),requestedByDept:(me&&me.dept)||'',requestedTs:Date.now(),date:today(),created:new Date().toISOString(),isRFQ:true};
-    apiAdd('quotes',d).then(function(newid){ try{ var _f=fileVal('tq_file'); if(_f&&newid){ var _lk=g('tq_file_lnk'); var _nm=(_lk&&_lk.value&&_lk.value.trim())?_lk.value.trim():((_f.slice(0,5)==='data:'||_f.slice(0,5)==='blob:')?'project-file':_f); var _rec={rec:newid,name:_nm,file:_f,by:(me&&me.name)||'',at:new Date().toISOString()}; apiAdd('attachments',_rec).then(function(aid){ if(aid){_rec.id=aid;attachments.push(_rec);} }); } }catch(e){} synced(); if(appReady)refreshAll(); alert('\u2714 '+(lang==='ar'?'\u0627\u062a\u0628\u0639\u062a \u0644\u0640 ':'Sent to ')+(asg.name||'Technical Office')+(lang==='ar'?' \u0628\u0643\u0644 \u0627\u0644\u0645\u062a\u0637\u0644\u0628\u0627\u062a.':' with the full requirements.')); if(newid){ setTimeout(function(){ attachOpen(newid, d.projectName||d.client); },350); } }).catch(function(e){ alert('Error: '+(e.message||e)); }); return true; }); tqRouteHint(); }
+    apiAdd('quotes',d).then(function(newid){ try{ var _f=fileVal('tq_file'); if(_f&&newid){ var _lk=g('tq_file_lnk'); var _nm=(_lk&&_lk.value&&_lk.value.trim())?_lk.value.trim():((_f.slice(0,5)==='data:'||_f.slice(0,5)==='blob:')?'project-file':_f); var _rec={rec:newid,name:_nm,file:_f,by:(me&&me.name)||'',at:new Date().toISOString()}; apiAdd('attachments',_rec).then(function(aid){ if(aid){_rec.id=aid;attachments.push(_rec);} }); } }catch(e){} synced(); if(appReady)refreshAll();
+      try{ if(asg.email){ var _ar=(lang==='ar'); var _NL=String.fromCharCode(10); var _subj=(_ar?'مطلوب كوتيشن — ':'Quotation requested — ')+(d.projectName||d.client||d.number||''); var _body=(_ar?'في طلب كوتيشن جديد مطلوب منك تجهيزه:':'A new quotation request has been assigned to you:')+_NL+_NL+(_ar?'العميل: ':'Client: ')+(d.client||'-')+_NL+(_ar?'المشروع: ':'Project: ')+(d.projectName||'-')+_NL+(_ar?'المجال: ':'Scope: ')+(d.service||'-')+_NL+(_ar?'التسليم: ':'Due: ')+(d.deadline||'-')+_NL+(_ar?'الطلب من: ':'Requested by: ')+(d.requestedBy||'-')+_NL+_NL+(_ar?'ادخل النظام لعرض كل المتطلبات والمرفقات.':'Open the system to view the full requirements and attachments.'); sendEmailAuto(asg.email,_subj,_body); try{sendPushToStaff([asg.email],(lang==='ar'?'📨 طلب كوتيشن جديد':'📨 New quote request'),(d.client||'')+(d.service?(' · '+d.service):''),'/');}catch(_p){} } }catch(_e){}
+      alert('\u2714 '+(lang==='ar'?'\u0627\u062a\u0628\u0639\u062a \u0644\u0640 ':'Sent to ')+(asg.name||'Technical Office')+(lang==='ar'?' \u0628\u0643\u0644 \u0627\u0644\u0645\u062a\u0637\u0644\u0628\u0627\u062a.':' with the full requirements.')); if(newid){ setTimeout(function(){ attachOpen(newid, d.projectName||d.client); },350); } }).catch(function(e){ alert('Error: '+(e.message||e)); }); return true; }); tqRouteHint(); }
 function rfqSummaryHTML(r){
   if(!r||!(r.isRFQ||r.projectName||r.reqKNX||r.reqLC||r.reqNetwork||r.designBasedOn||r.deadline||r.revisions)) return '';
   var ar=(typeof lang!=='undefined'&&lang==='ar');
@@ -3813,7 +4379,8 @@ function rfqCanSee(q){ if(!me||!q||!q.isRFQ)return false;
   var my=(me.email||'').toLowerCase();
   var assigned=(q.assignedEmail&&String(q.assignedEmail).toLowerCase()===my)||(q.assignedTo&&nameEq(q.assignedTo,me.name));
   var req=nameEq(q.requestedBy,me.name)||(q.requestedByEmail&&String(q.requestedByEmail).toLowerCase()===my);
-  return seesAll||salesLead||assigned||req; }
+  var techOffice=me.dept==='Technical';   /* every Technical Office member sees ALL requests, not just the assignee */
+  return seesAll||salesLead||assigned||req||techOffice; }
 function rfqPending(){ return (quotes||[]).filter(function(q){ return q.isRFQ && !q.rfqDone && rfqCanSee(q); }); }
 function setRfqPriority(id,p){ if(!rfqCanManage()){ alert(lang==='ar'?'تحديد الأولوية للمدير أو التيم ليدر فقط.':'Priority is set by a manager or team leader.'); return; } var q=quotes.find(function(x){return x.id===id;}); if(!q)return; apiMerge('quotes',id,{priority:p}).then(function(){ q.priority=p; logAudit('update','quotes',id,'priority '+p); synced(); }).catch(function(e){alert('Error: '+(e.message||e));}); }
 function setRfqStage(id,stage){ var q=quotes.find(function(x){return x.id===id;}); if(!q)return;
@@ -3836,9 +4403,17 @@ function vQuoteRequests(){
     var deliver=(canDeliverRFQ(q))? '<button class="btn cy sm" onclick="deliverRFQ(\''+q.id+'\')">✅ '+(ar?'سلّم':'Deliver')+'</button>':'';
     var edit='<button class="btn gh sm" onclick="editRequest(\''+q.id+'\')" title="'+(ar?'تعديل الطلب':'Edit request')+'">✏️ '+(ar?'تعديل':'Edit')+'</button> ';
     var log='<button class="btn gh sm" onclick="reqLog(\''+q.id+'\')" title="'+(ar?'سجل التعديلات':'Edit log')+'">📝'+((Array.isArray(q.reqHistory)&&q.reqHistory.length)?(' '+q.reqHistory.length):'')+'</button> ';
-    return '<tr><td>'+prioSel+'</td><td><b>'+esc(q.number||q.id.slice(-5))+'</b></td><td><b>'+esc(q.client||'')+'</b><div class="mini">'+esc(q.projectName||'')+'</div></td><td>'+esc(q.service||'')+'</td><td>'+esc(q.assignedTo||'—')+'</td><td'+(ov?' style="color:var(--bad);font-weight:700"':'')+'>'+esc(q.deadline||'—')+(ov?' ⚠️':'')+'</td><td style="white-space:nowrap">'+stageBtns+'</td><td style="white-space:nowrap">'+edit+log+build+'<button class="btn gh sm" onclick="attachOpen(\''+q.id+'\')">📎'+(attCount(q.id)?' '+attCount(q.id):'')+'</button> <button class="btn gh sm" onclick="recOpen(\''+q.id+'\')">👁</button> '+deliver+'</td></tr>';
+    var del=(rfqCanManage()||canEditRequest(q))?'<button class="btn dn sm" onclick="delRequest(\''+q.id+'\')" title="'+(ar?'حذف الطلب (يروح لسلة المحذوفات)':'Delete request (moves to Recycle Bin)')+'">🗑</button> ':'';
+    return '<tr><td>'+prioSel+'</td><td><b>'+esc(q.number||q.id.slice(-5))+'</b></td><td><b>'+esc(q.client||'')+'</b><div class="mini">'+esc(q.projectName||'')+'</div></td><td>'+esc(q.service||'')+'</td><td>'+esc(q.assignedTo||'—')+'</td><td'+(ov?' style="color:var(--bad);font-weight:700"':'')+'>'+esc(q.deadline||'—')+(ov?' ⚠️':'')+'</td><td style="white-space:nowrap">'+stageBtns+'</td><td style="white-space:nowrap">'+edit+log+build+'<button class="btn gh sm" onclick="attachOpen(\''+q.id+'\')">📎'+(attCount(q.id)?' '+attCount(q.id):'')+'</button> <button class="btn gh sm" onclick="recOpen(\''+q.id+'\')">👁</button> '+deliver+del+'</td></tr>';
   }).join('')+'</tbody></table></div>';
   return h;
+}
+/* Delete a quote request → moves it to the Recycle Bin (restorable for 30 days). */
+function delRequest(id){
+  var q=quotes.find(function(x){return x.id===id;}); if(!q)return;
+  if(!(rfqCanManage()||canEditRequest(q))){ alert(lang==='ar'?'حذف الطلب للمدير أو صاحب الطلب أو الأوفيس الفني فقط.':'Only a manager, the requester, or the Technical Office can delete this request.'); return; }
+  if(!confirm((lang==='ar'?'تحذف طلب الكوتيشن ده؟ هيروح لسلة المحذوفات وتقدر ترجّعه خلال 30 يوم.':'Delete this quote request? It moves to the Recycle Bin (restorable for 30 days).')+'\n\n'+(q.number||'')+' · '+(q.client||'')))return;
+  toTrash('quotes',id).then(function(){ quotes=quotes.filter(function(x){return x.id!==id;}); logAudit('delete','quotes',id,'request deleted'); try{if(typeof showToast==='function')showToast({title:(lang==='ar'?'اتحذف الطلب':'Request deleted'),body:(q.client||'')});}catch(e){} synced(); if(appReady)refreshAll(); }).catch(function(e){ alert('Error: '+(e.message||e)); });
 }
 function canEditRequest(q){ if(!q||!q.isRFQ)return false; var my=((me&&me.email)||'').toLowerCase(); var isReq=(nameEq(q.requestedBy,me&&me.name))||((q.requestedByEmail||'').toLowerCase()===my); return !!(isReq||canDeliverRFQ(q)||rfqCanManage()); }
 function editRequest(id){
@@ -3849,7 +4424,8 @@ function editRequest(id){
     '<div class="card mini" style="background:#fff7ed;border:1px solid #f0c98a;margin-bottom:10px">'+(ar?'أي تعديل هنا هيتسجّل في سجل التعديلات، وهيوصل إشعار تاني لكل المعنيين (الأوفيس الفني والمدراء والتيم ليدر).':'Any change here is logged and re-notifies everyone involved (Technical Office, managers, team leader).')+'</div>'+
     '<div class="row2">'+fEl('Project name','er_project',q.projectName||'')+'<div class="fld"><label>Client name</label><input id="er_client" list="cust_dl" value="'+esc(q.client||'')+'">'+custDatalist()+'</div></div>'+
     '<div class="row2">'+fEl('Project location','er_loc',q.location||'')+selEl('Project type','er_ptype',RFQ_PTYPES,q.projectType||q.buildingType||'Apartment')+'</div>'+
-    '<div class="row2">'+selEl('Scope of work (KNX / Wireless / Light Current)','er_service',SCOPE_SYSTEMS,q.service||'KNX')+selEl('Category','er_cat',RFQ_CATS,q.category||'Mid-range')+'</div>'+
+    scopeCheckboxes('er_service',(ar?'مجال العمل (اختر واحد أو أكثر)':'Scope of work (pick one or more)'),q.service||'KNX')+
+    selEl('Category','er_cat',RFQ_CATS,q.category||'Mid-range')+
     '<div class="row2">'+selEl('Design based on','er_design',RFQ_DESIGN,q.designBasedOn||'Plan')+fEl('Deadline','er_deadline',q.deadline||'','date')+'</div>'+
     '<div class="row2">'+fEl('Sales person','er_sales',q.salesPerson||'')+fEl('Quotation code','er_code',q.quotationCode||'')+'</div>'+
     fTa('KNX requirements','er_knx',q.reqKNX||'')+
@@ -3861,7 +4437,7 @@ function editRequest(id){
     var F=[['er_project','projectName','Project name'],['er_client','client','Client'],['er_loc','location','Location'],['er_ptype','projectType','Project type'],['er_service','service','Scope'],['er_cat','category','Category'],['er_design','designBasedOn','Design based on'],['er_deadline','deadline','Deadline'],['er_sales','salesPerson','Sales person'],['er_code','quotationCode','Quote code'],['er_knx','reqKNX','KNX'],['er_net','reqNetwork','Wireless'],['er_lc','reqLC','Light Current'],['er_links','refLinks','Reference links'],['er_rev','revisions','Revisions']];
     if(!val('er_client')){ alert(ar?'اسم العميل مطلوب':'Client name required'); return false; }
     var changes=[], d={};
-    F.forEach(function(f){ var nv=(val(f[0])||'').trim(); var ov=(q[f[1]]!=null?String(q[f[1]]):'').trim(); if(nv!==ov){ changes.push({field:f[2],from:ov,to:nv}); d[f[1]]=nv; } });
+    F.forEach(function(f){ var nv=(f[0]==='er_service'?scopeVal('er_service'):(val(f[0])||'')).trim(); var ov=(q[f[1]]!=null?String(q[f[1]]):'').trim(); if(nv!==ov){ changes.push({field:f[2],from:ov,to:nv}); d[f[1]]=nv; } });
     if(d.projectType!=null){ d.buildingType=d.projectType; }
     if(!changes.length){ alert(ar?'مفيش أي تعديل.':'No changes made.'); return true; }
     var hist=Array.isArray(q.reqHistory)?q.reqHistory.slice():[];
@@ -3889,16 +4465,21 @@ function deliverRFQ(id){
   if(!confirm(msg))return;
   var d={status:'Quotation Ready',rfqDone:true,completedTs:Date.now(),completedBy:(me&&me.name)||'',completedDate:today()};
   apiMerge('quotes',id,d).then(function(){ Object.assign(q,d); logAudit('update','quotes',id,'RFQ delivered to sales'); synced(); if(appReady)refreshAll();
-    var ar=(lang==='ar'); var hasEmail=!!q.requestedByEmail;
-    var msg=ar?'✔ اتسلّم للسيلز — هيوصله إشعار جوّه النظام إن الكوتيشن جاهز.':'✔ Delivered — the sales requester gets an in-app “quotation ready” notification.';
-    if(hasEmail && confirm(msg+String.fromCharCode(10)+String.fromCharCode(10)+(ar?'تحب كمان تبعتله إيميل جاهز؟ (هيفتح إيميلك بالرسالة، تضغط Send)':'Also send a ready email? (opens your email pre-filled — just press Send)'))){ emailSalesRFQ(q); }
-    else if(!hasEmail){ alert(msg); }
+    var ar=(lang==='ar'); var to=q.requestedByEmail||''; var NL2=String.fromCharCode(10);
+    if(to){
+      var subj=(ar?'كوتيشنك جاهز — ':'Your quotation is ready — ')+(q.number||q.client||'');
+      var body=(ar?'الكوتيشن اللي طلبته من المكتب الفني خلص وجاهز:':'The quotation you requested from the Technical Office is ready:')+NL2+NL2+(ar?'العميل: ':'Client: ')+(q.client||'-')+NL2+(ar?'رقم الكوتيشن: ':'Quote No.: ')+(q.number||'-')+NL2+(ar?'جهّزه: ':'Prepared by: ')+(q.completedBy||q.assignedTo||'-')+NL2+NL2+(ar?'ادخل النظام لعرض الكوتيشن والمرفقات.':'Open the system to view the quotation and attachments.');
+      sendEmailAuto(to,subj,body); try{sendPushToStaff([to],(ar?'✅ كوتيشنك جاهز':'✅ Your quotation is ready'),(q.client||'')+(q.number?(' · '+q.number):''),'/');}catch(_p){}
+      alert(ar?'✔ اتسلّم للسيلز — واتبعتله إيميل تلقائي إن الكوتيشن جاهز، وكمان إشعار جوّه النظام.':'✔ Delivered — an automatic “quotation ready” email was sent to the requester, plus an in-app notification.');
+    } else {
+      alert(ar?'✔ اتسلّم للسيلز — هيوصله إشعار جوّه النظام (مفيش إيميل متسجّل ليه).':'✔ Delivered — the requester gets an in-app notification (no email on file).');
+    }
   }).catch(function(e){ alert('Error: '+(e.message||e)); });
 }
 function editQuote(id){
   if(!id && !canCreateQuote()){ alert(lang==='ar'?'إنشاء عروض الأسعار متاح للمدير أو الـ Team Leader في فريق المبيعات فقط.':'Creating quotations is limited to the Manager or Team Leader in the Sales team.'); return; }
   const r=id?quotes.find(x=>x.id===id):{branch:defBranch(),type:'Quotation',status:'Draft',vat:vatForBranch(defBranch()),dept:(me.dept==='Management'?'Operations':me.dept),date:today(),service:'Home Automation',number:genQuoteNo('home-automation'),preparedBy:(me&&me.name)||'',presalesName:(me&&me.name)||'',validity:30};
-  _qsec=JSON.parse(JSON.stringify(quoteSections(r))); if(!_qsec.length)_qsec=[{title:'Smart Home System',items:[qBlankItem()]}];
+  _qsec=qMigrateSecs(JSON.parse(JSON.stringify(quoteSections(r)))); if(!_qsec.length)_qsec=[{title:'Smart Home System',items:[qBlankItem()]}];
   _qUndo=[]; _qRedo=[];
   openModal(id?'Edit quotation':'New quotation',
     rfqSummaryHTML(r)+
@@ -3913,7 +4494,7 @@ function editQuote(id){
     `<div class="row2">${selEl('Branch','q_branch',branchOpts(),r.branch)}<div class="fld"><label>Currency</label><select id="q_cur" onchange="qCurChange()">${CURRENCIES.map(function(c){return '<option '+((r.currency||CUR[r.branch||defBranch()]||'EGP')===c?'selected':'')+'>'+c+'</option>';}).join('')}</select></div></div>`+
     `<div class="card" id="q_fxbox" style="background:#f6f9fc;padding:10px;margin-bottom:8px"><div class="mini" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span>💱 ${lang==='ar'?'سعر الصرف — 1 وحدة بالعملة = كام جنيه':'Exchange rate — 1 unit = how many EGP'}</span><label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="q_fxman" ${r.fxManual?'checked':''} onchange="qCurChange()"> ${lang==='ar'?'أحدّده يدويًا':'set manually'}</label><input id="q_fx" type="number" step="0.01" placeholder="${lang==='ar'?'مثال 53':'e.g. 53'}" value="${(r.fxManual&&num(r.fxEgp))?num(r.fxEgp):''}" style="width:100px" oninput="qRecalc()" onchange="qCurChange()" ${r.fxManual?'':'disabled'}><span id="q_fxinfo" class="mini" style="color:#157f96"></span></div><div class="mini" style="color:var(--muted);margin-top:4px">${lang==='ar'?'اكتب سعر الدولار/الدرهم بالجنيه اللي انت عايزه (مثلاً 1 دولار = 53 جنيه) والأسعار هتتحسب عليه.':'Type how many EGP one unit of the currency equals (e.g. 1 USD = 53 EGP); prices are computed from it.'}</div></div>`+
     `<div class="qsec-h">🧩 ${lang==='ar'?'الأنظمة والبنود':'Systems & items'}</div>`+
-    `<div class="fld"><label>Sections & line items (pick products from inventory in the Description field)</label><div id="qSec"></div></div>`+
+    `<div class="fld"><label>${lang==='ar'?'الأنظمة والبنود (اكتب في خانة «اسم المنتج» أو دوس 📦 لاختيار منتج — الاسم في Item والكود في Code)':'Systems & line items (type in the “Item” box or press 📦 to pick a product — name goes to Item, code to Code)'}</label><div id="qSec"></div></div>`+
     `<div class="qsec-h">💰 ${lang==='ar'?'الحساب المالي':'Financials'}</div>`+
     `<div class="row2">${selEl('Status','q_status',QSTAT,r.status||'Draft')}${fEl('VAT %','q_vat',r.vat!=null?r.vat:vatForBranch(r.branch||defBranch()),'number','qRecalc()')}</div>`+
     `<div class="card" id="qTotals" style="background:#f6f9fc"></div>`+
@@ -3924,8 +4505,9 @@ function editQuote(id){
     `<div class="row2">${fEl('After delivery %','q_pc',r.payAfter!=null?r.payAfter:15,'number')}${fEl('Testing & commissioning %','q_pd',r.payTest!=null?r.payTest:15,'number')}</div>`+
     `<div class="row2">${fEl('Validity (days)','q_valid',r.validity!=null?r.validity:30,'number')}${fEl('Due date (finish by)','q_due',r.dueDate||r.deadline||'','date')}</div>`+
     fTa('Terms & conditions (one per line)','q_terms',r.terms||defQTerms())+
-    fTa('Notes','q_notes',r.notes),
-    ()=>{ qReadDOM(); const secs=_qsec.map(s=>({title:s.title||'Section',items:(s.items||[]).filter(i=>(i.desc||i.item)).map(i=>({item:i.item||'',desc:i.desc||'',brand:i.brand||'',qty:num(i.qty),price:num(i.price),image:i.image||''})),instOn:!!s.instOn,instType:s.instType||'percent',instVal:num(s.instVal),discOn:!!s.discOn,discType:s.discType||'percent',discVal:num(s.discVal),features:s.features||'',notes:s.notes||''})).filter(s=>s.items.length);
+    fTa('Notes','q_notes',r.notes)+
+    `<div id="qStickyTotal" class="qsticky"><span class="qst-lbl">${lang==='ar'?'الإجمالي النهائي':'Grand total'}</span><b id="qStickyVal">—</b></div>`,
+    ()=>{ qReadDOM(); const secs=_qsec.map(s=>({title:s.title||'Section',items:(s.items||[]).filter(i=>(i.desc||i.item)).map(i=>({item:i.item||'',code:i.code||'',desc:i.desc||'',brand:i.brand||'',qty:num(i.qty),price:num(i.price),image:i.image||'',optional:!!i.optional})),instOn:!!s.instOn,instType:s.instType||'percent',instVal:num(s.instVal),discOn:!!s.discOn,discType:s.discType||'percent',discVal:num(s.discVal),features:s.features||'',notes:s.notes||''})).filter(s=>s.items.length);
       const d={number:val('q_number'),type:val('q_type'),subject:val('q_subject'),presalesName:val('q_presales'),client:val('q_client'),date:val('q_date'),dueDate:val('q_due'),buildingType:val('q_btype'),location:val('q_loc'),consultant:val('q_consultant'),preparedBy:val('q_prep'),service:(g('q_service')?val('q_service'):(r.service||'Home Automation')),useGeneralCover:!!(g('q_gencover')&&g('q_gencover').checked),showPartNo:!!(g('q_showpn')&&g('q_showpn').checked),branch:val('q_branch'),dept:r.dept||'Operations',currency:val('q_cur'),fxManual:!!(g('q_fxman')&&g('q_fxman').checked),fxRate:(typeof qCurRate==='function'?qCurRate():1),fxEgp:num(val('q_fx'))||0,status:val('q_status'),vat:num(val('q_vat')),sections:secs,excluding:val('q_excl'),featuresList:val('q_features'),payAdvance:num(val('q_pa')),payBefore:num(val('q_pb')),payAfter:num(val('q_pc')),payTest:num(val('q_pd')),validity:num(val('q_valid')),terms:val('q_terms'),notes:val('q_notes')};
       if(!d.client){alert('Client name required');return false;} if(!secs.length){alert('Add at least one line item with a description.');return false;} if(!id){d.created=new Date().toISOString(); d.number=genQuoteNo(svcKey(d.service));}
       /* Version history: append this saved state as a version so any past version can be restored later. */
@@ -3934,8 +4516,11 @@ function editQuote(id){
       /* Update the in-memory quote immediately so Print / view reflect the edits at once
          (otherwise the change only appears after the next background sync). */
       try{ if(id){ var _qq=quotes.find(function(x){return x.id===id;}); if(_qq) Object.assign(_qq,d); } }catch(e){} },{wide:true,confirmClose:true});
-  qSecRender(); try{ qCurChange(); }catch(e){}
+  qSecRender(); try{ qCurChange(); }catch(e){} try{ qSetupSections(); }catch(e){}
 }
+/* Collapsible quote sections: click a section header to fold/unfold it. */
+function qSetupSections(){ try{ var mb=g('mBody'); if(!mb)return; var hs=mb.querySelectorAll('.qsec-h'); for(var i=0;i<hs.length;i++){ var h=hs[i]; if(h.getAttribute('data-coll'))continue; h.setAttribute('data-coll','1'); h.style.cursor='pointer'; var cv=document.createElement('span'); cv.className='qsec-chev'; cv.textContent='▾'; h.appendChild(cv); (function(hh){ hh.addEventListener('click',function(ev){ if(ev.target&&(ev.target.tagName==='INPUT'||ev.target.tagName==='SELECT'||ev.target.tagName==='TEXTAREA'))return; qToggleSect(hh); }); })(h); } }catch(e){} }
+function qToggleSect(h){ var collapsed=h.classList.toggle('qcollapsed'); var cv=h.querySelector('.qsec-chev'); if(cv)cv.textContent=collapsed?'▸':'▾'; var n=h.nextElementSibling; while(n && !(n.classList&&n.classList.contains('qsec-h'))){ if(n.id!=='qStickyTotal'){ n.style.display=collapsed?'none':''; } n=n.nextElementSibling; } }
 /* ---- Quote version history: snapshot on every save; restore any past version ---- */
 function qSnap(d){ var s={}; for(var k in d){ if(k==='history')continue; s[k]=d[k]; } s._savedAt=new Date().toISOString(); s._savedBy=(me&&me.name)||''; try{ s._total=Math.round(quoteTotal(d).total)||0; }catch(e){ s._total=null; } return s; }
 function qVersions(id){ var q=quotes.find(function(x){return x.id===id;}); if(!q){ alert(lang==='ar'?'العرض غير موجود':'Quote not found'); return; }
@@ -3986,8 +4571,8 @@ function printQuote(id,opts){
     return r; };
   /* Show the Part Number (item code) only when enabled on the quote (default: shown). */
   const showPN = (q.showPartNo!==false);
-  const qThead = `<thead><tr><th class="c">Image</th><th>Item - Description</th><th>Brand</th><th class="c">Qty</th><th class="r">Unit Price</th><th class="r">Total</th></tr></thead>`;
-  const qRows = sc => (sc.items||[]).map(it=>`<tr><td class="c">${it.image?`<img src="${esc(it.image)}" class="pimg">`:''}</td><td class="pd">${(showPN&&it.item)?`<div class="pn">${esc(it.item)}</div>`:''}<div class="ds">${esc(it.desc||'')}${it.optional?` <span style="display:inline-block;font-size:9.5px;font-weight:800;color:#8a5a00;background:#f6e7c8;border-radius:4px;padding:1px 6px;vertical-align:middle">${lang==='ar'?'اختياري':'OPTIONAL'}</span>`:''}</div></td><td class="br">${esc(it.brand||'-')}</td><td class="c">${num(it.qty)}</td><td class="r">${it.optional?(lang==='ar'?'اختياري':'Optional'):M(it.price)}</td><td class="r">${it.optional?'—':`<b>${M(num(it.qty)*num(it.price))}</b>`}</td></tr>`).join('');
+  const qThead = `<thead><tr><th class="c">Image</th><th>Item &amp; Description</th><th>Brand</th><th class="c">Qty</th><th class="r">Unit Price</th><th class="r">Total</th></tr></thead>`;
+  const qRows = sc => (sc.items||[]).map(it=>{ const d=qLineDisp(it); return `<tr><td class="c">${it.image?`<img src="${esc(it.image)}" class="pimg">`:''}</td><td class="pd"><div class="pn">${esc(d.name)}${it.optional?` <span style="display:inline-block;font-size:9.5px;font-weight:800;color:#8a5a00;background:#f6e7c8;border-radius:4px;padding:1px 6px;vertical-align:middle">${lang==='ar'?'اختياري':'OPTIONAL'}</span>`:''}</div>${(showPN&&d.code)?`<div class="pcode">${esc(d.code)}</div>`:''}${d.desc?`<div class="ds">${esc(d.desc)}</div>`:''}</td><td class="br">${esc(it.brand||'-')}</td><td class="c">${num(it.qty)}</td><td class="r">${it.optional?(lang==='ar'?'اختياري':'Optional'):M(it.price)}</td><td class="r">${it.optional?'—':`<b>${M(num(it.qty)*num(it.price))}</b>`}</td></tr>`; }).join('');
   const secTable=(sc,i)=>`<div class="sec"><div class="sech">${esc(sc.title||'Section')}</div>
     <table>${qThead}<tbody>${qRows(sc)}</tbody></table>${secFinRows(sc,i)}</div>`;
   const pay=[['Advance',q.payAdvance],['Before delivery',q.payBefore],['After delivery',q.payAfter],['Testing & commissioning',q.payTest]].filter(pp=>num(pp[1]));
@@ -4026,7 +4611,7 @@ function printQuote(id,opts){
     <div class="ap-top"><img src="${LOGO}" style="height:56px;width:auto"><div class="ap-title">Who We Are</div><div class="ap-rule"></div>
     <div class="ap-lead">Sedra Electric is a leader in smart automation, low-current systems and renewable energy — driving positive change across Egypt, the UAE and Saudi Arabia with innovative, reliable solutions that maximise efficiency and elevate everyday living.</div></div>
     <div class="ap-pillars">
-      <div class="ap-pill"><b>2013</b><span>Established in Egypt</span></div>
+      <div class="ap-pill"><b>2014</b><span>Established in Egypt</span></div>
       <div class="ap-pill"><b>3</b><span>Branches · Egypt · UAE · KSA</span></div>
       <div class="ap-pill"><b>KNX</b><span>Global smart-home standards</span></div>
       <div class="ap-pill"><b>1</b><span>One-stop · MEP to smart luxury</span></div>
@@ -4122,7 +4707,7 @@ function printQuote(id,opts){
   th{background:#f1f5f9;color:#0e2c49;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px}
   .c{text-align:center}.r{text-align:right}.br{color:#6c7c8c}.pn{font-weight:800;color:#0e2c49;font-size:12.5px}
   .pimg{width:58px;height:58px;object-fit:contain;background:#fff;border:1px solid #e6ebf0;border-radius:8px;display:block;margin:0 auto;padding:3px}
-  td.pd{min-width:230px}.pd .pn{font-weight:800;color:#33445a;font-size:12px}.pd .ds{font-weight:400;color:#33445a;line-height:1.5;margin-top:2px}.pd .pn+.ds{margin-top:3px}
+  td.pd{min-width:230px}.pd .pn{font-weight:800;color:#0e2c49;font-size:12.5px}.pd .pcode{font-weight:600;color:#6c7c8c;font-size:10.5px;letter-spacing:.3px;margin-top:2px}.pd .ds{font-weight:400;color:#33445a;line-height:1.5;font-size:12px;margin-top:3px}
   .sect{background:#123a5f;color:#fff;font-weight:800;padding:9px 14px;display:flex;justify-content:space-between;gap:16px}
   .sect2{display:flex;justify-content:space-between;padding:7px 14px;font-size:12.5px;color:#1c2b3a;border-top:1px solid #eef;gap:16px}
   .sect span:last-child,.sect2 span:last-child{white-space:nowrap}
@@ -4437,6 +5022,75 @@ function exportApplicants(){ if(!exportGuard())return; var rows=applicants.slice
 let srQ='',srSys='',srStatus='';
 function waSR(phone,name){ var pp=String(phone).replace(/\D/g,''); if(pp.charAt(0)==='0')pp='2'+pp; window.open('https://wa.me/'+pp+'?text='+encodeURIComponent('Hello '+name+', regarding your Sedra maintenance request'),'_blank'); }
 function exportSR(){ if(!exportGuard())return; var rows=servicereqs.slice().sort(function(a,b){return (b.created||'').localeCompare(a.created||'');}).map(function(r){return [r.name,r.phone,r.system,r.issue,r.prefDate,r.status||'Open',(r.created||'').slice(0,16).replace('T',' ')];}); exportCSV('Service-Requests',['Name','Phone','System','Issue','Preferred date','Status','Received'],rows); }
+/* ===== Client Requests (Sedra Home app) — unified inbox (added by Claude) ===== */
+var clientReqTab='all';
+var REQ_MAP={
+  Quotation:{mod:'sales',icon:'📝',col:'#2C77B0',ar:'عرض سعر',en:'Quotation'},
+  Maintenance:{mod:'servicereqs',icon:'🛠️',col:'#e0a93b',ar:'صيانة',en:'Maintenance'},
+  Visit:{mod:'bookings',icon:'📆',col:'#8e44ad',ar:'زيارة / معاينة',en:'Visit'}
+};
+function loadClientReqs(){
+  window.__clientReqsLoaded=false; window.__clientReqsErr=null; window.__clientReqsLoading=true;
+  if(curView==='clientreqs'){try{render();}catch(e){}}
+  apiCall('GET','/clientaccounts.json',undefined).then(function(ca){
+    var uids=Object.keys(ca||{});
+    return Promise.all(uids.map(function(uid){
+      return apiCall('GET','/clientspace/'+uid+'/requests.json',undefined).then(function(rq){
+        var acct=(ca&&ca[uid])||{}, out=[];
+        for(var k in (rq||{})){ var r=rq[k]||{}; out.push({id:k,uid:uid,client:acct.name||'',phone:acct.phone||'',branch:acct.branch||'',type:(r.type||''),status:(r.status||'Open'),statusLabel:(r.statusLabel||''),ref:(r.ref||''),detail:((r.detail||r.issue||r.note||r.message||r.system||'')+''),created:(r.created||'')}); }
+        return out;
+      }).catch(function(){return [];});
+    }));
+  }).then(function(arrs){
+    var all=[]; (arrs||[]).forEach(function(a){ all=all.concat(a); });
+    all.sort(function(a,b){ return (''+(b.created||'')).localeCompare(''+(a.created||'')); });
+    window.__clientReqs=all; window.__clientReqsLoaded=true; window.__clientReqsLoading=false;
+    if(curView==='clientreqs'){try{render();}catch(e){}}
+  }).catch(function(e){ window.__clientReqsErr=(e&&e.message)||(''+e); window.__clientReqsLoaded=true; window.__clientReqsLoading=false; if(curView==='clientreqs'){try{render();}catch(e){}} });
+}
+function openClientReqSource(type,ref){
+  if(type==='Quotation'&&ref){ openLeadId=ref; salesTab='leads'; go('sales'); }
+  else if(type==='Maintenance'){ go('servicereqs'); }
+  else if(type==='Visit'){ go('bookings'); }
+}
+function vClientReqs(){
+  var ar=(typeof lang!=='undefined'&&lang==='ar');
+  if(!window.__clientReqsLoaded && !window.__clientReqsLoading){ loadClientReqs(); }
+  var h='<div class="sect"><h2>📱 '+(ar?'طلبات العملاء (تطبيق Sedra Home)':'Client Requests (Sedra Home)')+'</h2><div class="sp"></div><button class="btn gh sm" onclick="loadClientReqs()">↻ '+(ar?'تحديث':'Refresh')+'</button></div>';
+  h+='<div class="card mini" style="margin-bottom:10px">'+(ar?'كل الطلبات اللي العملاء بيبعتوها من تطبيق الموبايل، مجمّعة هنا — كل نوع في تاب. اضغط «افتح» عشان تروح للطلب في موديوله الأصلي.':'All requests customers send from the mobile app, gathered here — each type in a tab. Click “Open” to jump to the request in its source module.')+'</div>';
+  if(window.__clientReqsErr) return h+'<div class="card" style="color:#c0392b">'+(ar?'تعذّر التحميل: ':'Load error: ')+esc(window.__clientReqsErr)+'</div>';
+  if(!window.__clientReqsLoaded) return h+'<div class="card empty">'+(ar?'جارٍ التحميل…':'Loading…')+'</div>';
+  var all=window.__clientReqs||[];
+  var types=['Quotation','Maintenance','Visit'];
+  var cnt={all:all.length}; types.forEach(function(t){ cnt[t]=all.filter(function(r){return r.type===t;}).length; });
+  var other=all.filter(function(r){return types.indexOf(r.type)<0;}).length;
+  h+='<div class="grid kpis">'
+    +'<div class="card kpi"><div class="n">'+cnt.all+'</div><div class="l">'+(ar?'إجمالي الطلبات':'Total requests')+'</div></div>'
+    +'<div class="card kpi"><div class="n" style="color:#2C77B0">'+(cnt.Quotation||0)+'</div><div class="l">'+(ar?'عروض سعر':'Quotations')+'</div></div>'
+    +'<div class="card kpi"><div class="n" style="color:#e0a93b">'+(cnt.Maintenance||0)+'</div><div class="l">'+(ar?'صيانة':'Maintenance')+'</div></div>'
+    +'<div class="card kpi"><div class="n" style="color:#8e44ad">'+(cnt.Visit||0)+'</div><div class="l">'+(ar?'زيارات':'Visits')+'</div></div></div>';
+  var tabs=[['all',(ar?'الكل':'All'),cnt.all]].concat(types.map(function(t){ return [t,REQ_MAP[t].icon+' '+(ar?REQ_MAP[t].ar:REQ_MAP[t].en),cnt[t]||0]; }));
+  if(other) tabs.push(['other',(ar?'أخرى':'Other'),other]);
+  h+='<div class="tabs" style="margin-top:12px;flex-wrap:wrap">'+tabs.map(function(t){ return '<button class="'+(clientReqTab===t[0]?'active':'')+'" onclick="clientReqTab=\''+t[0]+'\';render()">'+esc(t[1])+' ('+t[2]+')</button>'; }).join('')+'</div>';
+  var rows=(clientReqTab==='all')?all:(clientReqTab==='other'?all.filter(function(r){return types.indexOf(r.type)<0;}):all.filter(function(r){return r.type===clientReqTab;}));
+  if(!rows.length) return h+'<div class="card empty">'+(ar?'مفيش طلبات في القسم ده لسه.':'No requests in this section yet.')+'</div>';
+  h+='<div style="overflow-x:auto"><table><thead><tr><th>'+(ar?'العميل':'Client')+'</th><th>'+(ar?'النوع':'Type')+'</th><th>'+(ar?'التفاصيل':'Details')+'</th><th>'+(ar?'الحالة':'Status')+'</th><th>'+(ar?'التاريخ':'Date')+'</th><th></th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    var m=REQ_MAP[r.type]||{icon:'📄',col:'#5A6B7B',ar:r.type,en:r.type};
+    var tlabel=(ar?m.ar:m.en); var done=(r.status&&r.status!=='Open');
+    var nm=(r.client||'').replace(/'/g,'');
+    h+='<tr><td><b>'+esc(r.client||'—')+'</b>'+(r.phone?'<div class="mini" dir="ltr">'+esc(r.phone)+'</div>':'')+(r.branch?'<div class="mini">'+(FLAG[r.branch]||'')+' '+esc(r.branch)+'</div>':'')+'</td>'
+      +'<td><span class="tag" style="background:'+m.col+'22;color:'+m.col+'">'+m.icon+' '+esc(tlabel)+'</span></td>'
+      +'<td>'+esc((r.detail||'—').slice(0,70))+'</td>'
+      +'<td><span class="tag" style="background:'+(done?'#1a7a4f22;color:#1a7a4f':'#e0a93b22;color:#e0a93b')+'">'+esc(r.statusLabel||r.status||'Open')+'</span></td>'
+      +'<td class="mini" style="white-space:nowrap">'+esc((''+(r.created||'')).slice(0,10))+'</td>'
+      +'<td style="white-space:nowrap">'+(r.phone?'<button class="btn gh sm" title="WhatsApp" onclick="waSR(\''+esc(r.phone)+'\',\''+esc(nm)+'\')">💬</button> ':'')
+      +(REQ_MAP[r.type]?'<button class="btn cy sm" onclick="openClientReqSource(\''+esc(r.type)+'\',\''+esc(r.ref)+'\')">'+(ar?'افتح':'Open')+' ↗</button>':'')+'</td></tr>';
+  });
+  h+='</tbody></table></div>';
+  h+='<div class="card mini" style="margin-top:8px">'+(ar?'عرض السعر → Leads · الصيانة → Service Requests · الزيارة → Bookings':'Quotation → Leads · Maintenance → Service Requests · Visit → Bookings')+'</div>';
+  return h;
+}
 function vServiceReqs(){
   let rows=servicereqs.slice();
   if(srSys)rows=rows.filter(function(r){return r.system===srSys;});
@@ -5377,7 +6031,16 @@ function filePick(id,inp){ var f=inp.files&&inp.files[0]; if(!f)return; var st=d
     apiAdd('blobs',rec).then(function(bid){ if(!bid){ throw new Error('no id'); } _fileStore[id]='blob:'+bid; setStatus('✓ '+name+' ('+fmtBytes(rawSize||durl.length)+') '+(ar?'مرفوع':'uploaded')); })
       .catch(function(e){ _fileStore[id]=''; setStatus((ar?'⚠ فشل الرفع — جرّب تاني':'⚠ Upload failed — try again')+' ('+(e&&e.message||e)+')'); });
   }
-  if(f.type.indexOf('image/')===0){ compressImage(f,1400,0.7,function(durl){ store(durl,f.name,durl.length); }); return; }
+  // Images ALWAYS stay inline (they render directly via <img src> in the editor, picker and
+  // print — a blob: pointer would show as broken). Compress hard enough to keep them inline.
+  if(f.type.indexOf('image/')===0){
+    var _lk0=document.getElementById(id+'_lnk'); if(_lk0)_lk0.value='';
+    compressImage(f,1400,0.7,function(durl){
+      if(durl.length>1100*1024){ compressImage(f,1000,0.55,function(d2){ var best=(d2.length<durl.length?d2:durl); _fileStore[id]=best; setStatus('✓ '+f.name+' ('+fmtBytes(best.length)+') '+(ar?'مرفق':'attached')); }); }
+      else { _fileStore[id]=durl; setStatus('✓ '+f.name+' ('+fmtBytes(durl.length)+') '+(ar?'مرفق':'attached')); }
+    });
+    return;
+  }
   var r=new FileReader(); r.onload=function(){ store(r.result,f.name,f.size); }; r.readAsDataURL(f);
 }
 function compressImage(file,maxW,q,cb){ var r=new FileReader(); r.onload=function(){ var img=new Image(); img.onload=function(){ var w=img.width,h=img.height; if(w>maxW){ h=Math.round(h*maxW/w); w=maxW; } var c=document.createElement('canvas'); c.width=w; c.height=h; try{ c.getContext('2d').drawImage(img,0,0,w,h); cb(c.toDataURL('image/jpeg',q)); }catch(e){ cb(r.result); } }; img.onerror=function(){ cb(r.result); }; img.src=r.result; }; r.readAsDataURL(file); }
@@ -5879,7 +6542,7 @@ function vChat(){
   markChannelRead(ch);
   const msgs=messages.filter(m=>m.channel===ch).sort((a,b)=>num(a.ts)-num(b.ts));
   h+=`<div class="card" style="padding:0;overflow:hidden;margin-top:10px">
-    <div style="background:var(--navy);color:#fff;padding:10px 14px;font-weight:700">${header}</div>
+    <div style="background:#143F63;color:#fff;padding:10px 14px;font-weight:700">${header}</div>
     <div id="chatMsgs" style="height:44vh;overflow-y:auto;padding:14px;background:#f6f9fc">${msgs.length?msgs.map(m=>chatBubble(m,myEmail)).join(''):'<div class="empty">No messages yet. Say hello 👋</div>'}</div>
     <div style="display:flex;gap:8px;padding:10px;border-top:1px solid var(--mist)">
       <input id="chatInput" placeholder="Type a message…" style="flex:1" value="${esc(chatDraft)}" oninput="chatDraft=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();sendChat();}">
@@ -5892,8 +6555,15 @@ function chatBubble(m,myEmail){ const mine=(m.email||'').toLowerCase()===myEmail
     <div style="font-size:14px;white-space:pre-wrap;word-break:break-word">${renderMsgText(m.text)}</div>
     <div style="font-size:10px;color:var(--muted);text-align:right;margin-top:2px">${tm}</div></div></div>`;
 }
+function chatPushTargets(ch, text){
+  var me_=((me&&me.email)||'').toLowerCase(); var out=[];
+  if(ch.indexOf('dm_')===0){ out=ch.slice(3).split('__').filter(function(e){return e&&e.toLowerCase()!==me_;}); }
+  else if(ch.indexOf('grp_')===0){ var gr=(groups||[]).find(function(x){return x.id===ch.slice(4);}); if(gr) out=(gr.members||[]).filter(function(e){return e&&e.toLowerCase()!==me_;}); }
+  else if(ch==='company'){ var tl=(text||'').toLowerCase(); (employees||[]).forEach(function(e){ var em=(e.email||'').toLowerCase(); if(!em||em===me_)return; var nm=(e.name||'').toLowerCase(); var first=nm.split(' ')[0]; if((nm&&tl.indexOf('@'+nm)>=0)||(first&&first.length>1&&tl.indexOf('@'+first)>=0)) out.push(em); }); }
+  var seen={}, res=[]; out.forEach(function(x){ x=String(x||'').toLowerCase(); if(x&&!seen[x]){seen[x]=1;res.push(x);} }); return res;
+}
 function sendChat(){ const t=(chatDraft||'').trim(); const ch=currentChannel(); if(!t||!ch)return; chatDraft=''; const inp=g('chatInput'); if(inp)inp.value='';
-  apiAdd('messages',{channel:ch,text:t,sender:me.name||me.email,email:(me.email||'').toLowerCase(),ts:Date.now()}).then(synced).catch(e=>alert('Send error: '+(e.message||e))); }
+  apiAdd('messages',{channel:ch,text:t,sender:me.name||me.email,email:(me.email||'').toLowerCase(),ts:Date.now()}).then(function(){ synced(); try{ var _tg=chatPushTargets(ch,t); if(_tg.length) sendPushToStaff(_tg,(lang==='ar'?'💬 رسالة من ':'💬 Message from ')+((me&&me.name)||(me&&me.email)||''), t.slice(0,140), '/'); }catch(_e){} }).catch(e=>alert('Send error: '+(e.message||e))); }
 function newGroup(){
   const myE=(me.email||'').toLowerCase();
   openModal('New group',
@@ -6058,7 +6728,7 @@ function addUser(){
   openModal('Add team member',
     `<div style="font-weight:700;color:var(--navy);margin:2px 0 6px">👤 Account</div>`+
     `<div class="row2">${fEl('Full name','u_name','')}${fEl('Email','u_email','','email')}</div>`+
-    fEl('Temporary password (min 6 characters)','u_pass','','text')+
+    fEl('Temporary password (min 8, letters + numbers)','u_pass','','text')+
     `<div style="font-weight:700;color:var(--navy);margin:14px 0 6px;border-top:1px solid var(--mist);padding-top:10px">💼 Job details</div>`+
     `<div class="row2">${selEl('Department','u_dept',DEPTS,'Sales')}${selEl('Role','u_role',ROLES,'Member')}</div>`+
     `<div class="row2">${fEl('Job title','u_title','')}<div class="fld"><label>Reporting line (manager)</label><input id="u_mgr" list="emp_dl" value=""></div></div>`+empDatalist()+
@@ -6075,7 +6745,8 @@ function addUser(){
     fEl('Laptop serial number','u_laptop','')+
     deptChips([]),
     ()=>{ const name=val('u_name'),email=val('u_email').trim().toLowerCase(),pass=val('u_pass'),dept=val('u_dept'),role=val('u_role'),phone=val('u_phone'),salary=num(val('u_salary')),branches=readChips(),accessModules=readDChips();
-      if(!name||!email||pass.length<6){alert('Name, email, and a temp password (min 6) are required.');return false;}
+      if(!name||!email){alert('Name and email are required.');return false;}
+      if(!strongPw(pass)){alert(pwRule(typeof lang!=='undefined'&&lang==='ar'));return false;}
       if(employees.find(e=>(e.email||'').toLowerCase()===email)){alert('This email already exists.');return false;}
       if(!secondary){ try{ secondary=firebase.initializeApp(firebaseConfig,'sec'); }catch(e){ secondary=firebase.app('sec'); } }
       const prof={name,email,dept,role,phone,salary,accessModules,branches:role==='Super Admin'?BRANCHES.slice():branches,scope:val('u_scope'),title:val('u_title'),manager:val('u_mgr'),code:val('u_code'),hireDate:val('u_hire'),birthDate:val('u_birth'),socialInsNo:val('u_sins'),medicalIns:val('u_medins'),allowances:num(val('u_allow')),leaveEntitlement:num(val('u_ent')),iban:val('u_iban'),laptopSerial:val('u_laptop'),mustChangePass:true,active:true,created:today()};
@@ -6318,7 +6989,7 @@ function vProfile(){
   h+=`<div class="card"><div style="font-size:16px;font-weight:700;color:var(--navy);margin-bottom:8px">👤 My profile</div>
     <p><b>Name:</b> ${esc(me.name||'')}</p><p><b>Email:</b> ${esc(me.email||'')}</p><p><b>Department:</b> ${esc(me.dept||'')}</p><p><b>Role:</b> ${esc(me.role||'')}</p><p><b>Branches:</b> ${me.role==='Super Admin'?'All':((me.branches||[]).join(', ')||'—')}</p>
     <div style="border-top:1px solid var(--mist);margin-top:12px;padding-top:12px"><div style="font-weight:600;margin-bottom:8px">Language / اللغة</div><button class="btn ${lang==='en'?'':'gh'}" onclick="setLang('en')">English</button> <button class="btn ${lang==='ar'?'':'gh'}" onclick="setLang('ar')">العربية</button></div>
-    <div style="border-top:1px solid var(--mist);margin-top:12px;padding-top:12px"><div style="font-weight:600;margin-bottom:8px">Change my password</div><input id="pf_new" type="password" placeholder="New password (min 6)" style="width:100%;margin:5px 0"><input id="pf_conf" type="password" placeholder="Confirm" style="width:100%;margin:5px 0"><button class="btn" style="margin-top:8px" onclick="profileChangePass()">Update password</button><div class="gerr" id="pf_err"></div></div></div>`;
+    <div style="border-top:1px solid var(--mist);margin-top:12px;padding-top:12px"><div style="font-weight:600;margin-bottom:8px">Change my password</div><input id="pf_new" type="password" placeholder="New password (min 8, letters + numbers)" style="width:100%;margin:5px 0"><input id="pf_conf" type="password" placeholder="Confirm" style="width:100%;margin:5px 0"><button class="btn" style="margin-top:8px" onclick="profileChangePass()">Update password</button><div class="gerr" id="pf_err"></div></div></div>`;
   let ss=`<div>`;
   ss+=`<div class="card"><div class="ch-t">🌴 My leave balance</div><div style="font-size:26px;font-weight:800;color:${bal>0?'var(--ok)':'var(--bad)'}">${Math.round(bal)} <span style="font-size:13px;color:var(--muted)">days left</span></div><div class="mini">Entitlement ${leaveEntitlementFor(meE)} · used ${leaveDaysYear(me.email)} this year</div><button class="btn cy sm" style="margin-top:6px" onclick="curView='hr';hrTab='leave';render();setTimeout(editLeave,60)">Request leave</button></div>`;
   ss+=`<div class="card" style="margin-top:12px"><div class="ch-t">💵 My latest payslip</div>${slip?`<div>${esc(slip.month)} — net <b>${nfmt(slip.net)}</b></div><button class="btn gh sm" style="margin-top:6px" onclick="printPayslip('${slip.id}')">View payslip</button>`:'<div class="mini">No payslip yet.</div>'}</div>`;
@@ -6330,7 +7001,7 @@ function vProfile(){
 }
 function profileChangePass(){
   const np=g('pf_new').value,cf=g('pf_conf').value; g('pf_err').textContent='';
-  if(np.length<6){g('pf_err').textContent='At least 6 characters.';return;}
+  if(!strongPw(np)){g('pf_err').textContent=pwRule(typeof lang!=='undefined'&&lang==='ar');return;}
   if(np!==cf){g('pf_err').textContent='Passwords do not match.';return;}
   auth.currentUser.updatePassword(np).then(()=>{g('pf_err').style.color='var(--ok)';g('pf_err').textContent='Password updated.';g('pf_new').value='';g('pf_conf').value='';})
     .catch(e=>{g('pf_err').textContent=e.message+' (sign out and back in, then retry).';});
@@ -6499,16 +7170,49 @@ function showToast(o){ const wrap=g('toasts'); if(!wrap)return; const el=documen
 }
 function _tone(freq,start,dur,vol,type){ try{ _actx=_actx||new (window.AudioContext||window.webkitAudioContext)(); if(_actx.state==='suspended')_actx.resume(); const o=_actx.createOscillator(),gn=_actx.createGain(); o.type=type||'sine'; o.frequency.value=freq; o.connect(gn); gn.connect(_actx.destination); const t=_actx.currentTime+start; gn.gain.setValueAtTime(0.0001,t); gn.gain.exponentialRampToValueAtTime(vol||0.12,t+0.02); gn.gain.exponentialRampToValueAtTime(0.0001,t+dur); o.start(t); o.stop(t+dur+0.02); }catch(e){} }
 function pingMessage(){ _tone(680,0,0.16,0.12); _tone(1020,0.12,0.22,0.12); } /* رسالة: نغمتان صاعدتان */
-function pingNotify(){ _tone(520,0,0.42,0.10,'triangle'); } /* إشعار عادي: نغمة واحدة أخفض */
+function pingNotify(){ _tone(660,0,0.18,0.17); _tone(880,0.17,0.18,0.17); _tone(1240,0.34,0.34,0.18); } /* إشعار: نغمة صاعدة تشد الانتباه */
+function flashBell(){ try{ var b=document.querySelector('.bell'); if(b){ b.classList.remove('ring'); void b.offsetWidth; b.classList.add('ring'); setTimeout(function(){ try{b.classList.remove('ring');}catch(e){} },1200); } var bd=document.getElementById('bellBadge'); if(bd){ bd.classList.add('pulse'); setTimeout(function(){ try{bd.classList.remove('pulse');}catch(e){} },1400); } }catch(e){} }
 function pingSound(){ pingNotify(); }
 function desktopNotify(m){ try{ if(!('Notification' in window)||Notification.permission!=='granted')return; const n=new Notification('Sedra · '+(m.sender||'New message'),{body:(m.text||'').slice(0,120)}); n.onclick=function(){ try{window.focus();}catch(e){} openChatChannel(m.channel); n.close(); }; }catch(e){} }
+/* ===== Web Push (offline notifications) — subscribe + send ===== */
+var VAPID_PUBLIC='BPDLnlT1-K1ZumUzDVpgDIymEaOEzRgv1umHp_yn75VfrDJEr19aWBTbWSk4azDShSZzzW0-FYx2ybchQVOFeT8';
+function _urlB64ToU8(s){ var pad='='.repeat((4-s.length%4)%4); var b=(s+pad).replace(/-/g,'+').replace(/_/g,'/'); var raw=atob(b); var u=new Uint8Array(raw.length); for(var i=0;i<raw.length;i++)u[i]=raw.charCodeAt(i); return u; }
+function _pushSubId(ep){ var h=5381; for(var i=0;i<ep.length;i++){ h=((h<<5)+h+ep.charCodeAt(i))>>>0; } return 'sub_'+h.toString(36)+String(ep.length); }
+async function enablePush(silent){
+  try{
+    if(!('serviceWorker' in navigator)||!('PushManager' in window)){ if(!silent)alert(lang==='ar'?'المتصفح لا يدعم إشعارات الجهاز':'This browser does not support push notifications'); return false; }
+    var perm=(typeof Notification!=='undefined')?Notification.permission:'denied';
+    if(perm==='default'){ perm=await Notification.requestPermission(); }
+    if(perm!=='granted'){ if(!silent)alert(lang==='ar'?'لازم تسمح بالإشعارات من المتصفح الأول':'Please allow notifications in the browser first'); return false; }
+    var reg=await navigator.serviceWorker.ready;
+    var sub=await reg.pushManager.getSubscription();
+    if(!sub){ sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64ToU8(VAPID_PUBLIC)}); }
+    var j=sub.toJSON(); if(!j||!j.keys||!j.keys.p256dh){ return false; }
+    var rec={endpoint:sub.endpoint, p256dh:j.keys.p256dh, auth:j.keys.auth, email:((me&&me.email)||'').toLowerCase(), name:(me&&me.name)||'', ua:(navigator.userAgent||'').slice(0,140), at:new Date().toISOString()};
+    await apiMerge('pushsubs', _pushSubId(sub.endpoint), rec);
+    window.__pushOn=true;
+    if(!silent){ try{ showToast({title:(lang==='ar'?'✓ تنبيهات الجهاز مفعّلة':'✓ Device alerts enabled'), body:(lang==='ar'?'هتوصلك الإشعارات بصوت حتى والنظام مقفول':'You will get sound alerts even when the app is closed')}); }catch(e){} }
+    return true;
+  }catch(e){ if(!silent)alert('Push error: '+(e&&e.message||e)); return false; }
+}
+function sendPushToStaff(emails, title, body, url){
+  try{
+    emails=(emails||[]).map(function(x){return String(x||'').toLowerCase();}).filter(Boolean);
+    if(!emails.length) return;
+    if(!(auth&&auth.currentUser)) return;
+    auth.currentUser.getIdToken().then(function(tok){
+      try{ fetch('/push',{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({token:tok,targets:emails,title:title||'Sedra Electric',body:body||'',url:url||'/'}),keepalive:true}).catch(function(){}); }catch(e){}
+    }).catch(function(){});
+  }catch(e){}
+}
 function setupNotif(){
   if(_notifSetup)return; _notifSetup=true;
+  try{ if('Notification' in window && Notification.permission==='granted'){ setTimeout(function(){ enablePush(true); },1500); } }catch(e){}
   try{ if('Notification' in window){ if(Notification.permission==='granted')_wantDesktop=true; else if(Notification.permission!=='denied')Notification.requestPermission().then(p=>{_wantDesktop=(p==='granted');}); } }catch(e){}
   document.addEventListener('click',function(e){ if(!e.target.closest('.bellwrap')){ const bp=g('bellPanel'); if(bp)bp.classList.add('hide'); } if(!e.target.closest('.gswrap')){ const sr=g('searchResults'); if(sr)sr.classList.add('hide'); } });
 }
 var _nbCount=-1;
-function checkNotifSound(){ try{ var n=getNotifications().filter(function(x){return x.ico!=='💬';}).reduce(function(s,x){return s+(x.count||1);},0); if(_nbCount>=0 && n>_nbCount){ pingNotify(); try{ if(_wantDesktop && 'Notification' in window && Notification.permission==='granted'){ new Notification('Sedra Electric', {body:'You have a new notification', icon:'icon-192.png'}); } }catch(_){} } _nbCount=n; }catch(e){} }
+function checkNotifSound(){ try{ var n=getNotifications().filter(function(x){return x.ico!=='💬';}).reduce(function(s,x){return s+(x.count||1);},0); if(_nbCount>=0 && n>_nbCount){ pingNotify(); try{flashBell();}catch(_f){} try{ if(_wantDesktop && 'Notification' in window && Notification.permission==='granted'){ new Notification('Sedra Electric', {body:'You have a new notification', icon:'icon-192.png'}); } }catch(_){} } _nbCount=n; }catch(e){} }
 function updateBadges(){ try{ updateChatNavBadge(); updateBellBadge(); checkNotifSound(); updateReqNavBadge(); }catch(e){} }
 function updateReqNavBadge(){ const nav=g('nav'); if(!nav)return; const btn=nav.querySelector('button[data-v="quoterequests"]'); if(!btn)return; let b=btn.querySelector('.navbadge'); const n=(typeof rfqPending==='function')?rfqPending().length:0; if(n>0){ if(!b){ b=document.createElement('span'); b.className='navbadge'; btn.appendChild(b);} b.textContent=n>99?'99+':n; } else if(b){ b.remove(); } }
 function chatUnreadTotal(){ const myEmail=(me&&me.email||'').toLowerCase(); if(!myEmail)return 0; let n=0; messages.forEach(m=>{ if(msgForMe(m,myEmail)&&(m.email||'').toLowerCase()!==myEmail&&num(m.ts)>chReadFor(m.channel))n++; }); return n; }
@@ -6573,7 +7277,7 @@ function markBellSeen(){ try{ localStorage.setItem('sedra_bell_sig', JSON.string
 function fmtNotifTime(ts){ if(!ts)return ''; var d=new Date(Number(ts)); if(isNaN(d.getTime()))return ''; var now=new Date(); if(d.toDateString()===now.toDateString())return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); var y=new Date(now); y.setDate(now.getDate()-1); if(d.toDateString()===y.toDateString())return (lang==='ar'?'أمس ':'Yesterday ')+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); return d.getDate()+'/'+(d.getMonth()+1)+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); }
 function closeBell(){ const p=g('bellPanel'); if(p)p.classList.add('hide'); }
 function renderBellPanel(){ const p=g('bellPanel'); if(!p)return; const list=getNotifications(); window._notif=list;
-  const _tot=list.reduce((s,x)=>s+(x.count||1),0); p.innerHTML=`<div class="bh" style="display:flex;justify-content:space-between;align-items:center"><span>🔔 ${lang==='ar'?'الإشعارات':'Notifications'} ${_tot?'('+_tot+')':''}</span>${list.length?`<a onclick="markBellSeen();updateBellBadge()" style="cursor:pointer;color:#157f96;font-size:11px;font-weight:600">${lang==='ar'?'تعليم كمقروء':'Mark read'}</a>`:''}</div>`+(list.length?list.map((x,i)=>`<div class="ni" onclick="window._notif[${i}].act()"><div class="ico">${x.ico}</div><div class="tx">${esc(x.title)}<small>${esc(x.sub)}${x.ts?' · '+esc(fmtNotifTime(x.ts)):''}</small></div></div>`).join(''):`<div class="empty" style="padding:18px">${lang==='ar'?'مفيش إشعارات 🎉':"You're all caught up 🎉"}</div>`); }
+  const _tot=list.reduce((s,x)=>s+(x.count||1),0); p.innerHTML=`<div class="bh" style="display:flex;justify-content:space-between;align-items:center"><span>🔔 ${lang==='ar'?'الإشعارات':'Notifications'} ${_tot?'('+_tot+')':''}</span>${(typeof Notification==='undefined'||Notification.permission!=='granted'||!window.__pushOn)?`<a onclick="event.stopPropagation();enablePush(false)" style="cursor:pointer;color:#c0392b;font-size:11px;font-weight:700;margin-inline:8px">${lang==='ar'?'🔔 فعّل تنبيهات الجهاز':'🔔 Enable device alerts'}</a>`:''}${list.length?`<a onclick="markBellSeen();updateBellBadge()" style="cursor:pointer;color:#157f96;font-size:11px;font-weight:600">${lang==='ar'?'تعليم كمقروء':'Mark read'}</a>`:''}</div>`+(list.length?list.map((x,i)=>`<div class="ni" onclick="window._notif[${i}].act()"><div class="ico">${x.ico}</div><div class="tx">${esc(x.title)}<small>${esc(x.sub)}${x.ts?' · '+esc(fmtNotifTime(x.ts)):''}</small></div></div>`).join(''):`<div class="empty" style="padding:18px">${lang==='ar'?'مفيش إشعارات 🎉':"You're all caught up 🎉"}</div>`); }
 var _gsT=null;
 function globalSearch(q){ clearTimeout(_gsT); _gsT=setTimeout(function(){ _globalSearchRun(q); }, 160); }
 function _globalSearchRun(q){ const box=g('searchResults'); if(!box)return; q=(q||'').trim().toLowerCase();
@@ -6596,6 +7300,29 @@ function _globalSearchRun(q){ const box=g('searchResults'); if(!box)return; q=(q
   box.innerHTML=html||`<div class="empty" style="padding:16px">No matches.</div>`; box.classList.remove('hide');
 }
 function closeSearch(){ const b=g('searchResults'); if(b)b.classList.add('hide'); const i=g('globalSearch'); if(i)i.value=''; }
+/* ===== Quick actions (global toolbar) ===== */
+function qaItems(){ var ar=(typeof lang!=='undefined'&&lang==='ar');
+  return [
+    {ic:'➕',t:ar?'Lead جديد':'New lead',act:'editLead()'},
+    {ic:'📄',t:ar?'عرض سعر جديد':'New quotation',act:'newQuoteChoice()'},
+    {ic:'🔍',t:ar?'بحث في الـ Leads':'Search leads',act:"quickSearch('leads')"},
+    {ic:'📦',t:ar?'بحث في المنتجات':'Search products',act:"quickSearch('inventory')"},
+    {ic:'🧩',t:ar?'منتج جديد':'New product',act:'editItem()'},
+    {ic:'📁',t:ar?'استيراد منتجات (ملف)':'Import products (file)',act:'importCatalog()'}
+  ];
+}
+function qaPanelHTML(){ return qaItems().map(function(a){ return '<button class="qa-item" onclick="closeQuickActions();'+a.act+'"><span class="qa-ic">'+a.ic+'</span>'+a.t+'</button>'; }).join(''); }
+function toggleQuickActions(ev){ if(ev){ev.stopPropagation();} var p=g('qaPanel'); if(!p)return;
+  if(p.classList.contains('hide')){ p.innerHTML=qaPanelHTML(); p.classList.remove('hide'); setTimeout(function(){ document.addEventListener('click',closeQuickActions,{once:true}); },0); }
+  else { closeQuickActions(); } }
+function closeQuickActions(){ var p=g('qaPanel'); if(p)p.classList.add('hide'); }
+function quickSearch(which){ closeQuickActions();
+  try{
+    if(which==='leads'){ if(typeof go==='function')go('sales'); if(typeof salesTab!=='undefined'){salesTab='leads';} if(typeof render==='function')render(); }
+    else if(which==='inventory'){ if(typeof go==='function')go('inventory'); if(typeof invTab!=='undefined'){invTab='items';} if(typeof render==='function')render(); }
+  }catch(e){}
+  setTimeout(function(){ var s=document.querySelector('#view input[type=search], #view .tvq, #view input[placeholder*="Search"], #view input[placeholder*="بحث"]'); if(s){ try{ s.focus(); if(s.select)s.select(); }catch(e){} } }, 320);
+}
 function exportBtns(type){ if(!isAdmin())return ''; return `<button class="btn gh sm" onclick="doExport('${type}','csv')">⬇ Excel</button> <button class="btn gh sm" onclick="doExport('${type}','pdf')">🖨 PDF</button>`; }
 function doExport(type,fmt){
   if(!exportGuard())return;
@@ -7129,7 +7856,7 @@ const TXT = {
   '🎫 Tickets':'🎫 التذاكر','🛠️ Field service':'🛠️ خدمة ميدانية','⏱️ Timesheets':'⏱️ سجل الساعات','🗂️ Task board':'🗂️ لوحة المهام','Support tickets':'تذاكر الدعم','Field service schedule':'جدول الخدمة الميدانية','Time log':'سجل الوقت','+ New ticket':'+ تذكرة جديدة','+ Schedule job':'+ جدولة مهمة','+ Log time':'+ تسجيل وقت','Advance':'تقديم',
   // top bar / gate
   '🔎 Search…':'🔎 بحث…','Sign out':'تسجيل الخروج','🌐 All branches':'🌐 كل الفروع','Connecting…':'جارٍ الاتصال…','🟢 Online · shared':'🟢 متصل · مشترك',
-  'Company Management System':'نظام إدارة الشركة','Sign in with your company account to continue.':'سجّل الدخول بحساب الشركة للمتابعة.','Email':'البريد الإلكتروني','Password':'كلمة المرور','Sign in':'تسجيل الدخول','Set your new password':'عيّن كلمة مرور جديدة','First time — please choose your own password.':'أول مرة — اختر كلمة المرور الخاصة بك.','New password (min 6)':'كلمة مرور جديدة (٦ أحرف على الأقل)','Confirm new password':'تأكيد كلمة المرور','Save & continue':'حفظ ومتابعة','Choose a branch':'اختر الفرع','Select the branch you want to work in.':'اختر الفرع اللي عايز تشتغل فيه.','Access':'الصلاحية',
+  'Company Management System':'نظام إدارة الشركة','Sign in with your company account to continue.':'سجّل الدخول بحساب الشركة للمتابعة.','Email':'البريد الإلكتروني','Password':'كلمة المرور','Sign in':'تسجيل الدخول','Set your new password':'عيّن كلمة مرور جديدة','First time — please choose your own password.':'أول مرة — اختر كلمة المرور الخاصة بك.','New password (min 8, letters + numbers)':'كلمة مرور جديدة (٨ أحرف على الأقل، حروف وأرقام)','Confirm new password':'تأكيد كلمة المرور','Save & continue':'حفظ ومتابعة','Choose a branch':'اختر الفرع','Select the branch you want to work in.':'اختر الفرع اللي عايز تشتغل فيه.','Access':'الصلاحية',
   // tabs
   '📊 Overview':'📊 نظرة عامة','Overview':'نظرة عامة','Leads pipeline':'مسار العملاء المحتملين','Campaigns':'الحملات','🗓️ Content calendar':'🗓️ تقويم المحتوى','Content calendar':'تقويم المحتوى','Invoices':'الفواتير','Expenses':'المصروفات','🔁 Contracts (AMC)':'🔁 العقود (AMC)','Items':'الأصناف','Stock movements':'حركة المخزون','Suppliers':'الموردون','Purchase orders':'أوامر الشراء','👥 Directory':'👥 الدليل','🌴 Leave':'🌴 الإجازات','💵 Payroll':'💵 الرواتب','🏢 Company':'🏢 الشركة','💬 Direct':'💬 رسائل خاصة','👥 Groups':'👥 المجموعات','All tasks':'كل المهام','My tasks':'مهامي','Users & Access':'المستخدمون والصلاحيات','Office locations':'مواقع المكاتب','Social links':'روابط السوشيال','Import & Backup':'الاستيراد والنسخ','Activity log':'سجل النشاط',
   // section headers
@@ -10707,3 +11434,147 @@ document.addEventListener('keydown',function(e){
 </script>
 </body>
 </html>
+<!-- ===== SEDRA ZOHO THEME (added by Claude) ===== -->
+<link id="zoho-font" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<style id="zoho-theme">
+:root{--z-top:#273a4d;--z-side:#1f2e3d;--z-accent:#1a8cff;--z-bg:#eef1f5;--z-card:#ffffff;--z-border:#e4e8ee;--z-text:#2b3d4f;--z-muted:#6b7b8c;}
+body, body *{font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif !important;}
+body{background:var(--z-bg) !important;}
+main > .top{background:var(--z-top) !important;color:#fff !important;border-bottom:1px solid rgba(255,255,255,.06) !important;box-shadow:0 1px 4px rgba(0,0,0,.12) !important;}
+main > .top *{color:#fff;}
+main > .top input,main > .top .srch,main > .top [class*="search"]{background:rgba(255,255,255,.10) !important;color:#fff !important;border:1px solid rgba(255,255,255,.14) !important;border-radius:8px !important;}
+main > .top input::placeholder{color:rgba(255,255,255,.7) !important;}
+main > .top select,main > .top .branchsel{background:rgba(255,255,255,.14) !important;color:#fff !important;border:1px solid rgba(255,255,255,.22) !important;border-radius:8px !important;padding:5px 8px !important;}
+main > .top select option,main > .top .branchsel option{color:#17242f !important;background:#ffffff !important;}
+main > .top #statusPill,main > .top .pill{color:#fff !important;}
+/* Header dropdown panels (search / quick / notifications) inherit white text from the bar,
+   making them unreadable on their light background in light mode. Force dark text there. */
+body:not(.dark) main > .top #searchResults,body:not(.dark) main > .top #bellPanel,body:not(.dark) main > .top #qaPanel{background:#fff !important;}
+body:not(.dark) main > .top #searchResults *,body:not(.dark) main > .top #bellPanel *{color:#17242f !important;}
+body:not(.dark) main > .top #qaPanel *:not(.btn):not(button){color:#17242f !important;}
+aside,nav.rail,.rail,.side{background:var(--z-side) !important;border-right:1px solid rgba(255,255,255,.05) !important;}
+.logo{background:var(--z-side) !important;border-bottom:1px solid rgba(255,255,255,.06) !important;}
+.nrail-i{color:#9fb3c6 !important;border-radius:10px !important;transition:all .15s;}
+.nrail-i:hover{background:rgba(255,255,255,.07) !important;color:#fff !important;}
+.nrail-i.on,.nrail-i.active{background:rgba(26,140,255,.16) !important;color:#fff !important;box-shadow:inset 3px 0 0 var(--z-accent) !important;}
+nav a.on,.side a.on,.navlink.on{background:#e8f2ff !important;color:#1763c7 !important;font-weight:600 !important;}
+.card{background:var(--z-card) !important;border:1px solid var(--z-border) !important;border-radius:10px !important;box-shadow:0 1px 2px rgba(16,30,54,.06) !important;}
+.dstat{border:1px solid var(--z-border) !important;border-top:3px solid var(--acc,var(--z-accent)) !important;border-radius:10px !important;box-shadow:0 1px 2px rgba(16,30,54,.06) !important;color:var(--z-text) !important;}
+.dstat *{color:var(--z-text) !important;}
+.dstat .top{background:transparent !important;box-shadow:none !important;border:0 !important;}
+.dstat .val{color:#16263a !important;font-weight:800 !important;}
+.dstat .ic{border-radius:10px !important;}
+.dstat .dl{border-radius:999px !important;font-weight:700 !important;}
+.btn-primary,.btnp,button.primary,.chk-btn{background:var(--z-accent) !important;border-color:var(--z-accent) !important;color:#fff !important;border-radius:8px !important;}
+/* ===== Quick actions toolbar ===== */
+.qawrap{position:relative;display:inline-block}
+#qaBtn{background:var(--z-accent) !important;border-color:var(--z-accent) !important;color:#fff !important;}
+.qapanel{position:absolute;top:calc(100% + 8px);inset-inline-end:0;z-index:120;background:#fff !important;border:1px solid #e4e8ee;border-radius:12px;box-shadow:0 14px 38px rgba(16,30,54,.2);padding:6px;min-width:236px}
+.qapanel.hide{display:none}
+.qa-item{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;text-align:start;padding:10px 12px;border-radius:9px;font-family:inherit !important;font-size:14px;font-weight:600;color:#2b3d4f !important;cursor:pointer}
+.qapanel, .qapanel *{color:#2b3d4f !important}
+.qa-item:hover{background:#eef5ff}
+.qa-item:hover,.qa-item:hover .qa-ic,.qa-item:hover span{color:#1763c7 !important}
+.qa-ic{width:28px;height:28px;border-radius:8px;background:rgba(26,140,255,.1);display:grid;place-items:center;font-size:15px;flex-shrink:0}
+/* ===== Quotation item cards (new roomier layout) ===== */
+.qrows{display:flex;flex-direction:column;gap:9px;margin:4px 0 2px}
+.qrow{border:1.5px solid #e4e8ee;border-radius:11px;padding:11px 12px;background:#fff}
+.qr-main{display:flex;align-items:center;gap:9px}
+.qr-drag{cursor:grab;color:#aebccb;font-size:15px;user-select:none;flex-shrink:0}
+.qr-img{width:42px;height:42px;border-radius:9px;object-fit:contain;background:#f4f8fb;flex-shrink:0}
+.qr-img.ph{display:grid;place-items:center;color:#aebccb;font-size:18px}
+.qr-id{flex:1;min-width:0}
+.qr-name{width:100%;border:1.5px solid #e4e8ee !important;border-radius:8px;padding:8px 10px !important;font-weight:700;font-size:14px;background:#f7f9fc}
+.qr-id2{display:flex;gap:7px;margin-top:5px}
+.qr-code{width:120px;border:1.5px solid #e4e8ee !important;border-radius:7px;padding:6px 9px !important;font-size:12.5px;background:#f7f9fc}
+.qr-brand{width:120px;border:1.5px solid #e4e8ee !important;border-radius:7px;padding:6px 9px !important;font-size:12.5px;background:#f7f9fc}
+.qr-pick{flex-shrink:0;background:rgba(26,140,255,.1);color:#1a8cff;border:0;border-radius:8px;width:34px;height:34px;font-size:15px;cursor:pointer}
+.qr-pick.gh{background:#eef2f6;color:#6b7b8c}
+.qr-x{flex-shrink:0;background:none;border:0;color:#c0623a;font-size:15px;cursor:pointer}
+.qr-desc{width:100%;border:1.5px solid #e4e8ee !important;border-radius:8px;padding:7px 10px !important;font-size:13px;background:#f7f9fc;margin-top:8px}
+.qr-bot{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:9px}
+.qr-f{display:flex;flex-direction:column;gap:3px;font-size:11px;color:#6b7b8c;font-weight:700}
+.qr-f input{width:92px;border:1.5px solid #e4e8ee !important;border-radius:7px;padding:7px 9px !important;font-size:13.5px;text-align:center;background:#f7f9fc;font-weight:700;color:#16263a}
+.qr-line{font-size:13px;color:#6b7b8c}
+.qr-line b{color:#16263a;font-size:15px}
+.qr-opt{display:flex;align-items:center;gap:6px;font-size:12.5px;color:#6b7b8c;font-weight:600;margin-inline-start:auto}
+.qrow input:focus{border-color:#1a8cff !important;background:#fff;outline:0}
+/* sticky grand total + collapsible section chevrons */
+.qsticky{position:sticky;bottom:-2px;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#143f63;color:#fff !important;border-radius:11px;padding:13px 18px;margin-top:14px;box-shadow:0 -4px 16px rgba(16,30,54,.14)}
+.qsticky .qst-lbl{font-weight:700;font-size:13.5px;color:#cfe0ef !important}
+.qsticky b,.qsticky #qStickyVal{font-size:21px;font-weight:800;color:#fff !important}
+.qsec-chev{margin-inline-start:auto;color:#8aa0b5;font-size:12px;font-weight:700}
+.qsec-h.qcollapsed{opacity:.92}
+/* ===== Night-mode (dark) corrections — keep text/background contrast correct =====
+   The light theme above uses !important, which in dark mode would force white cards
+   + light text (unreadable). These dark-scoped rules restore dark surfaces so every
+   text stays light-on-dark in night mode, while day mode is untouched. */
+body.dark{background:#0e1620 !important;}
+body.dark .card{background:#16242f !important;border-color:#2a3744 !important;}
+body.dark .dstat{background:#16242f !important;border-color:#2a3744 !important;}
+body.dark .dstat, body.dark .dstat *{color:#e6edf3 !important;}
+body.dark .dstat .val, body.dark .dstat .n{color:#ffffff !important;}
+body.dark .qrow{background:#16242f !important;border-color:#2a3744 !important;}
+body.dark .qr-name,body.dark .qr-code,body.dark .qr-brand,body.dark .qr-desc,body.dark .qr-f input{background:#0f1c26 !important;color:#e6edf3 !important;border-color:#33414e !important;}
+body.dark .qr-line b{color:#e6edf3 !important;}
+body.dark .qr-img{background:#0f1c26 !important;}
+body.dark .qapanel{background:#16242f !important;border-color:#2a3744 !important;}
+body.dark .qapanel, body.dark .qapanel *{color:#e6edf3 !important;}
+body.dark .qa-item:hover{background:#1d2e3c !important;}
+body.dark .qa-ic{background:rgba(26,140,255,.18) !important;}
+/* table zebra striping: even rows were white (#fbfdfe) with no dark variant → light-on-white. */
+body.dark table tbody tr:nth-child(even) td{background:#15293f !important;}
+body.dark table tbody tr:hover td{background:#1d3350 !important;}
+/* Night-mode text contrast: JS marks dark/navy text that sits on a DARK surface with .zltx;
+   lighten only those (navy text on a light box is left dark, so it stays readable there). */
+body.dark .zltx{color:#e6edf3 !important;}
+</style>
+<script id="zoho-theme-js">
+(function(){
+  function cap(){
+    document.querySelectorAll('.dstat').forEach(function(t){
+      if(t.getAttribute('data-acc')) return;
+      var bi=getComputedStyle(t).backgroundImage||'';
+      var m=bi.match(/rgb\([^)]+\)/);
+      var acc=m?m[0]:'rgb(26,140,255)';
+      t.style.setProperty('--acc',acc);
+      t.style.background='#ffffff';
+      t.style.backgroundImage='none';
+      var tint=acc.replace('rgb(','rgba(').replace(')',',0.12)');
+      t.querySelectorAll('.ic,.dl').forEach(function(e){ e.style.background=tint; e.style.color=acc; });
+      t.setAttribute('data-acc','1');
+    });
+  }
+  function zLum(m){ return 0.2126*(+m[0])+0.7152*(+m[1])+0.0722*(+m[2]); }
+  function zFixText(){
+    if(!document.body.classList.contains('dark')) return;
+    var app=document.getElementById('app'); if(!app) return;
+    var els=app.getElementsByTagName('*');
+    for(var i=0;i<els.length;i++){ var e=els[i];
+      if(e.getAttribute('data-ztx')) continue;
+      var cm=(getComputedStyle(e).color||'').match(/[0-9.]+/g);
+      if(!cm){ e.setAttribute('data-ztx','1'); continue; }
+      if(zLum(cm)>120){ e.setAttribute('data-ztx','1'); continue; }   // text already light enough
+      var p=e,g=0,bg=null;
+      while(p&&g<8){ var bm=(getComputedStyle(p).backgroundColor||'').match(/[0-9.]+/g); if(bm&&(bm[3]==null|| +bm[3]>0.5)){ bg=bm; break; } p=p.parentElement; g++; }
+      if(!bg) bg=['14','22','32'];
+      if(zLum(bg)<120){ e.classList.add('zltx'); }                    // dark text on dark surface
+      e.setAttribute('data-ztx','1');
+    }
+  }
+  var pend=false;
+  function schedule(){ if(pend)return; pend=true; setTimeout(function(){pend=false; try{cap();}catch(e){} try{zFixText();}catch(e){}},120); }
+  if(document.readyState!=='loading') schedule(); else document.addEventListener('DOMContentLoaded',schedule);
+  try{ new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true}); }catch(e){}
+  /* re-run when the day/night class on <body> is toggled (a class change isn't a childList mutation) */
+  try{ new MutationObserver(schedule).observe(document.body,{attributes:true,attributeFilter:['class']}); }catch(e){}
+  /* Datalist re-pick is handled by the global _dlStashClear handlers in the main script. */
+  /* Protect work-in-progress: if an edit window (modal) is open and the page is about to
+     refresh / close / navigate away, ask first — so an accidental reload doesn't wipe an
+     unsaved quotation, customer, lead, etc. The browser shows its standard "Leave site?" prompt. */
+  try{ window.addEventListener('beforeunload',function(ev){
+    try{ var m=document.getElementById('modal'); if(m&&m.classList.contains('show')){ ev.preventDefault(); ev.returnValue=''; return ''; } }catch(_e){}
+  }); }catch(e){}
+})();
+</script>
+<!-- ===== END SEDRA ZOHO THEME ===== -->
