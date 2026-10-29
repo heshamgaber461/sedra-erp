@@ -3618,7 +3618,7 @@ function vProjects(){
   let h=`<div class="tabs"><button class="${projTab==='list'?'active':''}" onclick="projTab='list';render()">🏗️ ${lang==='ar'?'المشاريع':'Projects'}</button><button class="${projTab==='profit'?'active':''}" onclick="projTab='profit';render()">💹 ${lang==='ar'?'الربحية':'Profitability'}</button></div>`;
   if(projTab==='profit') return h+vProfit(rows);
   h+=projectsPanel(rows);
-  h+=`<div class="sect"><h2>Projects</h2><div class="sp"></div>${isAdmin()?`<button class="btn gh sm" onclick="sedraImportProjects()" title="Import projects from /projects-seed.json">⬆ Import</button> <button class="btn dn sm" onclick="sedraDeleteAllProjects()" title="Move all projects to Recycle Bin">🗑 Clear all</button> `:''}<button class="btn cy" onclick="editProject()">+ Add project</button></div>`;
+  h+=`<div class="sect"><h2>Projects</h2><div class="sp"></div>${isAdmin()?`<button class="btn gh sm" onclick="sedraImportProjects()" title="Import projects from /projects-seed.json">⬆ Import</button> <button class="btn dn sm" onclick="sedraDeleteAllProjects()" title="Move all projects to Recycle Bin">🗑 Clear all</button> `:''}${canApproveMat()?`<button class="btn cy" onclick="editProject()">+ Add project</button>`:''}</div>`;
   if(!rows.length)return h+`<div class="card empty">No projects yet.</div>`;
   h+=`<table><thead><tr><th>Project</th><th>Client</th><th>Branch</th><th>Dept</th><th>Status</th><th>Progress</th><th>Tasks</th><th>Value</th><th></th></tr></thead><tbody>`+rows.map(p=>{const pr=projProgress(p),ts=tasks.filter(t=>t.project===p.id),done=ts.filter(t=>t.status==='Done').length;return `<tr>
     <td><b>${esc(p.name)}</b><div class="mini">${esc(p.owner||'')}</div></td><td>${esc(p.client||'')}</td>
@@ -3627,7 +3627,7 @@ function vProjects(){
     <td><div style="background:#eef2f6;border-radius:6px;height:8px;width:80px;overflow:hidden"><div style="background:var(--cyan);height:8px;width:${pr}%"></div></div><span class="mini">${pr}%</span></td>
     <td>${ts.length?done+'/'+ts.length:'—'}</td>
     <td>${money(p.branch,p.value)}</td>
-    <td style="white-space:nowrap"><button class="btn cy sm" onclick="openProjectId='${p.id}';render()">Open</button> ${p.file?`<button class="btn gh sm" title="Open attached file" onclick="openRecFile('projects','${p.id}')">📎</button> `:''}<button class="btn gh sm" title="Open record" onclick="recOpen('${p.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${p.id}')">📎</button> <button class="btn gh sm" onclick="editProject('${p.id}')">Edit</button> ${isMgr()?`<button class="btn dn sm" onclick="delDoc('projects','${p.id}')">✕</button>`:''}</td></tr>`}).join('')+`</tbody></table>`;
+    <td style="white-space:nowrap"><button class="btn cy sm" onclick="openProjectId='${p.id}';render()">Open</button> ${p.file?`<button class="btn gh sm" title="Open attached file" onclick="openRecFile('projects','${p.id}')">📎</button> `:''}<button class="btn gh sm" title="Open record" onclick="recOpen('${p.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${p.id}')">📎</button> ${canApproveMat()?`<button class="btn gh sm" onclick="editProject('${p.id}')">Edit</button>`:''} ${isMgr()?`<button class="btn dn sm" onclick="delDoc('projects','${p.id}')">✕</button>`:''}</td></tr>`}).join('')+`</tbody></table>`;
   return h;
 }
 function vProfit(rows){
@@ -3652,7 +3652,7 @@ function projectDetail(p){
   h+=`<div class="card" style="margin-top:10px"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;align-items:center">
     <div><div style="font-size:19px;font-weight:800;color:var(--navy)">${esc(p.name)}</div>
     <div class="mini">${FLAG[p.branch]||''} ${esc(p.branch||'')} · ${esc(p.client||'—')} · ${esc(p.dept||'')} · Owner: ${esc(p.owner||'—')}</div></div>
-    <div><span class="tag" style="background:${PSTAT_COL[p.status]||'#eee'}22;color:${PSTAT_COL[p.status]||'#333'}">${esc(p.status||'Planning')}</span> <button class="btn gh sm" title="Open record" onclick="recOpen('${p.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${p.id}')">📎</button> <button class="btn gh sm" onclick="editProject('${p.id}')">Edit</button></div></div>
+    <div><span class="tag" style="background:${PSTAT_COL[p.status]||'#eee'}22;color:${PSTAT_COL[p.status]||'#333'}">${esc(p.status||'Planning')}</span> <button class="btn gh sm" title="Open record" onclick="recOpen('${p.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${p.id}')">📎</button> ${canApproveMat()?`<button class="btn gh sm" onclick="editProject('${p.id}')">Edit</button>`:''}</div></div>
     <div style="margin-top:12px">Progress <b>${pr}%</b><div style="background:#eef2f6;border-radius:6px;height:10px;overflow:hidden;margin-top:4px"><div style="background:var(--cyan);height:10px;width:${pr}%"></div></div></div>
     <div class="mini" style="margin-top:8px">${p.start?'Start: '+esc(p.start)+' · ':''}${p.end?'End: '+esc(p.end)+' · ':''}Value: ${money(p.branch,p.value)}</div></div>`;
   // Milestones
@@ -3700,6 +3700,7 @@ function addMilestone(pid){
 function toggleMilestone(pid,i){ const p=projects.find(x=>x.id===pid); if(!p)return; const mil=(p.milestones||[]).map((m,j)=>j===i?Object.assign({},m,{done:!m.done}):m); apiMerge('projects',pid,{milestones:mil}).then(synced); }
 function delMilestone(pid,i){ const p=projects.find(x=>x.id===pid); if(!p)return; const mil=(p.milestones||[]).filter((m,j)=>j!==i); apiMerge('projects',pid,{milestones:mil}).then(synced); }
 function editProject(id){
+  if(!canApproveMat()){ alert(lang==='ar'?'🚫 تعديل تفاصيل المشاريع للمدير أو Team Leader فقط.':'🚫 Editing project details is restricted to a manager / team leader.'); return; }
   const r=id?projects.find(x=>x.id===id):{branch:defBranch(),status:'Planning',progress:0,dept:(me.dept==='Management'?'Operations':me.dept),owner:me.name};
   openModal(id?'Edit project':'Add project',
     fEl('Project name','p_name',r.name)+fEl('Client','p_client',r.client)+
@@ -3714,7 +3715,7 @@ function editProject(id){
     fileField('p_file','Attach a file (contract / drawing / site photo / PDF)',r.file)+
     fTa('Notes','p_notes',r.notes),
     ()=>{ const d={name:val('p_name'),client:val('p_client'),branch:val('p_branch'),dept:val('p_dept'),status:val('p_status'),progress:num(val('p_progress')),start:val('p_start'),end:val('p_end'),owner:val('p_owner'),value:num(val('p_value')),gps:val('p_gps'),address:val('p_address'),collected:num(val('p_collected')),assignedTo:(val('p_assigned')||'').split(',').map(function(s){return s.trim().toLowerCase();}).filter(Boolean),drawingApproved:val('p_draw')==='Yes',cost:num(val('p_cost')),notes:val('p_notes'),file:fileVal('p_file')};
-      if(!d.name){alert('Name required');return false;} if(!dupGuard('projects',d,id))return false; if(!id)d.created=new Date().toISOString(); d.ownerEmail=ownerEmailFor(d.owner); saveDoc('projects',d,id); });
+      if(!d.name){alert('Name required');return false;} if(!dupGuard('projects',d,id))return false; if(!id)d.created=new Date().toISOString(); d.ownerEmail=ownerEmailFor(d.owner); saveDoc('projects',d,id); try{ notifyLeaders(d,(lang==='ar'?(id?'✏️ تعديل مشروع — ':'➕ مشروع جديد — '):(id?'✏️ Project edited — ':'➕ New project — '))+d.name,((me&&me.name)||'')+(lang==='ar'?(id?' عدّل بيانات المشروع':' أضاف مشروع'):(id?' edited the project':' added a project'))); }catch(_n){} });
 }
 
 /* ===================== PROJECTS — Checklist / Project store / Usage / Financials / Import (Claude 2026-10-29) ===================== */
@@ -3743,6 +3744,8 @@ function recordUsage(pid,idx){
     });
 }
 function canApproveMat(p){ if(isAdmin()||(me&&me.dept==='Management'))return true; if(me&&(me.dept==='Operations'||me.dept==='Technical')&&roleRank(me.role)>=ROLE_RANK['Team Leader'])return true; return false; }
+function projLeaders(p){ var br=(p&&p.branch)||''; return (typeof employees!=='undefined'?employees:[]).filter(function(e){ if(!e||!e.email)return false; var okRole=roleRank(e.role)>=ROLE_RANK['Team Leader']; var okDept=(e.dept==='Operations'||e.dept==='Technical'||e.dept==='Management'); var okBranch=!br||!e.branch||e.branch===br||e.dept==='Management'; return okRole&&okDept&&okBranch; }); }
+function notifyLeaders(p,subject,body){ try{ var ls=projLeaders(p); if(!ls.length)return; var emails=ls.map(function(e){return (e.email||'').toLowerCase();}).filter(Boolean); emails.forEach(function(em){ try{ if(typeof sendEmailAuto==='function') sendEmailAuto(em,subject,body); }catch(_){} }); try{ if(typeof sendPushToStaff==='function') sendPushToStaff(emails,subject,body,'/'); }catch(_){} }catch(e){} }
 function projMatReqs(p){ return (typeof matreqs!=='undefined'?matreqs:[]).filter(function(r){return r.projectId===p.id;}); }
 function requestMaterial(pid,idx){
   var p=projects.find(function(x){return x.id===pid;}); if(!p)return;
@@ -3753,7 +3756,7 @@ function requestMaterial(pid,idx){
     fEl(ar?'الكمية المطلوبة':'Quantity requested','rm_qty',1,'number')+fTa(ar?'ملاحظة (اختياري)':'Note (optional)','rm_note',''),
     function(){ var q=num(val('rm_qty')); if(q<=0){alert('Enter quantity');return false;}
       apiAdd('matreqs',{project:p.name,projectId:pid,item:it.item,itemIdx:idx,qty:q,by:(me&&me.name)||'',byEmail:((me&&me.email)||'').toLowerCase(),branch:p.branch,status:'Pending',note:val('rm_note'),date:new Date().toISOString()})
-        .then(function(){ try{logAudit('create','matreqs','',p.name);}catch(e){} synced(); alert(ar?'اتبعت الطلب ✔ — مستني موافقة مدير Operations أو Team Leader':'Request sent ✔ — awaiting Operations Manager / Team Leader approval'); })
+        .then(function(){ try{logAudit('create','matreqs','',p.name);}catch(e){} try{ notifyLeaders(p,(ar?'🧰 طلب مواد — ':'🧰 Material request — ')+p.name,((me&&me.name)||'')+(ar?' طلب ':' requested ')+q+' × '+it.item+(ar?' — محتاج موافقتك':' — needs your approval')); }catch(_n){} synced(); alert(ar?'اتبعت الطلب ✔ — مستني موافقة مدير Operations أو Team Leader':'Request sent ✔ — awaiting Operations Manager / Team Leader approval'); })
         .catch(function(e){alert('Error: '+(e.message||e));});
     });
 }
@@ -3776,7 +3779,7 @@ function decideMatReq(reqId,approve){
 function setCollected(pid){ var p=projects.find(function(x){return x.id===pid;}); if(!p)return;
   openModal(lang==='ar'?'تحديث المبلغ المحصّل':'Update collected amount',
     fEl(lang==='ar'?'إجمالي المحصّل':'Total collected','pc_col',num(p.collected!=null&&p.collected!==''?p.collected:projCollected(p)),'number'),
-    function(){ apiMerge('projects',pid,{collected:num(val('pc_col'))}).then(synced); });
+    function(){ var nc=num(val('pc_col')); apiMerge('projects',pid,{collected:nc}).then(function(){ try{ notifyLeaders(p,(lang==='ar'?'💰 تحديث تحصيل — ':'💰 Collected updated — ')+p.name,(lang==='ar'?'المحصّل الجديد: ':'New collected: ')+money(p.branch,nc)+' — '+((me&&me.name)||'')); }catch(_n){} synced(); }); });
 }
 function projExtraDetail(p){
   var ar=(lang==='ar'); var cl=projChecklist(p);
@@ -10815,7 +10818,7 @@ function siteCheckIn(){
   var target=pobj?scLatLng(pobj.gps):null;
   var canOverride=(typeof isAdmin==='function'&&isAdmin())||isMgr();
   var rec={emp:(me&&me.name)||'',empEmail:(me&&me.email||'').toLowerCase(),project:proj,site:site,inTs:Date.now(),outTs:0,date:today(),branch:defBranch(),gpsIn:'',distM:null,note:''};
-  var save=function(){ apiAdd('sitevisits',rec).then(function(id){ logAudit('checkin','sitevisits',id||'',proj); synced(); }).catch(e=>alert('Error: '+(e.message||e))); };
+  var save=function(){ apiAdd('sitevisits',rec).then(function(id){ logAudit('checkin','sitevisits',id||'',proj); try{ notifyLeaders((typeof pobj!=='undefined'&&pobj)?pobj:{name:proj,branch:rec.branch},(lang==='ar'?'📍 تسجيل حضور — ':'📍 Check-in — ')+proj,(rec.emp||'')+(lang==='ar'?' سجّل حضور في ':' checked in at ')+proj+' · '+hhmm(rec.inTs)); }catch(_n){} synced(); }).catch(e=>alert('Error: '+(e.message||e))); };
   if(!target){
     if(navigator.geolocation){ navigator.geolocation.getCurrentPosition(function(p){ rec.gpsIn=p.coords.latitude.toFixed(5)+','+p.coords.longitude.toFixed(5); save(); }, function(){ save(); }, {timeout:8000,enableHighAccuracy:true}); } else save();
     return;
@@ -10838,7 +10841,7 @@ function siteCheckOut(id){
   var pobj=(projects||[]).find(function(p){return (p.name||'')===v.project;})||(projects||[]).find(function(p){return nameEq(p.name,v.project);});
   var target=pobj?scLatLng(pobj.gps):null;
   var canOverride=(typeof isAdmin==='function'&&isAdmin())||isMgr();
-  var fin=function(gps,dM,ov){ var patch={outTs:Date.now(),gpsOut:gps||''}; if(dM!=null)patch.distOut=Math.round(dM); if(ov)patch.overrideOut=true; apiMerge('sitevisits',id,patch).then(function(){ logAudit('checkout','sitevisits',id,v.project||''); synced(); }).catch(e=>alert('Error: '+(e.message||e))); };
+  var fin=function(gps,dM,ov){ var patch={outTs:Date.now(),gpsOut:gps||''}; if(dM!=null)patch.distOut=Math.round(dM); if(ov)patch.overrideOut=true; apiMerge('sitevisits',id,patch).then(function(){ logAudit('checkout','sitevisits',id,v.project||''); try{ notifyLeaders((typeof pobj!=='undefined'&&pobj)?pobj:{name:v.project,branch:v.branch},(lang==='ar'?'📤 تسجيل انصراف — ':'📤 Check-out — ')+(v.project||''),(v.emp||'')+(lang==='ar'?' سجّل انصراف من ':' checked out from ')+(v.project||'')); }catch(_n){} synced(); }).catch(e=>alert('Error: '+(e.message||e))); };
   if(!target){ if(navigator.geolocation){ navigator.geolocation.getCurrentPosition(function(p){ fin(p.coords.latitude.toFixed(5)+','+p.coords.longitude.toFixed(5),null); }, function(){ fin(''); }, {timeout:8000}); } else fin(''); return; }
   if(!navigator.geolocation){ alert(lang==='ar'?'جهازك مش بيدعم تحديد الموقع (GPS).':'Geolocation is not supported on this device.'); return; }
   navigator.geolocation.getCurrentPosition(function(p){
