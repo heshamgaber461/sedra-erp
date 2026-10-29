@@ -795,6 +795,7 @@ let wastelogs=[], prequals=[], drills=[];
 let sheets=[], worddocs=[], decks=[];
 let positions=[], mktasks=[], mktlib=[], mktplans=[], growthexp=[];
 let sitevisits=[];
+let matreqs=[];
 let reccmts=[], wfappr=[];
 let rfis=[], dsrs=[], contacts=[];
 let announcements=[], suggestions=[], overtimes=[];
@@ -1387,7 +1388,7 @@ async function refreshLight(){
    this known list. 'blobs' (big files) and 'attachments'/'attachmentAccess' (own per-user
    rules) are loaded on demand, not here. New collections auto-appear once a service account
    is configured again (the shallow discovery below succeeds); until then, add them here. */
-var BULK_COLLS=['_backups','accounts','activities','adcampaigns','announcements','approvals','attendance','audit','bookings','botChats','campaigns','chats','clientaccounts','clientspace','comments','contacts','customers','employees','events','expclaims','feedbacks','goals','groups','imports','inventory','invoices','jobreqs','leads','leaves','messages','meta','mktasks','mktplans','notifications','orbit','payments','paySchedule','payslips','posts','projects','prs','pushsubs','quotes','schedules','servicereqs','sheets','siteLabor','sitevisits','staffEmails','suggestions','suppliers','tasks','tickets','todos','trash','wfappr','workorders'];
+var BULK_COLLS=['_backups','accounts','activities','adcampaigns','announcements','approvals','attendance','audit','bookings','botChats','campaigns','chats','clientaccounts','clientspace','comments','contacts','customers','employees','events','expclaims','feedbacks','goals','groups','imports','inventory','invoices','jobreqs','leads','leaves','matreqs','messages','meta','mktasks','mktplans','notifications','orbit','payments','paySchedule','payslips','posts','projects','prs','pushsubs','quotes','schedules','servicereqs','sheets','siteLabor','sitevisits','staffEmails','suggestions','suppliers','tasks','tickets','todos','trash','wfappr','workorders'];
 /* HEAVY collections are EXCLUDED from the initial blocking load and loaded in the
    background right after the app opens (loadHeavy). They are large (e.g. quotes carries
    inline images, ~10 MB), so pulling them in the first load froze the browser and burned
@@ -1531,7 +1532,7 @@ function applyAll(all){
     subcontractors=listToArr(all.subcontractors); equipment=listToArr(all.equipment); licenses=listToArr(all.licenses);
     warranties=listToArr(all.warranties);
     tenders=listToArr(all.tenders); drawings=listToArr(all.drawings); toolbox=listToArr(all.toolbox);
-    submittals=listToArr(all.submittals); ipcs=listToArr(all.ipcs); risks=listToArr(all.risks); permits=listToArr(all.permits); requisitions=listToArr(all.requisitions); tandc=listToArr(all.tandc); ncrs=listToArr(all.ncrs); gatepasses=listToArr(all.gatepasses); bonds=listToArr(all.bonds); calibrations=listToArr(all.calibrations); handovers=listToArr(all.handovers); retentions=listToArr(all.retentions); insurances=listToArr(all.insurances); methods=listToArr(all.methods); siteinstr=listToArr(all.siteinstr); subipcs=listToArr(all.subipcs); asbuilts=listToArr(all.asbuilts); wastelogs=listToArr(all.wastelogs); prequals=listToArr(all.prequals); drills=listToArr(all.drills); sheets=listToArr(all.sheets); worddocs=listToArr(all.worddocs); decks=listToArr(all.decks); positions=listToArr(all.positions); mktasks=listToArr(all.mktasks); mktlib=listToArr(all.mktlib); mktplans=listToArr(all.mktplans); growthexp=listToArr(all.growthexp); sitevisits=listToArr(all.sitevisits); reccmts=listToArr(all.comments); wfappr=listToArr(all.wfappr);
+    submittals=listToArr(all.submittals); ipcs=listToArr(all.ipcs); risks=listToArr(all.risks); permits=listToArr(all.permits); requisitions=listToArr(all.requisitions); tandc=listToArr(all.tandc); ncrs=listToArr(all.ncrs); gatepasses=listToArr(all.gatepasses); bonds=listToArr(all.bonds); calibrations=listToArr(all.calibrations); handovers=listToArr(all.handovers); retentions=listToArr(all.retentions); insurances=listToArr(all.insurances); methods=listToArr(all.methods); siteinstr=listToArr(all.siteinstr); subipcs=listToArr(all.subipcs); asbuilts=listToArr(all.asbuilts); wastelogs=listToArr(all.wastelogs); prequals=listToArr(all.prequals); drills=listToArr(all.drills); sheets=listToArr(all.sheets); worddocs=listToArr(all.worddocs); decks=listToArr(all.decks); positions=listToArr(all.positions); mktasks=listToArr(all.mktasks); mktlib=listToArr(all.mktlib); mktplans=listToArr(all.mktplans); growthexp=listToArr(all.growthexp); sitevisits=listToArr(all.sitevisits); matreqs=listToArr(all.matreqs); reccmts=listToArr(all.comments); wfappr=listToArr(all.wfappr);
     rfis=listToArr(all.rfis); dsrs=listToArr(all.dsrs); contacts=listToArr(all.contacts);
     announcements=listToArr(all.announcements); suggestions=listToArr(all.suggestions); overtimes=listToArr(all.overtimes);
     taxcodes=listToArr(all.taxcodes); transfers=listToArr(all.transfers); capitals=listToArr(all.capitals); creditnotes=listToArr(all.creditnotes); debitnotes=listToArr(all.debitnotes);
@@ -3661,7 +3662,7 @@ function projectDetail(p){
     <div style="flex:1"><b style="${m.done?'text-decoration:line-through;color:var(--muted)':''}">${esc(m.name)}</b> <span class="mini">${esc(m.date||'')}</span></div>
     <button class="btn dn sm" onclick="delMilestone('${p.id}',${i})">✕</button></div>`).join('')+`</div>`:`<div class="card empty">No milestones yet.</div>`;
   // Tasks
-  h+=`<div class="sect"><h2>✅ Tasks</h2><div class="sp"></div><button class="btn cy" onclick="editTask(null,'${p.id}')">+ Add task</button></div>`;
+  h+=`<div class="sect"><h2>✅ Tasks</h2><div class="sp"></div>${canApproveMat(p)?`<button class="btn cy" onclick="editTask(null,'${p.id}')">+ Add task</button>`:`<span class="mini">${lang==='ar'?'المدير / Team Leader بس يضيف تاسك':'Only a manager / team leader can add a task'}</span>`}</div>`;
   h+= ts.length?`<table><thead><tr><th>Task</th><th>Assignee</th><th>Due</th><th>Status</th><th></th></tr></thead><tbody>`+ts.map(t=>taskRow(t)).join('')+`</tbody></table>`:`<div class="card empty">No tasks yet. Break the project into tasks.</div>`;
   try{ h+=projExtraDetail(p); }catch(e){ h+='<div class="card mini">⚠ materials/analytics: '+(e.message||e)+'</div>'; }
   return h;
@@ -3741,6 +3742,37 @@ function recordUsage(pid,idx){
       }).catch(function(e){alert('Error: '+(e.message||e));});
     });
 }
+function canApproveMat(p){ if(isAdmin()||(me&&me.dept==='Management'))return true; if(me&&(me.dept==='Operations'||me.dept==='Technical')&&roleRank(me.role)>=ROLE_RANK['Team Leader'])return true; return false; }
+function projMatReqs(p){ return (typeof matreqs!=='undefined'?matreqs:[]).filter(function(r){return r.projectId===p.id;}); }
+function requestMaterial(pid,idx){
+  var p=projects.find(function(x){return x.id===pid;}); if(!p)return;
+  if(!canUseMaterials(p)){ alert(lang==='ar'?'الطلب للفني المكلّف بالمشروع أو المدير فقط.':'Only an assigned technician or manager can request.'); return; }
+  var it=(p.checklist||[])[idx]; if(!it)return; var rem=clRemaining(it); var ar=(lang==='ar');
+  openModal((ar?'طلب مواد/أدوات — ':'Request material/tools — ')+esc(it.item),
+    '<div class="card mini" style="margin-bottom:8px">'+(ar?'متبقّي في مخزن المشروع':'Remaining in project store')+': <b>'+rem+'</b></div>'+
+    fEl(ar?'الكمية المطلوبة':'Quantity requested','rm_qty',1,'number')+fTa(ar?'ملاحظة (اختياري)':'Note (optional)','rm_note',''),
+    function(){ var q=num(val('rm_qty')); if(q<=0){alert('Enter quantity');return false;}
+      apiAdd('matreqs',{project:p.name,projectId:pid,item:it.item,itemIdx:idx,qty:q,by:(me&&me.name)||'',byEmail:((me&&me.email)||'').toLowerCase(),branch:p.branch,status:'Pending',note:val('rm_note'),date:new Date().toISOString()})
+        .then(function(){ try{logAudit('create','matreqs','',p.name);}catch(e){} synced(); alert(ar?'اتبعت الطلب ✔ — مستني موافقة مدير Operations أو Team Leader':'Request sent ✔ — awaiting Operations Manager / Team Leader approval'); })
+        .catch(function(e){alert('Error: '+(e.message||e));});
+    });
+}
+function decideMatReq(reqId,approve){
+  var r=(typeof matreqs!=='undefined'?matreqs:[]).find(function(x){return x.id===reqId;}); if(!r)return;
+  var p=projects.find(function(x){return x.id===r.projectId;}); if(!p){ alert('Project not found'); return; }
+  if(!canApproveMat(p)){ alert(lang==='ar'?'الموافقة لمدير Operations أو Team Leader فقط.':'Only an Operations Manager or Team Leader can approve.'); return; }
+  if(approve){
+    var cl=(p.checklist||[]).slice(); var it=cl[r.itemIdx];
+    if(it){ var rem=clRemaining(it); if(num(r.qty)>rem && !confirm(lang==='ar'?('الكمية أكبر من المتبقّي ('+rem+'). توافق برضه؟'):('Qty exceeds remaining ('+rem+'). Approve anyway?')))return;
+      it.qtyUsed=num(it.qtyUsed)+num(r.qty); cl[r.itemIdx]=it;
+      apiMerge('projects',r.projectId,{checklist:cl});
+      apiAdd('stockMoves',{item:r.item,project:p.name,projectId:r.projectId,branch:p.branch,type:'out',qty:num(r.qty),by:r.by,note:'Approved material request (by '+((me&&me.name)||'')+')',date:new Date().toISOString().slice(0,16).replace('T',' ')});
+    }
+    apiMerge('matreqs',reqId,{status:'Approved',decidedBy:(me&&me.name)||'',decidedAt:new Date().toISOString()}).then(function(){ try{logAudit('approve','matreqs',reqId,p.name);}catch(e){} synced(); }).catch(function(e){alert('Error: '+(e.message||e));});
+  } else {
+    apiMerge('matreqs',reqId,{status:'Rejected',decidedBy:(me&&me.name)||'',decidedAt:new Date().toISOString()}).then(function(){ synced(); }).catch(function(e){alert('Error: '+(e.message||e));});
+  }
+}
 function setCollected(pid){ var p=projects.find(function(x){return x.id===pid;}); if(!p)return;
   openModal(lang==='ar'?'تحديث المبلغ المحصّل':'Update collected amount',
     fEl(lang==='ar'?'إجمالي المحصّل':'Total collected','pc_col',num(p.collected!=null&&p.collected!==''?p.collected:projCollected(p)),'number'),
@@ -3761,6 +3793,18 @@ function projExtraDetail(p){
   h+='<div class="grid kpis"><div class="card kpi"><div class="n">'+(typeof fmtHrs==='function'?fmtHrs(hrs):hrs.toFixed(1)+'h')+'</div><div class="l">'+(ar?'ساعات موقعية':'Site hours')+'</div></div>'
     +'<div class="card kpi"><div class="n">'+cl.length+'</div><div class="l">'+(ar?'أصناف':'Items')+'</div></div>'
     +'<div class="card kpi"><div class="n">'+upct+'%</div><div class="l">'+(ar?'مستهلك':'Materials used')+'</div></div></div>';
+  var reqs=projMatReqs(p); var pend=reqs.filter(function(r){return r.status==='Pending';}); var canAp=canApproveMat(p);
+  h+='<div class="sect"><h2>📝 '+(ar?'طلبات المواد/الأدوات':'Material / tool requests')+(pend.length?' <span class="tag" style="background:#e0a93b22;color:#e0a93b">'+pend.length+' '+(ar?'معلّق':'pending')+'</span>':'')+'</h2></div>';
+  if(!reqs.length){ h+='<div class="card mini">'+(ar?'مفيش طلبات. الفني بيطلب المواد من زرار «طلب» تحت، ومدير Operations أو Team Leader بيوافق.':'No requests. A technician requests materials via the "Request" button below; an Operations Manager / Team Leader approves.')+'</div>'; }
+  else { h+='<div style="overflow-x:auto"><table><thead><tr><th>'+(ar?'الصنف':'Item')+'</th><th>'+(ar?'كمية':'Qty')+'</th><th>'+(ar?'الطالب':'By')+'</th><th>'+(ar?'الحالة':'Status')+'</th><th></th></tr></thead><tbody>';
+    reqs.slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');}).forEach(function(r){
+      var col=r.status==='Approved'?'var(--ok)':(r.status==='Rejected'?'var(--bad)':'#e0a93b');
+      h+='<tr><td><b>'+esc(r.item)+'</b>'+(r.note?'<div class="mini">'+esc(r.note)+'</div>':'')+'</td><td>'+num(r.qty)+'</td><td>'+esc(r.by||'')+'<div class="mini">'+esc((r.date||'').slice(0,10))+'</div></td>'
+        +'<td><span class="tag" style="background:'+col+'22;color:'+col+'">'+esc(r.status||'')+'</span>'+(r.decidedBy?'<div class="mini">'+esc(r.decidedBy)+'</div>':'')+'</td>'
+        +'<td style="white-space:nowrap">'+((canAp&&r.status==='Pending')?'<button class="btn cy sm" onclick="decideMatReq(\''+r.id+'\',true)">'+(ar?'موافقة':'Approve')+'</button> <button class="btn dn sm" onclick="decideMatReq(\''+r.id+'\',false)">'+(ar?'رفض':'Reject')+'</button>':'')+'</td></tr>';
+    });
+    h+='</tbody></table></div>';
+  }
   h+='<div class="sect"><h2>📦 '+(ar?'قائمة المواد (مخزن المشروع)':'Materials checklist (project store)')+' <span class="tag">'+cl.length+'</span>';
   if(cl.length&&(isMgr()||isAdmin())){ h+=' <button class="btn gh sm" onclick="projMatExport(\''+p.id+'\')" style="font-size:11px">⬇ CSV</button>'; }
   h+='</h2></div>';
@@ -3770,7 +3814,7 @@ function projExtraDetail(p){
     h+='<tr><td><b>'+esc(it.item)+'</b>'+(it.code?'<div class="mini">'+esc(it.code)+'</div>':'')+'</td>'
       +'<td>'+num(it.qtyPlanned)+'</td><td>'+num(it.qtyUsed)+'</td>'
       +'<td style="font-weight:700;color:'+(done?'var(--ok)':'var(--navy)')+'">'+rem+'</td>'
-      +'<td>'+((canUseMaterials(p)&&!done)?'<button class="btn cy sm" onclick="recordUsage(\''+p.id+'\','+i+')">'+(ar?'استخدام':'Use')+'</button>':(done?'✔':''))+'</td></tr>';
+      +'<td>'+((canUseMaterials(p)&&!done)?'<button class="btn cy sm" onclick="requestMaterial(\''+p.id+'\','+i+')">'+(ar?'طلب':'Request')+'</button>':(done?'✔':''))+'</td></tr>';
   });
   h+='</tbody></table></div>'; return h;
 }
