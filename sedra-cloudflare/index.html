@@ -7169,7 +7169,7 @@ let _onSave=null;
 function _mSaveClick(){ if(_onSave){ const r=_onSave(); if(r!==false)closeModal(); } else closeModal(); }
 var _modalGuard=false;
 function openModal(title,body,onSave,opts){ const ro=(me&&me.role==='Viewer'); const sb=g('mSave'); if(sb){ if(ro){ sb.classList.add('hide'); } else { sb.classList.remove('hide'); sb.textContent='Save'; sb.onclick=_mSaveClick; } } var mc=g('mCard'); if(mc){ if(opts&&opts.wide){ mc.classList.add('wide'); } else { mc.classList.remove('wide'); } } _modalGuard=!!(opts&&opts.confirmClose); g('mTitle').textContent=title; g('mBody').innerHTML=(ro?'<div class="card mini" style="background:#eef3f8;border-color:#ccd;color:#143F63;margin-bottom:8px">\u{1F441}\uFE0F '+(lang==='ar'?'\u0648\u0636\u0639 \u0627\u0644\u0645\u0634\u0627\u0647\u062F\u0629 \u2014 \u0644\u0644\u0639\u0631\u0636 \u0641\u0642\u0637':'Viewer mode \u2014 view only')+'</div>':'')+body; _onSave=onSave; g('modal').classList.add('show'); if(lang==='ar'){ try{translateDOM(g('modal'));}catch(e){} } }
-function closeModal(){ try{stopScan&&stopScan();}catch(e){} g('modal').classList.remove('show'); _onSave=null; _modalGuard=false; }
+function closeModal(){ try{stopScan&&stopScan();}catch(e){} try{scStopCam&&scStopCam();}catch(e){} _scCtx=null; g('modal').classList.remove('show'); _onSave=null; _modalGuard=false; }
 /* Guarded close: when a modal opted into confirmClose (e.g. the quote editor), asking before
    discarding unsaved work. Used by ESC, the \u2715 and Cancel. Save calls closeModal() directly. */
 function guardedClose(){ if(_modalGuard){ if(!confirm(lang==='ar'?'\u062A\u0642\u0641\u0644 \u0645\u0646 \u063A\u064A\u0631 \u062D\u0641\u0638\u061F \u0643\u0644 \u0627\u0644\u0644\u064A \u0643\u062A\u0628\u062A\u0647 \u0641\u064A \u0627\u0644\u0643\u0648\u062A\u064A\u0634\u0646 \u0647\u064A\u0636\u064A\u0639.':'Close without saving? Everything you entered will be lost.')) return; } closeModal(); }
@@ -10816,6 +10816,107 @@ function hhmm(ts){ if(!ts)return '—'; var d=new Date(num(ts)); return ('0'+d.g
 function fmtHrs(h){ var m=Math.round(h*60); return Math.floor(m/60)+'h '+(m%60)+'m'; }
 var SITE_RADIUS_M=300; /* meters allowed from the project's GPS to check in */
 function scLatLng(sx){ if(!sx)return null; var m=String(sx).match(/(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/); return m?{lat:parseFloat(m[1]),lng:parseFloat(m[2])}:null; }
+/* ===== Site check-in: live photo + GPS accuracy + IP cross-check + spoof flag ===== */
+var _scStream=null, _scCtx=null;
+function scStopCam(){ if(_scStream){ try{_scStream.getTracks().forEach(function(t){t.stop();});}catch(e){} _scStream=null; } }
+function scStartCam(){
+  var s=g('scStatus'); var ar=(lang==='ar');
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ if(s)s.innerHTML='⚠️ '+(ar?'الكاميرا مش متاحة على المتصفح ده':'Camera not available on this browser'); return; }
+  navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}).then(function(st){ _scStream=st; var v=g('scVid'); if(v){ v.srcObject=st; try{v.play();}catch(e){} } }).catch(function(){ var s2=g('scStatus'); if(s2)s2.innerHTML='⚠️ '+(ar?'لازم تسمح بالكاميرا عشان تسجّل — الصورة إجبارية':'Allow camera access — a photo is required'); });
+}
+function scFetchIP(cb){
+  var done=false; var t=setTimeout(function(){ if(!done){done=true;cb(null);} },6000);
+  fetch('https://ipwho.is/',{cache:'no-store'}).then(function(r){return r.json();}).then(function(j){
+    if(done)return; done=true; clearTimeout(t);
+    if(j&&j.success!==false){ cb({ip:j.ip,city:j.city||'',country:j.country||'',cc:j.country_code||'',lat:j.latitude,lng:j.longitude,isp:(j.connection&&j.connection.isp)||''}); } else cb(null);
+  }).catch(function(){ if(done)return; done=true; clearTimeout(t); cb(null); });
+}
+function scSuspReasons(target,coords,ip){
+  var ar=(lang==='ar'); var reasons=[];
+  if(coords && (coords.accuracy==null || coords.accuracy<=0)) reasons.push(ar?'دقّة GPS = صفر (مؤشّر تزييف)':'GPS accuracy = 0 (spoof signal)');
+  if(ip){
+    var ok=['EG','AE','SA'];
+    if(ip.cc && ok.indexOf(ip.cc)<0) reasons.push((ar?'الإنترنت من خارج البلد: ':'IP outside region: ')+(ip.country||ip.cc));
+    if(ip.lat!=null && (coords||target)){ var la=coords?coords.latitude:target.lat, ln=coords?coords.longitude:target.lng; var dkm=dist(la,ln,ip.lat,ip.lng)/1000; if(dkm>500) reasons.push((ar?'موقع الإنترنت بعيد ~':'IP ~')+Math.round(dkm)+(ar?' كم عن الـ GPS':'km from GPS')); }
+  }
+  return reasons;
+}
+function scCamBody(ar){
+  return '<div class="card mini" style="margin-bottom:8px">'+(ar?'📸 لازم صورة حيّة من الموقع + تحديد مكانك — عشان نتأكد إنك فعلاً في المشروع. الصورة إجبارية.':'📸 A live site photo + your location are required. The photo is mandatory.')+'</div>'
+   +'<div style="position:relative;background:#000;border-radius:10px;overflow:hidden">'
+   +'<video id="scVid" autoplay playsinline muted style="width:100%;max-height:300px;object-fit:cover;display:block"></video>'
+   +'<img id="scShot" alt="" style="width:100%;max-height:300px;object-fit:cover;display:none">'
+   +'</div><canvas id="scCanvas" style="display:none"></canvas>'
+   +'<div id="scStatus" class="mini" style="margin-top:8px">'+(ar?'⏳ بفتح الكاميرا وبحدّد موقعك…':'⏳ Opening camera & locating…')+'</div>'
+   +'<div style="margin-top:8px"><button type="button" class="btn cy sm" id="scShotBtn" onclick="scSnap()">📸 '+(ar?'التقط صورة':'Take photo')+'</button> <button type="button" class="btn gh sm" id="scRetakeBtn" onclick="scRetake()" style="display:none">↩ '+(ar?'إعادة':'Retake')+'</button></div>';
+}
+function scSnap(){
+  var ar=(lang==='ar'); var vid=g('scVid'); if(!vid||!vid.videoWidth){ alert(ar?'الكاميرا لسه بتفتح، استنى ثانية…':'Camera still loading…'); return; }
+  var maxW=480; var w=vid.videoWidth,h=vid.videoHeight; if(w>maxW){ h=Math.round(h*maxW/w); w=maxW; }
+  var c=g('scCanvas'); c.width=w; c.height=h; try{ c.getContext('2d').drawImage(vid,0,0,w,h); }catch(e){ alert('Camera error'); return; }
+  _scCtx.photo=c.toDataURL('image/jpeg',0.5);
+  var im=g('scShot'); if(im){ im.src=_scCtx.photo; im.style.display='block'; } vid.style.display='none';
+  var sb=g('scShotBtn'),rb=g('scRetakeBtn'); if(sb)sb.style.display='none'; if(rb)rb.style.display='inline-block';
+  scStopCam();
+}
+function scRetake(){ if(_scCtx)_scCtx.photo=null; var im=g('scShot'); if(im)im.style.display='none'; var v=g('scVid'); if(v)v.style.display='block'; var sb=g('scShotBtn'),rb=g('scRetakeBtn'); if(sb)sb.style.display='inline-block'; if(rb)rb.style.display='none'; scStartCam(); }
+function scStatusUpdate(){
+  var s=g('scStatus'); if(!s||!_scCtx)return; var ar=(lang==='ar'); var parts=[];
+  if(_scCtx.geo){ var acc=Math.round(_scCtx.geo.accuracy||0); parts.push('📍 '+(ar?'الموقع اتحدد':'located')+(acc?(' ±'+acc+'m'):'')); if(_scCtx.target&&_scCtx.dist!=null){ var dm=Math.round(_scCtx.dist); parts.push((dm<=SITE_RADIUS_M?'✅ ':'⚠️ ')+(dm>=1000?(dm/1000).toFixed(1)+'km':dm+'m')); } }
+  else if(_scCtx.geoErr){ parts.push('⚠️ '+(ar?'الموقع مش متاح — فعّل GPS':'location unavailable')); }
+  else parts.push(ar?'⏳ بحدّد موقعك…':'⏳ locating…');
+  if(_scCtx.ip){ parts.push('🌐 '+(_scCtx.ip.city||_scCtx.ip.country||_scCtx.ip.ip||'IP')); }
+  s.innerHTML=parts.join(' · ');
+}
+function scGather(){
+  scFetchIP(function(ip){ if(_scCtx){_scCtx.ip=ip;} scStatusUpdate(); });
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(function(p){ if(!_scCtx)return; _scCtx.geo={latitude:p.coords.latitude,longitude:p.coords.longitude,accuracy:p.coords.accuracy}; if(_scCtx.target){ _scCtx.dist=dist(p.coords.latitude,p.coords.longitude,_scCtx.target.lat,_scCtx.target.lng); } scStatusUpdate(); },
+      function(){ if(_scCtx){_scCtx.geoErr=true;} scStatusUpdate(); }, {timeout:12000,enableHighAccuracy:true,maximumAge:0});
+  } else if(_scCtx){ _scCtx.geoErr=true; }
+}
+function scCommit(){
+  var ctx=_scCtx; if(!ctx)return; var ar=(lang==='ar');
+  if(!ctx.photo){ alert(ar?'لازم تلتقط صورة الأول 📸':'Take a photo first 📸'); return; }
+  if(ctx.target){
+    if(!ctx.geo){ alert(ar?'لازم نحدّد موقعك (GPS) — فعّل الموقع وجرّب تاني':'Location required — enable GPS and retry'); return; }
+    if(ctx.dist>SITE_RADIUS_M){
+      var dtxt=(ctx.dist>=1000?(ctx.dist/1000).toFixed(1)+(ar?' كم':' km'):Math.round(ctx.dist)+(ar?' متر':' m'));
+      var msg=(ar?('إنت على بُعد '+dtxt+' من موقع المشروع. لازم تكون خلال '+SITE_RADIUS_M+' متر.'):('You are '+dtxt+' from the site. Must be within '+SITE_RADIUS_M+'m.'));
+      if(ctx.canOverride){ if(!confirm(msg+'\n\n'+(ar?'تسجيل بصلاحية المدير رغم البُعد؟':'Override as manager?')))return; ctx.override=true; }
+      else { alert(msg); return; }
+    }
+  }
+  var susp=scSuspReasons(ctx.target,ctx.geo,ctx.ip).join(' · ');
+  var photo=ctx.photo;
+  var sb=g('mSave'); if(sb){ sb.disabled=true; sb.textContent=(ar?'… جارِ الحفظ':'… saving'); }
+  var gpsStr=ctx.geo?(ctx.geo.latitude.toFixed(5)+','+ctx.geo.longitude.toFixed(5)):'';
+  if(ctx.mode==='in'){
+    var rec={emp:(me&&me.name)||'',empEmail:(me&&me.email||'').toLowerCase(),project:ctx.proj,site:ctx.site,inTs:Date.now(),outTs:0,date:today(),branch:defBranch(),note:'',
+      gpsIn:gpsStr, distM:(ctx.target&&ctx.dist!=null)?Math.round(ctx.dist):null, accIn:ctx.geo?Math.round(ctx.geo.accuracy||0):null,
+      ipIn:ctx.ip?ctx.ip.ip:'', ipCityIn:ctx.ip?((ctx.ip.city?ctx.ip.city+', ':'')+(ctx.ip.country||'')):'', ispIn:ctx.ip?ctx.ip.isp:'', suspIn:susp, hasPhotoIn:true};
+    if(ctx.override)rec.override=true;
+    apiAdd('sitevisits',rec).then(function(id){
+      if(id){ apiCall('PUT','/sitephotos/'+id+'.json',{in:photo,inAt:rec.inTs}).catch(function(){}); }
+      logAudit('checkin','sitevisits',id||'',ctx.proj);
+      try{ notifyLeaders(ctx.pobj||{name:ctx.proj,branch:rec.branch},(ar?'📍 تسجيل حضور — ':'📍 Check-in — ')+ctx.proj,(rec.emp||'')+(ar?' سجّل حضور في ':' checked in at ')+ctx.proj+' · '+hhmm(rec.inTs)+(susp?('\n⚠️ '+(ar?'تنبيه: ':'Flag: ')+susp):'')); }catch(_n){}
+      scStopCam(); closeModal(); synced();
+    }).catch(function(e){ var s2=g('mSave'); if(s2){s2.disabled=false;} alert('Error: '+(e.message||e)); });
+  } else {
+    var id=ctx.visitId; var patch={outTs:Date.now(),gpsOut:gpsStr,accOut:ctx.geo?Math.round(ctx.geo.accuracy||0):null,ipOut:ctx.ip?ctx.ip.ip:'',suspOut:susp,hasPhotoOut:true};
+    if(ctx.target&&ctx.dist!=null)patch.distOut=Math.round(ctx.dist);
+    if(ctx.override)patch.overrideOut=true;
+    apiMerge('sitevisits',id,patch).then(function(){
+      apiCall('PATCH','/sitephotos/'+id+'.json',{out:photo,outAt:patch.outTs}).catch(function(){});
+      logAudit('checkout','sitevisits',id,ctx.proj||'');
+      try{ notifyLeaders(ctx.pobj||{name:ctx.proj,branch:defBranch()},(ar?'📤 تسجيل انصراف — ':'📤 Check-out — ')+(ctx.proj||''),(((me&&me.name)||'')+(ar?' سجّل انصراف من ':' checked out from ')+(ctx.proj||''))+(susp?('\n⚠️ '+(ar?'تنبيه: ':'Flag: ')+susp):'')); }catch(_n){}
+      scStopCam(); closeModal(); synced();
+    }).catch(function(e){ var s3=g('mSave'); if(s3){s3.disabled=false;} alert('Error: '+(e.message||e)); });
+  }
+}
+function scPhoto(id,which){ var ar=(lang==='ar'); apiCall('GET','/sitephotos/'+id+'.json').then(function(rec){ var d=rec&&rec[which]; if(!d){ alert(ar?'الصورة مش موجودة':'No photo'); return; } _openDataUrl(d,(which==='in'?'checkin':'checkout')+'-'+id+'.jpg'); }).catch(function(e){ alert('Error: '+(e&&e.message||e)); }); }
+function scEvidIn(v){ var ar=(lang==='ar'); var h=''; if(v.hasPhotoIn)h+=' <a href="#" onclick="scPhoto(\''+v.id+'\',\'in\');return false" title="'+(ar?'صورة الحضور':'check-in photo')+'">📷</a>'; if(v.accIn)h+=' <span class="mini" title="GPS accuracy">±'+v.accIn+'m</span>'; if(v.suspIn)h+=' <span class="tag" style="background:#c0202018;color:#c02020" title="'+esc(v.suspIn)+'">⚠️ '+(ar?'شك':'flag')+'</span>'; return h; }
+function scEvidOut(v){ var ar=(lang==='ar'); var h=''; if(v.hasPhotoOut)h+=' <a href="#" onclick="scPhoto(\''+v.id+'\',\'out\');return false" title="'+(ar?'صورة الانصراف':'check-out photo')+'">📷</a>'; if(v.suspOut)h+=' <span class="tag" style="background:#c0202018;color:#c02020" title="'+esc(v.suspOut)+'">⚠️ '+(ar?'شك':'flag')+'</span>'; return h; }
 function siteCheckIn(){
   var proj=g('sc_project')?g('sc_project').value:''; if(!proj){ alert(lang==='ar'?'اختر الموقع/المشروع':'Select a site/project'); return; }
   if(scOpen()){ alert(lang==='ar'?'عندك جلسة مفتوحة — اعمل Check-out الأول':'You have an open session — check out first'); return; }
@@ -10823,42 +10924,22 @@ function siteCheckIn(){
   var pobj=(projects||[]).find(function(p){return (p.name||'')===proj;})||(projects||[]).find(function(p){return nameEq(p.name,proj);});
   var target=pobj?scLatLng(pobj.gps):null;
   var canOverride=(typeof isAdmin==='function'&&isAdmin())||isMgr();
-  var rec={emp:(me&&me.name)||'',empEmail:(me&&me.email||'').toLowerCase(),project:proj,site:site,inTs:Date.now(),outTs:0,date:today(),branch:defBranch(),gpsIn:'',distM:null,note:''};
-  var save=function(){ apiAdd('sitevisits',rec).then(function(id){ logAudit('checkin','sitevisits',id||'',proj); try{ notifyLeaders((typeof pobj!=='undefined'&&pobj)?pobj:{name:proj,branch:rec.branch},(lang==='ar'?'📍 تسجيل حضور — ':'📍 Check-in — ')+proj,(rec.emp||'')+(lang==='ar'?' سجّل حضور في ':' checked in at ')+proj+' · '+hhmm(rec.inTs)); }catch(_n){} synced(); }).catch(e=>alert('Error: '+(e.message||e))); };
-  if(!target){
-    if(navigator.geolocation){ navigator.geolocation.getCurrentPosition(function(p){ rec.gpsIn=p.coords.latitude.toFixed(5)+','+p.coords.longitude.toFixed(5); save(); }, function(){ save(); }, {timeout:8000,enableHighAccuracy:true}); } else save();
-    return;
-  }
-  if(!navigator.geolocation){ alert(lang==='ar'?'جهازك مش بيدعم تحديد الموقع (GPS)، فمش هينفع تسجّل حضور موقع.':'Geolocation is not supported on this device.'); return; }
-  navigator.geolocation.getCurrentPosition(function(p){
-    var d=dist(p.coords.latitude,p.coords.longitude,target.lat,target.lng);
-    rec.gpsIn=p.coords.latitude.toFixed(5)+','+p.coords.longitude.toFixed(5); rec.distM=Math.round(d);
-    if(d<=SITE_RADIUS_M){ save(); return; }
-    var dtxt=(d>=1000?(d/1000).toFixed(1)+(lang==='ar'?' كم':' km'):Math.round(d)+(lang==='ar'?' متر':' m'));
-    var msg=(lang==='ar'?('إنت على بُعد '+dtxt+' من موقع المشروع «'+proj+'».\nلازم تكون في الموقع (خلال '+SITE_RADIUS_M+' متر) عشان تسجّل حضور.'):('You are '+dtxt+' from «'+proj+'».\nYou must be within '+SITE_RADIUS_M+'m of the site to check in.'));
-    if(canOverride){ if(confirm(msg+'\n\n'+(lang==='ar'?'تسجيل بصلاحية المدير رغم البُعد؟':'Check in anyway (manager override)?'))){ rec.override=true; save(); } }
-    else { alert(msg); }
-  }, function(err){
-    alert(lang==='ar'?'مش قادر أحدد موقعك. فعّل الـ GPS واسمح للمتصفح بالوصول للموقع، وحاول تاني.':'Cannot determine your location. Enable GPS and allow location access, then try again.');
-  }, {timeout:12000,enableHighAccuracy:true,maximumAge:0});
+  _scCtx={mode:'in',proj:proj,site:site,pobj:pobj,target:target,canOverride:canOverride,photo:null,geo:null,ip:null,dist:null};
+  var ar=(lang==='ar');
+  openModal((ar?'📍 تسجيل حضور — ':'📍 Check-in — ')+proj, scCamBody(ar), function(){ scCommit(); return false; });
+  var sb=g('mSave'); if(sb)sb.textContent=(ar?'✓ سجّل حضور':'✓ Check in');
+  scStartCam(); scGather();
 }
 function siteCheckOut(id){
-  var v=(sitevisits||[]).find(x=>x.id===id); if(!v)return;
+  var v=(sitevisits||[]).find(function(x){return x.id===id;}); if(!v)return;
   var pobj=(projects||[]).find(function(p){return (p.name||'')===v.project;})||(projects||[]).find(function(p){return nameEq(p.name,v.project);});
   var target=pobj?scLatLng(pobj.gps):null;
   var canOverride=(typeof isAdmin==='function'&&isAdmin())||isMgr();
-  var fin=function(gps,dM,ov){ var patch={outTs:Date.now(),gpsOut:gps||''}; if(dM!=null)patch.distOut=Math.round(dM); if(ov)patch.overrideOut=true; apiMerge('sitevisits',id,patch).then(function(){ logAudit('checkout','sitevisits',id,v.project||''); try{ notifyLeaders((typeof pobj!=='undefined'&&pobj)?pobj:{name:v.project,branch:v.branch},(lang==='ar'?'📤 تسجيل انصراف — ':'📤 Check-out — ')+(v.project||''),(v.emp||'')+(lang==='ar'?' سجّل انصراف من ':' checked out from ')+(v.project||'')); }catch(_n){} synced(); }).catch(e=>alert('Error: '+(e.message||e))); };
-  if(!target){ if(navigator.geolocation){ navigator.geolocation.getCurrentPosition(function(p){ fin(p.coords.latitude.toFixed(5)+','+p.coords.longitude.toFixed(5),null); }, function(){ fin(''); }, {timeout:8000}); } else fin(''); return; }
-  if(!navigator.geolocation){ alert(lang==='ar'?'جهازك مش بيدعم تحديد الموقع (GPS).':'Geolocation is not supported on this device.'); return; }
-  navigator.geolocation.getCurrentPosition(function(p){
-    var d=dist(p.coords.latitude,p.coords.longitude,target.lat,target.lng);
-    var gps=p.coords.latitude.toFixed(5)+','+p.coords.longitude.toFixed(5);
-    if(d<=SITE_RADIUS_M){ fin(gps,d); return; }
-    var dtxt=(d>=1000?(d/1000).toFixed(1)+(lang==='ar'?' كم':' km'):Math.round(d)+(lang==='ar'?' متر':' m'));
-    var msg=(lang==='ar'?('إنت على بُعد '+dtxt+' من موقع المشروع «'+(v.project||'')+'».\nلازم تكون في الموقع (خلال '+SITE_RADIUS_M+' متر) عشان تسجّل انصراف.'):('You are '+dtxt+' from «'+(v.project||'')+'».\nYou must be within '+SITE_RADIUS_M+'m of the site to check out.'));
-    if(canOverride){ if(confirm(msg+'\n\n'+(lang==='ar'?'انصراف بصلاحية المدير رغم البُعد؟':'Check out anyway (manager override)?'))){ fin(gps,d,true); } }
-    else { alert(msg); }
-  }, function(err){ alert(lang==='ar'?'مش قادر أحدد موقعك. فعّل الـ GPS واسمح للمتصفح بالوصول للموقع، وحاول تاني.':'Cannot determine your location. Enable GPS and allow location access, then try again.'); }, {timeout:12000,enableHighAccuracy:true,maximumAge:0});
+  _scCtx={mode:'out',visitId:id,proj:v.project,pobj:pobj,target:target,canOverride:canOverride,photo:null,geo:null,ip:null,dist:null};
+  var ar=(lang==='ar');
+  openModal((ar?'📤 تسجيل انصراف — ':'📤 Check-out — ')+(v.project||''), scCamBody(ar), function(){ scCommit(); return false; });
+  var sb=g('mSave'); if(sb)sb.textContent=(ar?'✓ سجّل انصراف':'✓ Check out');
+  scStartCam(); scGather();
 }
 function scNote(id){ var v=(sitevisits||[]).find(x=>x.id===id); if(!v)return; var n=prompt(lang==='ar'?'ملاحظة عن الزيارة:':'Visit note:',v.note||''); if(n===null)return; apiMerge('sitevisits',id,{note:n}).then(()=>synced()); }
 function vSiteCheck(){
@@ -10870,7 +10951,7 @@ function vSiteCheck(){
   const totToday=todayV.reduce((a,v)=>a+scHours(v),0);
   const off=isOffDay(T,defBranch()), hol=holidayOn(T,defBranch());
   let h=`<div class="sect"><h2>📍 Site Check-in</h2><div class="sp"></div>${mgr?`<input type="month" value="${esc(scMonth)}" onchange="scMonth=this.value;render()" style="max-width:150px"> <button class="btn gh sm" onclick="scExport('csv')">⬇ Excel</button> <button class="btn gh sm" onclick="scReport()">🖨 Report</button> <button class="btn gh sm" onclick="scView=(scView==='mine'?'team':'mine');render()">${scView==='team'?'👤 My visits':'👥 Team'}</button>`:''}</div>`;
-  h+=`<div class="card mini" style="margin-bottom:8px">سجّل حضورك (Check-in) وانصرافك (Check-out) من موقع المشروع نفسه. <b>لازم تكون خلال ${SITE_RADIUS_M} متر من موقع المشروع في الحضور والانصراف</b> — النظام بيتأكد من موقعك (GPS) وبيحسب ساعات شغلك تلقائيًا. المدير بس اللي يقدر يتجاوز شرط المسافة.</div>`;
+  h+=`<div class="card mini" style="margin-bottom:8px">سجّل حضورك (Check-in) وانصرافك (Check-out) من موقع المشروع نفسه. <b>لازم تكون خلال ${SITE_RADIUS_M} متر من موقع المشروع</b> و<b>تاخد صورة حيّة بالكاميرا</b> في الحضور والانصراف — النظام بيتأكد من موقعك (GPS) وبيسجّل دقّة الموقع وعنوان الإنترنت ويحسب ساعات شغلك تلقائيًا. المدير بس اللي يقدر يتجاوز شرط المسافة.</div>`;
   if(off) h+=`<div class="card" style="background:#fff6e6;border-color:#e0a93b;color:#8a5a00;margin-bottom:10px">🌴 ${hol?(lang==='ar'?'اليوم إجازة رسمية: ':'Official holiday: ')+esc(hol.name||''):(lang==='ar'?'اليوم إجازة أسبوعية (جمعة/سبت)':'Weekly day off (Fri/Sat)')}</div>`;
   // check-in panel
   h+=`<div class="card" style="margin-bottom:12px">`;
@@ -10888,8 +10969,8 @@ function vSiteCheck(){
   if(todayV.length){
     h+=`<div class="sect" style="margin:16px 0 8px"><h2 style="font-size:15px">${lang==='ar'?'جلسات اليوم':"Today's sessions"}</h2></div><div style="overflow-x:auto"><table><thead><tr><th>${lang==='ar'?'الموقع':'Site'}</th><th>In</th><th>Out</th><th class="r">${lang==='ar'?'الساعات':'Hours'}</th><th></th></tr></thead><tbody>`+todayV.slice().sort((a,b)=>num(a.inTs)-num(b.inTs)).map(v=>`<tr>
       <td><b>${esc(v.project||'')}</b>${v.site?`<div class="mini">📍 ${esc(v.site)}</div>`:''}${v.note?`<div class="mini">📝 ${esc(v.note)}</div>`:''}</td>
-      <td>${hhmm(v.inTs)}${v.gpsIn?` <a href="https://maps.google.com/?q=${esc(v.gpsIn)}" target="_blank" title="Location">📍</a>`:''}</td>
-      <td>${v.outTs?hhmm(v.outTs)+(v.gpsOut?` <a href="https://maps.google.com/?q=${esc(v.gpsOut)}" target="_blank" title="Check-out location">📍</a>`:'')+(v.overrideOut?` <span class="tag" style="background:#e0a93b22;color:#d98a00" title="Manager override">${lang==='ar'?'تجاوز':'override'}</span>`:''):'<span class="tag" style="background:#1a7a4f22;color:#1a7a4f">Active</span>'}</td>
+      <td>${hhmm(v.inTs)}${v.gpsIn?` <a href="https://maps.google.com/?q=${esc(v.gpsIn)}" target="_blank" title="Location">📍</a>`:''}${scEvidIn(v)}</td>
+      <td>${v.outTs?hhmm(v.outTs)+(v.gpsOut?` <a href="https://maps.google.com/?q=${esc(v.gpsOut)}" target="_blank" title="Check-out location">📍</a>`:'')+scEvidOut(v)+(v.overrideOut?` <span class="tag" style="background:#e0a93b22;color:#d98a00" title="Manager override">${lang==='ar'?'تجاوز':'override'}</span>`:''):'<span class="tag" style="background:#1a7a4f22;color:#1a7a4f">Active</span>'}</td>
       <td style="text-align:right"><b>${fmtHrs(scHours(v))}</b></td>
       <td style="white-space:nowrap">${!v.outTs?`<button class="btn dn sm" onclick="siteCheckOut('${v.id}')">Out</button> `:''}<button class="btn gh sm" onclick="scNote('${v.id}')">📝</button> ${(isMgr()||v.emp===me.name)?`<button class="btn gh sm" onclick="delDoc('sitevisits','${v.id}')">✕</button>`:''}</td></tr>`).join('')+`</tbody></table></div>`;
   }
@@ -10905,6 +10986,8 @@ function vSiteCheck(){
     const all=sitevisits.filter(inBranch);
     const byEmp={}; all.forEach(v=>{ byEmp[v.emp||'—']=byEmp[v.emp||'—']||{today:0,week:0,month:0,open:false}; if(v.date===T)byEmp[v.emp].today+=scHours(v); if(weekStart(v.date||T)===wk)byEmp[v.emp].week+=scHours(v); if(String(v.date||'').slice(0,7)===mo)byEmp[v.emp].month+=scHours(v); if(!v.outTs)byEmp[v.emp].open=true; });
     h+=`<div class="sect" style="margin:18px 0 8px"><h2 style="font-size:15px">👥 ${lang==='ar'?'الفريق الميداني':'Field team'}</h2></div><div style="overflow-x:auto"><table><thead><tr><th>${lang==='ar'?'الموظف':'Employee'}</th><th></th><th class="r">${lang==='ar'?'اليوم':'Today'}</th><th class="r">${lang==='ar'?'الأسبوع':'Week'}</th><th class="r">${lang==='ar'?'الشهر':'Month'}</th></tr></thead><tbody>`+Object.entries(byEmp).sort((a,b)=>b[1].month-a[1].month).map(e=>`<tr><td><b>${esc(e[0])}</b></td><td>${e[1].open?'🟢':''}</td><td style="text-align:right">${fmtHrs(e[1].today)}</td><td style="text-align:right">${fmtHrs(e[1].week)}</td><td style="text-align:right"><b>${fmtHrs(e[1].month)}</b></td></tr>`).join('')+`</tbody></table></div>`;
+    const tvis=all.filter(v=>v.date===T).sort((a,b)=>num(b.inTs)-num(a.inTs));
+    if(tvis.length){ h+=`<div class="sect" style="margin:16px 0 8px"><h2 style="font-size:15px">🔎 ${lang==='ar'?'تسجيلات اليوم — مراجعة الأدلة':"Today's check-ins — evidence review"}</h2></div><div class="card mini" style="margin-bottom:6px">${lang==='ar'?'📷 اضغط لعرض الصورة الحيّة · ⚠️ شك = مؤشّر تزييف موقع لازم تراجعه':'📷 click to view the live photo · ⚠️ flag = possible location spoof to review'}</div><div style="overflow-x:auto"><table><thead><tr><th>${lang==='ar'?'الموظف':'Emp'}</th><th>${lang==='ar'?'الموقع':'Site'}</th><th>In</th><th>Out</th><th>${lang==='ar'?'الإنترنت/الشك':'IP / flag'}</th></tr></thead><tbody>`+tvis.map(v=>{ const flag=(v.suspIn||v.suspOut); return `<tr${flag?' style="background:#c0202010"':''}><td><b>${esc(v.emp||'')}</b></td><td>${esc(v.project||'')}</td><td>${hhmm(v.inTs)}${scEvidIn(v)}</td><td>${v.outTs?hhmm(v.outTs)+scEvidOut(v):'<span class="tag" style="background:#1a7a4f22;color:#1a7a4f">Active</span>'}</td><td class="mini">${flag?('⚠️ '+esc(v.suspIn||v.suspOut)):(v.ipCityIn?('🌐 '+esc(v.ipCityIn)):'—')}</td></tr>`; }).join('')+`</tbody></table></div>`; }
   }
   return h;
 }
