@@ -3711,7 +3711,7 @@ function editProject(id){
     `<div class="row2">${selEl('Status','p_status',PSTAT,r.status||'Planning')}${fEl('Progress %','p_progress',r.progress,'number')}</div>`+
     `<div class="row2">${fEl('Start date','p_start',r.start,'date')}${fEl('End date','p_end',r.end,'date')}</div>`+
     `<div class="row2">${fEl('Owner','p_owner',r.owner)}${fEl('Value','p_value',r.value,'number')}</div>`+
-    `<div class="row2">${fEl('GPS location (lat,lng or link)','p_gps',r.gps)}${selEl('Drawings approved?','p_draw',['No','Yes'],r.drawingApproved?'Yes':'No')}</div>`+
+    `<div class="row2"><div class="fld"><label>${lang==='ar'?'موقع المشروع على الخريطة (GPS)':'GPS location (lat,lng or link)'}</label><input id="p_gps" value="${esc(r.gps||'')}" placeholder="${lang==='ar'?'مثال: 30.0512, 31.2405 أو لينك خرائط جوجل':'e.g. 30.0512, 31.2405 or a Google Maps link'}"><button type="button" class="btn gh sm" style="margin-top:6px" onclick="fillMyGps()">📍 ${lang==='ar'?'استخدم موقعي الحالي':'Use my current location'}</button></div>${selEl('Drawings approved?','p_draw',['No','Yes'],r.drawingApproved?'Yes':'No')}</div>`+
     fEl('Site address (text)','p_address',r.address)+
     `<div class="row2">${fEl('Collected so far','p_collected',r.collected,'number')}${fEl('Assigned technicians (emails, comma-separated)','p_assigned',(r.assignedTo||[]).join(', '))}</div>`+
     fEl('Estimated / actual cost','p_cost',r.cost,'number')+
@@ -3721,6 +3721,16 @@ function editProject(id){
       if(!d.name){alert('Name required');return false;} if(!dupGuard('projects',d,id))return false; if(!id)d.created=new Date().toISOString(); d.ownerEmail=ownerEmailFor(d.owner); saveDoc('projects',d,id); try{ notifyLeaders(d,(lang==='ar'?(id?'✏️ تعديل مشروع — ':'➕ مشروع جديد — '):(id?'✏️ Project edited — ':'➕ New project — '))+d.name,((me&&me.name)||'')+(lang==='ar'?(id?' عدّل بيانات المشروع':' أضاف مشروع'):(id?' edited the project':' added a project'))); }catch(_n){} });
 }
 
+/* Fill the project GPS field from the manager's/TL's current device location (editProject is already gated to canApproveMat) */
+function fillMyGps(){
+  var ar=(lang==='ar'); var el=g('p_gps'); if(!el)return;
+  if(!navigator.geolocation){ alert(ar?'جهازك مش بيدعم تحديد الموقع (GPS).':'Geolocation not supported on this device.'); return; }
+  var old=el.value; el.value=(ar?'… بحدّد موقعك':'… locating'); el.disabled=true;
+  navigator.geolocation.getCurrentPosition(function(p){
+    el.disabled=false; el.value=p.coords.latitude.toFixed(6)+','+p.coords.longitude.toFixed(6);
+    var acc=Math.round(p.coords.accuracy||0); if(acc>80){ alert(ar?('تنبيه: دقّة الموقع ضعيفة (±'+acc+' متر). يفضّل تكون في الموقع نفسه وتحت السما المكشوفة.'):('Note: low accuracy (±'+acc+'m). Best taken on-site, outdoors.')); }
+  }, function(){ el.disabled=false; el.value=old; alert(ar?'مش قادر أحدد موقعك. فعّل الـ GPS واسمح للمتصفح بالوصول للموقع، وحاول تاني.':'Could not get your location. Enable GPS and allow access, then retry.'); }, {timeout:12000,enableHighAccuracy:true,maximumAge:0});
+}
 /* ===================== PROJECTS — Checklist / Project store / Usage / Financials / Import (Claude 2026-10-29) ===================== */
 function projChecklist(p){ return (p&&p.checklist)||[]; }
 function clRemaining(it){ return Math.max(0, num(it.qtyPlanned)-num(it.qtyUsed)); }
