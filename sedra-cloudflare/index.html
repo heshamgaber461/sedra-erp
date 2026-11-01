@@ -4191,8 +4191,8 @@ function qItemAdd(si){ qUndoSnap(); _qsec[si].items.push(qBlankItem()); qSecRend
 function qItemDel(si,ii){ qUndoSnap(); _qsec[si].items.splice(ii,1); if(!_qsec[si].items.length)_qsec[si].items.push(qBlankItem()); qSecRender(); }
 /* A usable display name: real name if it has one, else the first line of the description, else the code.
    Fixes products that were imported with a placeholder name ("..") but full info in the description. */
-function qCleanName(s){ s=String(s||'').split(/[\r\n]/)[0].trim(); if(s.length>80)s=s.slice(0,80).trim(); return s; }
-function prodName(p){ if(!p)return ''; var n=String(p.name||''); if(n.replace(/[^a-zA-Z0-9]/g,'').length>=3) return n; var d=qCleanName(p.desc||p.description||''); if(d)return d; return p.sku||p.code||n||'Item'; }
+function qCleanName(s){ s=String(s||'').split(/[\r\n]/)[0].trim(); s=s.replace(/^[\s\-–—._*#"'`]+/,'').replace(/[\s\-–—._*#"'`]+$/,'').trim(); if(s.length>80)s=s.slice(0,80).trim(); return s; }
+function prodName(p){ if(!p)return ''; var n=String(p.name||''); if(n.replace(/[^a-zA-Z0-9]/g,'').length>=3){ var c=n.split(/[\r\n]/)[0].replace(/^[\s\-–—._*#"'`]+/,'').replace(/[\s\-–—._*#"'`]+$/,'').trim(); return c||n; } var d=qCleanName(p.desc||p.description||''); if(d)return d; return p.sku||p.code||n||'Item'; }
 function qPickProduct(si,ii,val){ qUndoSnap(); var v=String(val||'').trim(); var lv=v.toLowerCase();
   const p=inventory.find(x=>((x.name||'')+(x.sku?' — '+x.sku:''))===v) || inventory.find(x=>((x.sku?x.sku+' — ':'')+(x.name||''))===v) || inventory.find(x=>(x.name||'')===v) || inventory.find(x=>(x.sku||'')===v) || inventory.find(x=>String(x.sku||'').toLowerCase()===lv || String(x.name||'').toLowerCase()===lv);
   qReadDOM(); const it=_qsec[si].items[ii];
