@@ -4198,6 +4198,28 @@ function qPickProduct(si,ii,val){ qUndoSnap(); var v=String(val||'').trim(); var
   qReadDOM(); const it=_qsec[si].items[ii];
   if(p){ it.item=prodName(p)||it.item||''; it.code=p.sku||p.code||''; it.desc=(p.desc||p.description||''); if(p.brand)it.brand=p.brand; const pr=num(p.price)||num(p.cost); if(pr){ var _rt=qCurRate(); it.price=(_rt&&_rt!==1)?Math.round(pr*_rt*100)/100:pr; } if(p.image)it.image=p.image; it._pid=p.id; }
   qSecRender(); }
+/* Type-ahead autocomplete under the item-name / code fields: type a name or code → a short
+   dropdown of matching products appears; click one to fill the line. Lightweight (max 15 rows),
+   so it never freezes like a 2000-item native datalist. */
+function qacHide(){ var d=document.getElementById('qac'); if(d)d.style.display='none'; }
+function qacPick(si,ii,pid){ qacHide(); qpickChoose(si,ii,pid); }
+function qSuggest(si,ii,field,inp){
+  var v=String(inp&&inp.value||'').toLowerCase().trim();
+  var d=document.getElementById('qac');
+  if(!d){ d=document.createElement('div'); d.id='qac'; d.style.cssText='position:fixed;z-index:100000;background:var(--card,#fff);border:1px solid #cdd;border-radius:10px;box-shadow:0 12px 34px rgba(0,0,0,.22);max-height:46vh;overflow:auto;padding:4px;display:none'; document.body.appendChild(d); d.addEventListener('mousedown',function(e){ e.preventDefault(); }); }
+  function place(){ var r=inp.getBoundingClientRect(); d.style.left=Math.round(r.left)+'px'; d.style.top=Math.round(r.bottom+3)+'px'; d.style.width=Math.max(320,Math.round(r.width*1.7))+'px'; d.style.display='block'; }
+  if(v.length<1){ d.style.display='none'; return; }
+  if(!(typeof inventory!=='undefined' && inventory && inventory.length)){ if(typeof loadHeavy==='function'){ try{ loadHeavy('inventory').then(function(){ qSuggest(si,ii,field,inp); }); }catch(e){} } d.innerHTML='<div class="mini" style="padding:10px;color:var(--muted)">⏳ '+(lang==='ar'?'بحمّل المنتجات…':'Loading products…')+'</div>'; place(); return; }
+  var terms=v.split(/\s+/);
+  var list=(inventory||[]).filter(inBranch).filter(function(p){ var s=((p.name||'')+' '+(p.brand||'')+' '+(p.sku||'')+' '+(p.model||'')+' '+(p.desc||p.description||'')+' '+(p.code||'')).toLowerCase(); return terms.every(function(t){ return s.indexOf(t)>=0; }); });
+  var total=list.length; list=list.slice(0,15);
+  if(!list.length){ d.style.display='none'; return; }
+  var rt=qCurRate(); var cur=(g('q_cur')&&val('q_cur'))||'EGP';
+  d.innerHTML=list.map(function(p){ var pr=num(p.price)||num(p.cost); var shown=(rt&&rt!==1)?Math.round(pr*rt*100)/100:pr;
+    return '<div onclick="qacPick('+si+','+ii+',\''+p.id+'\')" style="padding:7px 9px;border-bottom:1px solid #eef3f5;cursor:pointer;display:flex;gap:8px;align-items:center" onmouseover="this.style.background=\'#f4f8fb\'" onmouseout="this.style.background=\'transparent\'"><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px;color:#1c2b3a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(prodName(p))+'</div><div class="mini" style="color:var(--muted)">'+esc(p.brand||'-')+(p.sku?(' · '+esc(p.sku)):'')+'</div></div>'+(pr?('<div style="font-weight:800;color:var(--navy);white-space:nowrap;font-size:12.5px">'+Math.round(num(shown)).toLocaleString()+' '+cur+'</div>'):'')+'</div>';
+  }).join('')+(total>list.length?('<div class="mini" style="padding:6px;text-align:center;color:var(--muted)">+'+(total-list.length)+' '+(lang==='ar'?'كمان — اكتب أكتر':'more — type to narrow')+'</div>'):'');
+  place();
+}
 /* Rich product picker — a searchable overlay (above the quote modal) that shows each product's
    photo, name, brand, SKU and price; click one to fill the line. Much clearer than the native
    datalist over ~2000 items. */
@@ -4358,8 +4380,8 @@ function qSecRender(){ const el=g('qSec'); if(!el)return;
         <span class="qr-drag" draggable="true" ondragstart="qDragStart(event,${si},${ii})" title="${lang==='ar'?'اسحب لإعادة الترتيب':'Drag to reorder'}">⠿</span>
         ${it.image?`<img src="${esc(it.image)}" class="qr-img" title="${lang==='ar'?'صورة المنتج':'product image'}">`:`<span class="qr-img ph">📦</span>`}
         <div class="qr-id">
-          <input id="q_${si}_${ii}_item" class="qr-name" value="${esc(it.item||'')}" placeholder="${lang==='ar'?'اسم المنتج':'Item name'}" onchange="qPickProduct(${si},${ii},this.value)">
-          <div class="qr-id2"><input id="q_${si}_${ii}_code" class="qr-code" value="${esc(it.code||'')}" placeholder="${lang==='ar'?'كود':'Code'}"><input id="q_${si}_${ii}_brand" class="qr-brand" value="${esc(it.brand||'')}" placeholder="${lang==='ar'?'براند':'Brand'}"></div>
+          <input id="q_${si}_${ii}_item" class="qr-name" value="${esc(it.item||'')}" placeholder="${lang==='ar'?'اكتب اسم المنتج…':'Type item name…'}" autocomplete="off" oninput="qSuggest(${si},${ii},'item',this)" onfocus="qSuggest(${si},${ii},'item',this)" onblur="setTimeout(qacHide,200)" onchange="qPickProduct(${si},${ii},this.value)">
+          <div class="qr-id2"><input id="q_${si}_${ii}_code" class="qr-code" value="${esc(it.code||'')}" placeholder="${lang==='ar'?'كود':'Code'}" autocomplete="off" oninput="qSuggest(${si},${ii},'code',this)" onfocus="qSuggest(${si},${ii},'code',this)" onblur="setTimeout(qacHide,200)"><input id="q_${si}_${ii}_brand" class="qr-brand" value="${esc(it.brand||'')}" placeholder="${lang==='ar'?'براند':'Brand'}"></div>
         </div>
         <button type="button" class="qr-pick" title="${lang==='ar'?'اختر من الكتالوج':'Pick from catalog'}" onclick="qProductPicker(${si},${ii})">📦</button>
         ${(isAdmin()||isMgr())?`<button type="button" class="qr-pick gh" title="${lang==='ar'?'صورة المنتج':'product image'}" onclick="qEditProductImage(${si},${ii})">🖼</button>`:''}
@@ -7186,7 +7208,7 @@ let _onSave=null;
 function _mSaveClick(){ if(_onSave){ const r=_onSave(); if(r!==false)closeModal(); } else closeModal(); }
 var _modalGuard=false;
 function openModal(title,body,onSave,opts){ const ro=(me&&me.role==='Viewer'); const sb=g('mSave'); if(sb){ if(ro){ sb.classList.add('hide'); } else { sb.classList.remove('hide'); sb.textContent='Save'; sb.onclick=_mSaveClick; } } var mc=g('mCard'); if(mc){ if(opts&&opts.wide){ mc.classList.add('wide'); } else { mc.classList.remove('wide'); } } _modalGuard=!!(opts&&opts.confirmClose); g('mTitle').textContent=title; g('mBody').innerHTML=(ro?'<div class="card mini" style="background:#eef3f8;border-color:#ccd;color:#143F63;margin-bottom:8px">\u{1F441}\uFE0F '+(lang==='ar'?'\u0648\u0636\u0639 \u0627\u0644\u0645\u0634\u0627\u0647\u062F\u0629 \u2014 \u0644\u0644\u0639\u0631\u0636 \u0641\u0642\u0637':'Viewer mode \u2014 view only')+'</div>':'')+body; _onSave=onSave; g('modal').classList.add('show'); if(lang==='ar'){ try{translateDOM(g('modal'));}catch(e){} } }
-function closeModal(){ try{stopScan&&stopScan();}catch(e){} try{scStopCam&&scStopCam();}catch(e){} _scCtx=null; g('modal').classList.remove('show'); _onSave=null; _modalGuard=false; }
+function closeModal(){ try{stopScan&&stopScan();}catch(e){} try{scStopCam&&scStopCam();}catch(e){} try{qacHide&&qacHide();}catch(e){} _scCtx=null; g('modal').classList.remove('show'); _onSave=null; _modalGuard=false; }
 /* Guarded close: when a modal opted into confirmClose (e.g. the quote editor), asking before
    discarding unsaved work. Used by ESC, the \u2715 and Cancel. Save calls closeModal() directly. */
 function guardedClose(){ if(_modalGuard){ if(!confirm(lang==='ar'?'\u062A\u0642\u0641\u0644 \u0645\u0646 \u063A\u064A\u0631 \u062D\u0641\u0638\u061F \u0643\u0644 \u0627\u0644\u0644\u064A \u0643\u062A\u0628\u062A\u0647 \u0641\u064A \u0627\u0644\u0643\u0648\u062A\u064A\u0634\u0646 \u0647\u064A\u0636\u064A\u0639.':'Close without saving? Everything you entered will be lost.')) return; } closeModal(); }
