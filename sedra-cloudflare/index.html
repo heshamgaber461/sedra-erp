@@ -4096,7 +4096,7 @@ function quoteTotal(q){ const secs=quoteSections(q); let grand=0; const secTotal
     const ex=qCalcExtras(secSub,{instOn:s.instOn,instType:s.instType,instVal:s.instVal,discOn:s.discOn,discType:s.discType,discVal:s.discVal});
     secDetail.push({sub:secSub,inst:ex.inst,disc:ex.disc,total:ex.taxable}); secTotals.push(ex.taxable); grand+=ex.taxable; });
   const vat=grand*num(q.vat)/100;
-  if(grand===0){ var zg=num(q.zohoGrandTotal), zs=num(q.zohoSubTotal), zv=num(q.zohoVAT); if(zg>0||zs>0){ var zsub=zs>0?zs:zg; return {sub:zsub,secTotals,secDetail,vat:zv,total:zg>0?zg:(zsub+zv),secs,fromZoho:true}; } }
+  if(q.zohoId){ var zg=num(q.zohoGrandTotal); if(zg>0){ var zsub=(grand>0?grand:num(q.zohoSubTotal)); if(!(zsub>0)) zsub=zg; var adj=zg-zsub; return {sub:zsub,secTotals:(secTotals.length?secTotals:[zsub]),secDetail,vat:0,total:zg,adj:adj,secs,fromZoho:true}; } }
   return {sub:grand,secTotals,secDetail,vat,total:grand+vat,secs}; }
 function vQuotes(){
   const meName=(me&&me.name)||'';
@@ -4773,7 +4773,8 @@ function printQuote(id,opts){
   const _hasVat=num(q.vat)>0;
   const _subLabel=lang==='ar'?(_hasVat?'إجمالي كل السيستمز (قبل الضريبة)':'إجمالي كل السيستمز'):(_hasVat?'All systems subtotal (excl. VAT)':'All systems subtotal');
   const _vatRow=_hasVat?`<div class="r2"><span>VAT (${num(q.vat)}%)</span><b>${M(t.vat)}</b></div>`:'';
-  const finHTML=`${cur!=='EGP'?`<div class="mini" style="text-align:right;color:#5a6b7b;font-size:11px;margin-bottom:4px">${lang==='ar'?'كل المبالغ بعملة':'All amounts in'} ${cur}</div>`:''}<div class="fin">${sysLines}<div class="r2"><span>${_subLabel}</span><b>${M(t.sub)}</b></div>${_vatRow}<div class="g"><span>Grand Total</span><span>${M(t.total)}</span></div></div>`;
+  const _adjRow=(t.adj&&Math.abs(t.adj)>=1)?`<div class="r2"><span>${t.adj>0?(lang==='ar'?'ضريبة / تعديل':'Tax / Adjustment'):(lang==='ar'?'خصم':'Discount')}</span><b>${t.adj<0?'− ':''}${M(Math.abs(t.adj))}</b></div>`:'';
+  const finHTML=`${cur!=='EGP'?`<div class="mini" style="text-align:right;color:#5a6b7b;font-size:11px;margin-bottom:4px">${lang==='ar'?'كل المبالغ بعملة':'All amounts in'} ${cur}</div>`:''}<div class="fin">${sysLines}<div class="r2"><span>${_subLabel}</span><b>${M(t.sub)}</b></div>${_vatRow}${_adjRow}<div class="g"><span>Grand Total</span><span>${M(t.total)}</span></div></div>`;
   const featHTML=(function(){var fl=lines(q.featuresList);return fl.length?`<div class="stitle" style="font-size:15px;margin-top:10px">✨ Features list</div><div class="sec" style="page-break-inside:avoid;border-color:#37c0dc"><ul style="padding:14px 30px;margin:0;line-height:1.9;font-size:12.5px;color:#1c2b3a;columns:2;-webkit-columns:2;column-gap:30px">${fl.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')}</ul></div>`:'';})();
   const payHTML=pay.length?`<div class="stitle" style="font-size:15px;margin-top:6px">Payment terms</div><div class="pay">${pay.map(pp=>`<div class="pc"><div class="k">${esc(pp[0].toUpperCase())}</div><div class="v">${num(pp[1])}%</div></div>`).join('')}</div>`:'';
   const notesHTML=(function(){var nl=lines(q.notes);return nl.length?`<div class="stitle" style="font-size:15px;margin-top:10px">📝 ${lang==='ar'?'ملاحظات':'Notes'}</div><div class="sec" style="page-break-inside:avoid;border-color:#37c0dc"><ul style="padding:14px 30px;margin:0;line-height:1.9;font-size:12.5px;color:#1c2b3a">${nl.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')}</ul></div>`:'';})();
