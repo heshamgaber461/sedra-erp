@@ -1454,7 +1454,7 @@ async function loadHeavy(which){
   }catch(e){ todo.forEach(function(k){ window.__heavyLoading[k]=false; }); }
 }
 /* Which heavy collections each view needs. */
-var VIEW_HEAVY={ quotes:['quotes'], variations:['quotes'], salesorders:['quotes'], quicksale:['quotes','inventory'], inventory:['inventory'], reorder:['inventory'], stockledger:['inventory'], stockcount:['inventory'], invvalue:['inventory'], grn:['inventory'], gatepass:['inventory'], requisitions:['inventory'], purchasereq:['inventory'] };
+var VIEW_HEAVY={ quotes:['quotes','inventory'], variations:['quotes','inventory'], salesorders:['quotes','inventory'], quicksale:['quotes','inventory'], inventory:['inventory'], reorder:['inventory'], stockledger:['inventory'], stockcount:['inventory'], invvalue:['inventory'], grn:['inventory'], gatepass:['inventory'], requisitions:['inventory'], purchasereq:['inventory'] };
 function ensureHeavyFor(v){ try{ var need=VIEW_HEAVY[v]; if(need){ need.forEach(function(k){ loadHeavy(k); }); } }catch(_){ } }
 async function refreshAll(quiet){
   if(polling)return; polling=true; lastRefresh=Date.now();
@@ -4213,6 +4213,8 @@ function qProductPicker(si,ii){
   ov.onclick=function(){ qpickClose(); };
   document.body.appendChild(ov);
   var inp=document.getElementById('qpickq'); if(inp)inp.focus();
+  /* products are a HEAVY collection loaded on demand — make sure they're loaded when picking from a quote */
+  if(!(typeof inventory!=='undefined' && inventory && inventory.length) && typeof loadHeavy==='function'){ try{ loadHeavy('inventory').then(function(){ qpickRender(si,ii); }); }catch(e){} }
   qpickRender(si,ii);
 }
 function qpickClose(){ var ov=document.getElementById('qpick'); if(ov)ov.remove(); }
@@ -4222,7 +4224,7 @@ function qpickRender(si,ii){
   if(lv){ var terms=lv.split(/\s+/); list=list.filter(function(p){ var s=((p.name||'')+' '+(p.brand||'')+' '+(p.sku||'')+' '+(p.model||'')+' '+(p.desc||p.description||'')+' '+(p.code||'')).toLowerCase(); return terms.every(function(t){return s.indexOf(t)>=0;}); }); }
   var total=list.length; list=list.slice(0,60);
   var el=document.getElementById('qpicklist'); if(!el)return;
-  if(!list.length){ el.innerHTML='<div class="mini" style="padding:24px;text-align:center;color:var(--muted)">'+(lang==='ar'?'لا نتائج — جرّب كلمة تانية':'No results — try another word')+'</div>'; return; }
+  if(!list.length){ var _loadingInv=!(typeof inventory!=='undefined'&&inventory&&inventory.length); el.innerHTML='<div class="mini" style="padding:24px;text-align:center;color:var(--muted)">'+(_loadingInv?(lang==='ar'?'⏳ بحمّل المنتجات…':'⏳ Loading products…'):(lang==='ar'?'لا نتائج — جرّب كلمة تانية':'No results — try another word'))+'</div>'; return; }
   var rt=qCurRate(); var cur=(g('q_cur')&&val('q_cur'))||'EGP';
   el.innerHTML=list.map(function(p){ var pr=num(p.price)||num(p.cost); var shown=(rt&&rt!==1)?Math.round(pr*rt*100)/100:pr;
     var img=p.image?('<img src="'+esc(p.image)+'" style="width:46px;height:46px;object-fit:contain;border-radius:8px;background:#f4f8fb;flex-shrink:0">'):('<div style="width:46px;height:46px;border-radius:8px;background:#eef3f8;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#9fb3c4;font-size:18px">📦</div>');
@@ -4637,6 +4639,7 @@ function deliverRFQ(id){
 }
 function editQuote(id){
   if(!id && !canCreateQuote()){ alert(lang==='ar'?'إنشاء عروض الأسعار متاح للمدير أو الـ Team Leader في فريق المبيعات فقط.':'Creating quotations is limited to the Manager or Team Leader in the Sales team.'); return; }
+  try{ if(typeof loadHeavy==='function') loadHeavy('inventory'); }catch(_e){}   /* preload products so the picker is ready */
   const r=id?quotes.find(x=>x.id===id):{branch:defBranch(),type:'Quotation',status:'Draft',vat:vatForBranch(defBranch()),dept:(me.dept==='Management'?'Operations':me.dept),date:today(),service:'Home Automation',number:genQuoteNo('home-automation'),preparedBy:(me&&me.name)||'',presalesName:(me&&me.name)||'',validity:30};
   _qsec=qMigrateSecs(JSON.parse(JSON.stringify(quoteSections(r)))); if(!_qsec.length)_qsec=[{title:'Smart Home System',items:[qBlankItem()]}];
   _qUndo=[]; _qRedo=[];
