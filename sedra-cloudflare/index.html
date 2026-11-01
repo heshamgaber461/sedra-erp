@@ -4095,7 +4095,9 @@ function quoteTotal(q){ const secs=quoteSections(q); let grand=0; const secTotal
   secs.forEach(s=>{ const secSub=(s.items||[]).reduce((a,i)=>a+(i.optional?0:num(i.qty)*num(i.price)),0);
     const ex=qCalcExtras(secSub,{instOn:s.instOn,instType:s.instType,instVal:s.instVal,discOn:s.discOn,discType:s.discType,discVal:s.discVal});
     secDetail.push({sub:secSub,inst:ex.inst,disc:ex.disc,total:ex.taxable}); secTotals.push(ex.taxable); grand+=ex.taxable; });
-  const vat=grand*num(q.vat)/100; return {sub:grand,secTotals,secDetail,vat,total:grand+vat,secs}; }
+  const vat=grand*num(q.vat)/100;
+  if(grand===0){ var zg=num(q.zohoGrandTotal), zs=num(q.zohoSubTotal), zv=num(q.zohoVAT); if(zg>0||zs>0){ var zsub=zs>0?zs:zg; return {sub:zsub,secTotals,secDetail,vat:zv,total:zg>0?zg:(zsub+zv),secs,fromZoho:true}; } }
+  return {sub:grand,secTotals,secDetail,vat,total:grand+vat,secs}; }
 function vQuotes(){
   const meName=(me&&me.name)||'';
   const techAssignees=Object.keys(TECH_ROUTING).map(function(k){return TECH_ROUTING[k].name;});
