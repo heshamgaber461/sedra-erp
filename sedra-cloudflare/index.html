@@ -2963,7 +2963,9 @@ function bantCount(r){ return ['bantB','bantA','bantN','bantT'].filter(function(
 /* A record that came from an import (Zoho / Facebook / CSV) rather than being entered in the ERP.
    Imported records carry historical/garbage dates, so we EXCLUDE them from auto date-based alerts
    and auto analytics — those should reflect only what the team enters here (fresh start). */
-function isImported(r){ return !!(r && (r.zohoId || r.importId || r.imported)); }
+function isImported(r){ if(!r)return false; if(r.zohoId||r.importId||r.imported)return true;
+  try{ var fs=(typeof settings!=='undefined'&&settings)?settings.freshStart:null; if(fs){ var c=r.created||r.date||''; if(!c||String(c)<fs)return true; } }catch(e){}
+  return false; }
 function slaBreached(r){ if(isImported(r))return false; if(r.firstResponseAt||r.stage==='Won'||r.stage==='Lost'||leadLifecycle(r)==='Recycled')return false; if(!r.created)return false; var hrs=(Date.now()-new Date(r.created).getTime())/3600000; return hrs>4; }
 function slaMins(r){ if(!r.created||!r.firstResponseAt)return null; return Math.round((new Date(r.firstResponseAt)-new Date(r.created))/60000); }
 function leadFirstResponse(id){ var l=leads.find(function(x){return x.id===id;}); if(!l)return; apiMerge('leads',id,{firstResponseAt:new Date().toISOString()}).then(function(){ logAudit('update','leads',id,'first response'); synced(); }); }
