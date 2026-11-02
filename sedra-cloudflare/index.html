@@ -1394,7 +1394,7 @@ var BULK_COLLS=['_backups','accounts','activities','adcampaigns','announcements'
    inline images, ~10 MB), so pulling them in the first load froze the browser and burned
    the free DB quota. applyAll only overwrites their globals when they ARE present, so a
    light refresh never blanks them. */
-var HEAVY_COLLS=['quotes','inventory'];
+var HEAVY_COLLS=['quotes','inventory','audit','trash'];
 /* Bulk DB read that EXCLUDES the large-file store ('blobs').
    Big attachments (up to 50MB) live under /blobs and are fetched on demand only,
    so they never bloat this whole-DB read, the poll, or the offline snapshot. */
@@ -1449,12 +1449,14 @@ async function loadHeavy(which){
       var v=res[i]; if(v===undefined) return; any=true; window.__heavyLoaded[k]=true;
       if(k==='quotes') quotes=listToArr(v).sort((x,y)=>(y.created||'').localeCompare(x.created||''));
       else if(k==='inventory') inventory=listToArr(v).sort((x,y)=>(x.name||'').localeCompare(y.name||''));
+      else if(k==='audit') audit=listToArr(v).sort((x,y)=>num(y.ts)-num(x.ts));
+      else if(k==='trash'){ trash=listToArr(v).sort((x,y)=>(y.at||'').localeCompare(x.at||'')); try{ purgeOldTrash(); }catch(_t){} }
     });
     if(any){ try{ if(appReady && typeof render==='function' && !_modalOpen()) render(); }catch(_){} }
   }catch(e){ todo.forEach(function(k){ window.__heavyLoading[k]=false; }); }
 }
 /* Which heavy collections each view needs. */
-var VIEW_HEAVY={ quotes:['quotes','inventory'], variations:['quotes','inventory'], salesorders:['quotes','inventory'], quicksale:['quotes','inventory'], inventory:['inventory'], reorder:['inventory'], stockledger:['inventory'], stockcount:['inventory'], invvalue:['inventory'], grn:['inventory'], gatepass:['inventory'], requisitions:['inventory'], purchasereq:['inventory'] };
+var VIEW_HEAVY={ quotes:['quotes','inventory'], variations:['quotes','inventory'], salesorders:['quotes','inventory'], quicksale:['quotes','inventory'], inventory:['inventory'], reorder:['inventory'], stockledger:['inventory'], stockcount:['inventory'], invvalue:['inventory'], grn:['inventory'], gatepass:['inventory'], requisitions:['inventory'], purchasereq:['inventory'], auditlog:['audit'], admin:['audit'], trash:['trash'] };
 function ensureHeavyFor(v){ try{ var need=VIEW_HEAVY[v]; if(need){ need.forEach(function(k){ loadHeavy(k); }); } }catch(_){ } }
 async function refreshAll(quiet){
   if(polling)return; polling=true; lastRefresh=Date.now();
@@ -1503,9 +1505,9 @@ function applyAll(all){
     events=listToArr(all.events);
     todos=listToArr(all.todos);
     customers=listToArr(all.customers).sort((x,y)=>(x.name||'').localeCompare(y.name||''));
-    trash=listToArr(all.trash).sort((x,y)=>(y.at||'').localeCompare(x.at||''));
+    if(all.trash!==undefined) trash=listToArr(all.trash).sort((x,y)=>(y.at||'').localeCompare(x.at||''));
     contracts=listToArr(all.contracts).sort((x,y)=>(x.nextDue||'').localeCompare(y.nextDue||''));
-    audit=listToArr(all.audit).sort((x,y)=>num(y.ts)-num(x.ts));
+    if(all.audit!==undefined) audit=listToArr(all.audit).sort((x,y)=>num(y.ts)-num(x.ts));
     tickets=listToArr(all.tickets).sort((x,y)=>(y.created||'').localeCompare(x.created||''));
     rules=listToArr(all.rules);
     jobs=listToArr(all.jobs).sort((x,y)=>((x.date||'')+(x.time||'')).localeCompare((y.date||'')+(y.time||'')));
@@ -7310,7 +7312,7 @@ function trashPurge(tid){ if(!(isMgr()||me.dept==='Management'||isAdmin())){ ale
   if(!confirm(lang==='ar'?'حذف نهائي؟ مش هينفع يترجّع.':'Delete permanently? This cannot be undone.')) return;
   apiDelete('trash',tid).then(function(){ synced(); }).catch(function(e){ alert('Error: '+(e.message||e)); });
 }
-function purgeOldTrash(){ try{ if(window.__trashPurged)return; window.__trashPurged=true; var cut=Date.now()-TRASH_DAYS*86400000; (trash||[]).forEach(function(t){ var ts=Date.parse(t.at||''); if(ts && ts<cut){ apiDelete('trash',t.id).catch(function(){}); } }); }catch(e){} }
+function purgeOldTrash(){ try{ if(window.__trashPurged)return; if(!(trash&&trash.length))return; /* trash is lazy-loaded — wait until it's actually loaded (Recycle Bin opened) */ window.__trashPurged=true; var cut=Date.now()-TRASH_DAYS*86400000; (trash||[]).forEach(function(t){ var ts=Date.parse(t.at||''); if(ts && ts<cut){ apiDelete('trash',t.id).catch(function(){}); } }); }catch(e){} }
 
 /* ===== Global Find & Replace (real, writes data) — Super Admin only, preview before apply ===== */
 var _frMatches=[];
