@@ -1440,7 +1440,7 @@ async function loadHeavy(which){
   var todo = list.filter(function(k){ return !window.__heavyLoaded[k] && !window.__heavyLoading[k]; });
   if(!todo.length) return;
   todo.forEach(function(k){ window.__heavyLoading[k]=true; });
-  try{ showToast && showToast(lang==='ar'?'بحمّل البيانات…':'Loading data…'); }catch(_){}
+  /* no toast on heavy load — silent (was showing a recurring popup) */
   try{
     var res=await Promise.all(todo.map(function(k){ return apiCall('GET','/'+k+'.json').catch(function(){return undefined;}); }));
     var any=false;
@@ -2575,6 +2575,20 @@ function vHub(){
   var logo=location.origin+'/logo.png';
   return '<div class="hubv"><div class="hub-hero"><div class="hub-mk"><img src="'+logo+'" alt="Sedra" onerror="this.style.display=\'none\'"></div><div class="hub-title">Sedra Electric</div><div class="hub-sub">Control Center · Reach The Nature Energy</div><div class="hub-status"><span class="dot"></span> '+(ar?'كل الأنظمة تعمل':'All systems online')+' · '+t+'</div></div><div class="hub-kpis">'+kpiHtml+'</div><div class="hub-sec">'+(ar?'الأقسام':'System Modules')+'</div><div class="hub-cards">'+cardsHtml+'</div></div>';
 }
+/* Super-Admin one-click PERMANENT wipe of a whole collection (runs in the admin's own session). */
+function sedraClearColl(coll,label){
+  if(!isAdmin()){ alert('Super Admin only'); return; }
+  var ar=(lang==='ar');
+  apiCall('GET','/'+coll+'.json?shallow=true').then(function(d){
+    var ids=d?Object.keys(d):[]; var n=ids.length;
+    if(!n){ alert((ar?'مفيش بيانات في ':'Nothing to clear in ')+label); return; }
+    if(!confirm((ar?('مسح نهائي لكل '+n+' سجل في '+label+'؟ مش هينفع يترجّع.'):('Permanently delete ALL '+n+' records in '+label+'? This cannot be undone.')))) return;
+    if(!confirm((ar?('متأكد؟ هيتمسح كل محتوى '+label+' نهائيًا.'):('Are you sure? This clears all of '+label+' permanently.')))) return;
+    var done=0,err=0;
+    (function nxt(i){ if(i>=ids.length){ synced(); alert((ar?('تم مسح '+done+' سجل من '+label):('Cleared '+done+' from '+label))+(err?(' ('+err+' errors)'):'')+' — Ctrl+Shift+R.'); return; }
+      apiDelete(coll,ids[i]).then(function(){done++;}).catch(function(){err++;}).then(function(){ nxt(i+1); }); })(0);
+  }).catch(function(e){ alert('Error: '+(e&&e.message||e)); });
+}
 function vAdSpend(){
   var ar=(typeof lang!=='undefined'&&lang==='ar');
   var mgr=isMgr()||me.dept==='Management'||me.dept==='Marketing';
@@ -2584,7 +2598,7 @@ function vAdSpend(){
   var reach=rows.reduce(function(s,c){return s+num(c.reach);},0);
   var cpl=results>0?spend/results:0;
   var kpis=[[ar?'المصروف':'Spend', nfmt(spend), 'var(--bad)'],[ar?'النتايج':'Results', nfmt(results), 'var(--navy)'],[ar?'تكلفة النتيجة':'Cost / result', (cpl?money(defBranch(),cpl):'—'), 'var(--warn)'],[ar?'الوصول':'Reach', nfmt(reach), 'var(--cyan)']];
-  var h='<div class="sect"><h2>📣 '+(ar?'الحملات الإعلانية':'Ad Campaigns')+'</h2><div class="sp"></div>'+(mgr?'<button class="btn cy" onclick="editAdCampaign()">+ '+(ar?'حملة':'Campaign')+'</button>':'')+'</div>';
+  var h='<div class="sect"><h2>📣 '+(ar?'الحملات الإعلانية':'Ad Campaigns')+'</h2><div class="sp"></div>'+(mgr?'<button class="btn cy" onclick="editAdCampaign()">+ '+(ar?'حملة':'Campaign')+'</button>':'')+(isAdmin()?' <button class="btn dn sm" onclick="sedraClearColl(\'adcampaigns\',\'Ad Campaigns\')">🗑 '+(ar?'مسح الكل':'Clear all')+'</button>':'')+'</div>';
   h+='<div class="card mini" style="margin-bottom:8px">'+(ar?'مصروفات ونتايج حملات Meta / السوشيال ميديا — بتتحدّث تلقائيًا من المزامنة أو تضيفها يدوي.':'Meta / social ad spend & results — auto-synced or added manually.')+'</div>';
   h+='<div class="grid kpis">'+kpis.map(function(k){return '<div class="card kpi"><div class="n" style="color:'+k[2]+'">'+k[1]+'</div><div class="l">'+k[0]+'</div></div>';}).join('')+'</div>';
   if(!rows.length) return h+'<div class="card empty">'+(ar?'لسه مفيش بيانات حملات — هتظهر هنا أول ما تتزامن أو تضيفها.':'No campaign data yet.')+'</div>';
@@ -3570,6 +3584,19 @@ function mktOverview(rows){
   </div>`;
   h+=campaignPerf(rows);
   return h;
+}
+function mktPerf(){
+  var rows=campaigns.filter(inBranch); var ar=(lang==='ar');
+  var h='<div class="sect"><h2>📈 '+(ar?'أداء الحملات':'Campaign performance')+'</h2></div>';
+  if(!rows.length){ return h+'<div class="card empty">'+(ar?'مفيش حملات لسه. أضف حملة من تبويب Campaigns واربطها بالليدز عشان يظهر الأداء الحقيقي.':'No campaigns yet. Add a campaign (Campaigns tab) and link it to leads to see real performance.')+'</div>'; }
+  var spend=rows.reduce(function(s,c){return s+num(c.spend);},0), cLeads=rows.reduce(function(s,c){return s+num(c.leads);},0), rev=rows.reduce(function(s,c){return s+num(c.revenue);},0);
+  var roas=spend?rev/spend:0, cpl=cLeads?spend/cLeads:0;
+  h+='<div class="grid kpis"><div class="card kpi"><div class="n">'+nfmt(spend)+'</div><div class="l">'+(ar?'إجمالي الإنفاق':'Total spend')+'</div></div>'
+    +'<div class="card kpi"><div class="n" style="color:var(--cyan)">'+cLeads+'</div><div class="l">'+(ar?'ليدز':'Leads')+'</div></div>'
+    +'<div class="card kpi"><div class="n" style="color:var(--ok)">'+nfmt(rev)+'</div><div class="l">'+(ar?'الإيراد':'Revenue')+'</div></div>'
+    +'<div class="card kpi"><div class="n" style="color:'+(roas>=1?'var(--ok)':'var(--bad)')+'">'+roas.toFixed(1)+'x</div><div class="l">ROAS</div></div>'
+    +'<div class="card kpi"><div class="n">'+nfmt(cpl)+'</div><div class="l">'+(ar?'تكلفة الليد':'Cost / lead')+'</div></div></div>';
+  return h+campaignPerf(rows);
 }
 
 /* ===================== PROJECTS ===================== */
@@ -7375,7 +7402,7 @@ function checkChatNotifications(){
   if(_wantDesktop&&document.visibilityState==='hidden')desktopNotify(fresh[fresh.length-1]);
 }
 function showChatToast(m){ const mention=isMentionMe(m.text); showToast({title:(mention?'📣 ':'💬 ')+esc(m.sender||m.email||'')+(mention?' mentioned you':''),body:esc(m.text),sub:esc(chLabel(m.channel)),onclick:()=>openChatChannel(m.channel)}); }
-function showToast(o){ const wrap=g('toasts'); if(!wrap)return; const el=document.createElement('div'); el.className='toast';
+function showToast(o){ if(typeof o==='string') o={title:o}; o=o||{}; if(o.title==null&&o.body==null)return; const wrap=g('toasts'); if(!wrap)return; const el=document.createElement('div'); el.className='toast';
   el.innerHTML=`<div class="th">${o.title}</div>${o.body?`<div class="tb">${o.body}</div>`:''}${o.sub?`<div class="tx2">${o.sub} · click to open</div>`:''}`;
   el.onclick=function(){ try{o.onclick&&o.onclick();}catch(e){} el.remove(); };
   wrap.appendChild(el);
@@ -10635,7 +10662,7 @@ function vMktProd(){
   let h=`<div class="sect"><h2>🎨 Creative Production</h2><div class="sp"></div>
     <select onchange="mktFilterRole=this.value;render()"><option value="">${lang==='ar'?'كل الفريق':'All roles'}</option>${MKT_ROLES.map(r=>`<option ${r===mktFilterRole?'selected':''}>${r}</option>`).join('')}</select>
     <button class="btn gh sm" onclick="mktView=(mktView==='board'?'table':'board');render()">${mktView==='board'?'▤ Table':'▦ Board'}</button>
-    <button class="btn cy" onclick="editMkTask()">+ New request</button></div>`;
+    <button class="btn cy" onclick="editMkTask()">+ New request</button>${isAdmin()?` <button class="btn dn sm" onclick="sedraClearColl('mktasks','Creative Production')">🗑 ${lang==='ar'?'مسح الكل':'Clear all'}</button>`:''}</div>`;
   h+=`<div class="card mini" style="margin-bottom:8px">لوحة إنتاج المحتوى — كلّف الجرافيك ديزاينر/المصور/الفيديوجرافر بمهام، وتابع من الطلب للنشر.</div>`;
   const overdue=rows.filter(r=>r.due&&r.due<today()&&r.stage!=='Published'&&r.stage!=='Approved').length;
   h+=`<div class="grid kpis"><div class="card kpi"><div class="n">${rows.length}</div><div class="l">Total</div></div><div class="card kpi"><div class="n" style="color:var(--warn)">${rows.filter(r=>r.stage==='Requested').length}</div><div class="l">Requested</div></div><div class="card kpi"><div class="n" style="color:#2f6fed">${rows.filter(r=>r.stage==='In Progress').length}</div><div class="l">In progress</div></div><div class="card kpi"><div class="n" style="color:var(--ok)">${rows.filter(r=>r.stage==='Published').length}</div><div class="l">Published</div></div><div class="card kpi"><div class="n" style="color:var(--bad)">${overdue}</div><div class="l">Overdue</div></div></div>`;
@@ -10767,7 +10794,7 @@ const PLAN_STAT=['Draft','Under Review','Approved','Active','Completed','On Hold
 const MKT_CHANNELS=['Instagram','Facebook','LinkedIn','TikTok','YouTube','X / Twitter','WhatsApp','Website / Blog','Email','Google Ads','Print','Events'];
 function vMktPlan(){
   const rows=mktplans.filter(inBranch).slice().sort((a,b)=>(b.created||'').localeCompare(a.created||''));
-  let h=`<div class="sect"><h2>🧭 Marketing Strategy &amp; Plans</h2><div class="sp"></div><button class="btn cy" onclick="editPlan()">+ New plan</button></div>`;
+  let h=`<div class="sect"><h2>🧭 Marketing Strategy &amp; Plans</h2><div class="sp"></div><button class="btn cy" onclick="editPlan()">+ New plan</button>${isAdmin()?` <button class="btn dn sm" onclick="sedraClearColl('mktplans','Strategy & Plans')">🗑 ${lang==='ar'?'مسح الكل':'Clear all'}</button>`:''}</div>`;
   h+=`<div class="card mini" style="margin-bottom:8px">الخطط والاستراتيجيات التسويقية — الأهداف، الجمهور المستهدف، القنوات، الميزانية، ومؤشرات النجاح (KPIs). ارفق ملفات ومراجع.</div>`;
   h+=`<div class="grid kpis"><div class="card kpi"><div class="n">${rows.length}</div><div class="l">Plans</div></div><div class="card kpi"><div class="n" style="color:var(--ok)">${rows.filter(r=>r.status==='Active').length}</div><div class="l">Active</div></div><div class="card kpi"><div class="n">${nfmt(rows.reduce((a,r)=>a+num(r.budget),0))}</div><div class="l">Total budget</div></div></div>`;
   if(!rows.length) return h+`<div class="card empty">No plans yet. Add your marketing strategy and plans here.</div>`;
@@ -10808,7 +10835,7 @@ var mktCalView='list';
 var POST_COL={Idea:'#5A6B7B',Draft:'#8a94a6',Scheduled:'#c9861a',Published:'#1a7a4f',Archived:'#889aa9',Cancelled:'#c0392b'};
 function vContentCal(){
   const rows=posts.filter(inBranch).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-  let h=`<div class="sect"><h2>🗓️ Content Calendar</h2><div class="sp"></div><button class="btn gh sm" onclick="mktCalView=(mktCalView==='cal'?'list':'cal');render()">${mktCalView==='cal'?'▤ List':'🗓️ Calendar'}</button> <button class="btn gh sm" onclick="postImportOpen()">📥 Import CSV</button> <button class="btn cy" onclick="editPost()">+ Add post</button></div>`;
+  let h=`<div class="sect"><h2>🗓️ Content Calendar</h2><div class="sp"></div><button class="btn gh sm" onclick="mktCalView=(mktCalView==='cal'?'list':'cal');render()">${mktCalView==='cal'?'▤ List':'🗓️ Calendar'}</button> <button class="btn gh sm" onclick="postImportOpen()">📥 Import CSV</button> <button class="btn cy" onclick="editPost()">+ Add post</button>${isAdmin()?` <button class="btn dn sm" onclick="sedraClearColl('posts','Content Calendar')">🗑 ${lang==='ar'?'مسح الكل':'Clear all'}</button>`:''}</div>`;
   const idea=rows.filter(p=>(p.status||'Idea')==='Idea').length, sched=rows.filter(p=>p.status==='Scheduled').length, pub=rows.filter(p=>p.status==='Published').length;
   h+=`<div class="grid kpis"><div class="card kpi"><div class="n">${rows.length}</div><div class="l">Total posts</div></div><div class="card kpi"><div class="n" style="color:#5A6B7B">${idea}</div><div class="l">Ideas</div></div><div class="card kpi"><div class="n" style="color:var(--warn)">${sched}</div><div class="l">Scheduled</div></div><div class="card kpi"><div class="n" style="color:var(--ok)">${pub}</div><div class="l">Published</div></div></div>`;
   if(mktCalView==='cal') return h+mktCalendar(rows);
