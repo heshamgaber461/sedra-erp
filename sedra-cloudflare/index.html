@@ -3630,7 +3630,7 @@ function vProjects(){
     <td><div style="background:#eef2f6;border-radius:6px;height:8px;width:80px;overflow:hidden"><div style="background:var(--cyan);height:8px;width:${pr}%"></div></div><span class="mini">${pr}%</span></td>
     <td>${ts.length?done+'/'+ts.length:'—'}</td>
     <td>${money(p.branch,p.value)}</td>
-    <td style="white-space:nowrap"><button class="btn cy sm" onclick="openProjectId='${p.id}';render()">Open</button> ${p.file?`<button class="btn gh sm" title="Open attached file" onclick="openRecFile('projects','${p.id}')">📎</button> `:''}<button class="btn gh sm" title="Open record" onclick="recOpen('${p.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${p.id}')">📎</button> ${canApproveMat()?`<button class="btn gh sm" onclick="editProject('${p.id}')">Edit</button>`:''} ${isMgr()?`<button class="btn dn sm" onclick="delDoc('projects','${p.id}')">✕</button>`:''}</td></tr>`}).join('')+`</tbody></table>`;
+    <td style="white-space:nowrap"><button class="btn cy sm" onclick="openProjectId='${p.id}';render()">Open</button> ${p.file?`<button class="btn gh sm" title="Open attached file" onclick="openRecFile('projects','${p.id}')">📎</button> `:''}<button class="btn gh sm" title="Open record" onclick="recOpen('${p.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${p.id}')">📎</button> ${canApproveMat()?`<button class="btn gh sm" onclick="editProject('${p.id}')">Edit</button>`:''} ${canApproveMat()?`<button class="btn dn sm" title="${lang==='ar'?'مسح المشروع (سلة المحذوفات)':'Delete project (Recycle Bin)'}" onclick="delDoc('projects','${p.id}')">✕</button>`:''}</td></tr>`}).join('')+`</tbody></table>`;
   return h;
 }
 function vProfit(rows){
@@ -3655,7 +3655,7 @@ function projectDetail(p){
   h+=`<div class="card" style="margin-top:10px"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;align-items:center">
     <div><div style="font-size:19px;font-weight:800;color:var(--navy)">${esc(p.name)}</div>
     <div class="mini">${FLAG[p.branch]||''} ${esc(p.branch||'')} · ${esc(p.client||'—')} · ${esc(p.dept||'')} · Owner: ${esc(p.owner||'—')}</div></div>
-    <div><span class="tag" style="background:${PSTAT_COL[p.status]||'#eee'}22;color:${PSTAT_COL[p.status]||'#333'}">${esc(p.status||'Planning')}</span> <button class="btn gh sm" title="Open record" onclick="recOpen('${p.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${p.id}')">📎</button> ${canApproveMat()?`<button class="btn gh sm" onclick="editProject('${p.id}')">Edit</button>`:''}</div></div>
+    <div><span class="tag" style="background:${PSTAT_COL[p.status]||'#eee'}22;color:${PSTAT_COL[p.status]||'#333'}">${esc(p.status||'Planning')}</span> <button class="btn gh sm" title="Open record" onclick="recOpen('${p.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${p.id}')">📎</button> ${canApproveMat()?`<button class="btn gh sm" onclick="editProject('${p.id}')">Edit</button> <button class="btn dn sm" title="${lang==='ar'?'مسح المشروع (سلة المحذوفات)':'Delete project (Recycle Bin)'}" onclick="delDoc('projects','${p.id}')">🗑 ${lang==='ar'?'مسح':'Delete'}</button>`:''}</div></div>
     <div style="margin-top:12px">Progress <b>${pr}%</b><div style="background:#eef2f6;border-radius:6px;height:10px;overflow:hidden;margin-top:4px"><div style="background:var(--cyan);height:10px;width:${pr}%"></div></div></div>
     <div class="mini" style="margin-top:8px">${p.start?'Start: '+esc(p.start)+' · ':''}${p.end?'End: '+esc(p.end)+' · ':''}Value: ${money(p.branch,p.value)}</div></div>`;
   // Milestones
@@ -3803,6 +3803,7 @@ function projExtraDetail(p){
   var hrs=projSiteHours(p); var upct=projUsedPct(p); var h='';
   h+='<div class="sect"><h2>📍 '+(ar?'الموقع':'Location')+'</h2></div>';
   h+='<div class="card mini">'+(p.address?esc(p.address):'<span style="color:var(--muted)">'+(ar?'مفيش عنوان':'No address')+'</span>')+(p.gps?' · GPS: '+esc(p.gps)+' <a href="https://maps.google.com/?q='+encodeURIComponent(p.gps)+'" target="_blank">🗺️</a>':' · <span style="color:#c0392b">'+(ar?'مفيش GPS — لازم للحضور':'No GPS — needed for check-in')+'</span>')+'</div>';
+  if(canApproveMat(p)){ h+='<div style="margin:8px 0 2px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn cy sm" onclick="addProjectQuote(\''+p.id+'\')">📄 '+(ar?'كوتيشن جديد للمشروع':'Add quotation')+'</button></div>'; }
   h+='<div class="sect"><h2>💰 '+(ar?'الفلوس':'Financials')+'</h2><div class="sp"></div>'+((isMgr()||isAdmin())?'<button class="btn gh sm" onclick="setCollected(\''+p.id+'\')">'+(ar?'تحديث المحصّل':'Update collected')+'</button>':'')+'</div>';
   h+='<div class="grid kpis"><div class="card kpi"><div class="n">'+money(p.branch,val0)+'</div><div class="l">'+(ar?'قيمة العقد':'Contract value')+'</div></div>'
     +'<div class="card kpi"><div class="n" style="color:var(--ok)">'+money(p.branch,col)+'</div><div class="l">'+(ar?'محصّل':'Collected')+'</div></div>'
@@ -3824,9 +3825,10 @@ function projExtraDetail(p){
     });
     h+='</tbody></table></div>';
   }
-  h+='<div class="sect"><h2>📦 '+(ar?'قائمة المواد (مخزن المشروع)':'Materials checklist (project store)')+' <span class="tag">'+cl.length+'</span>';
-  if(cl.length&&(isMgr()||isAdmin())){ h+=' <button class="btn gh sm" onclick="projMatExport(\''+p.id+'\')" style="font-size:11px">⬇ CSV</button>'; }
-  h+='</h2></div>';
+  h+='<div class="sect"><h2>📦 '+(ar?'قائمة المواد (مخزن المشروع)':'Materials checklist (project store)')+' <span class="tag">'+cl.length+'</span></h2><div class="sp"></div>';
+  if(canApproveMat(p)){ h+='<button class="btn cy sm" onclick="addProjMaterial(\''+p.id+'\')">➕ '+(ar?'إضافة مادة':'Add material')+'</button> '; }
+  if(cl.length&&(isMgr()||isAdmin())){ h+='<button class="btn gh sm" onclick="projMatExport(\''+p.id+'\')">⬇ CSV</button>'; }
+  h+='</div>';
   if(!cl.length){ h+='<div class="card empty">'+(ar?'مفيش بنود. اعمل Import من الكوتيشن.':'No items. Import from the quotation.')+'</div>'; return h; }
   h+='<div style="overflow-x:auto"><table><thead><tr><th>'+(ar?'الصنف':'Item')+'</th><th>'+(ar?'المطلوب':'Required')+'</th><th>'+(ar?'المنصرف':'Issued')+'</th><th>'+(ar?'المتبقّي':'Remaining')+'</th><th></th></tr></thead><tbody>';
   cl.forEach(function(it,i){ var rem=clRemaining(it); var done=rem<=0;
@@ -3841,6 +3843,30 @@ function projMatExport(pid){ var p=projects.find(function(x){return x.id===pid;}
   var rows=[['Item','Code','Planned','Used','Remaining','UnitPrice']].concat(cl.map(function(it){return [it.item,it.code||'',num(it.qtyPlanned),num(it.qtyUsed),clRemaining(it),num(it.unitPrice)];}));
   var csv=rows.map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
   var a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv); a.download=(p.name||'project')+'-materials.csv'; document.body.appendChild(a); a.click(); a.remove();
+}
+/* Manually ADD a material line to a project's checklist (manager / Team Leader only) */
+function addProjMaterial(pid){
+  var p=projects.find(function(x){return x.id===pid;}); if(!p)return;
+  if(!canApproveMat(p)){ alert(lang==='ar'?'🚫 إضافة المواد للمدير أو Team Leader فقط.':'🚫 Adding materials is restricted to a manager / team leader.'); return; }
+  var ar=(lang==='ar');
+  openModal(ar?'➕ إضافة مادة للمشروع':'➕ Add material to project',
+    fEl(ar?'اسم الصنف':'Item name','am_item','')+
+    '<div class="row2">'+fEl(ar?'الكود (اختياري)':'Code (optional)','am_code','')+fEl(ar?'الكمية المطلوبة':'Required qty','am_qty',1,'number')+'</div>'+
+    fEl(ar?'سعر الوحدة (اختياري)':'Unit price (optional)','am_price','','number'),
+    function(){ var item=val('am_item'); if(!item){alert(ar?'اكتب اسم الصنف':'Enter item name');return false;}
+      var cl=(p.checklist||[]).map(function(x){return Object.assign({},x);});
+      cl.push({item:item,code:val('am_code')||'',qtyPlanned:num(val('am_qty'))||0,unitPrice:num(val('am_price'))||0,qtyUsed:0});
+      apiMerge('projects',pid,{checklist:cl}).then(function(){ try{logAudit('update','projects',pid,p.name);}catch(e){} try{ notifyLeaders(p,(ar?'📦 مادة جديدة — ':'📦 Material added — ')+p.name,((me&&me.name)||'')+(ar?' أضاف ':' added ')+item+(ar?' لقائمة مواد المشروع':' to the project materials')); }catch(_n){} synced(); }).catch(function(e){alert('Error: '+(e.message||e));});
+    });
+}
+/* Create a NEW quotation already linked to this project, then open it to add items (manager / Team Leader only) */
+function addProjectQuote(pid){
+  var p=projects.find(function(x){return x.id===pid;}); if(!p)return;
+  if(!canApproveMat(p)){ alert(lang==='ar'?'🚫 إضافة كوتيشن للمدير أو Team Leader فقط.':'🚫 Adding a quotation is restricted to a manager / team leader.'); return; }
+  var rec={client:p.client||'',subject:p.name||'',projectName:p.name||'',projectId:pid,fromProject:pid,branch:p.branch||defBranch(),date:(typeof today==='function'?today():new Date().toISOString().slice(0,10)),status:'Draft',preparedBy:(me&&me.name)||'',created:new Date().toISOString(),sections:[],items:[]};
+  var go=function(id){ if(!id){ alert('Error creating quotation'); return; } rec.id=id; try{ if(typeof quotes!=='undefined'&&quotes&&!quotes.find(function(x){return x.id===id;})) quotes.push(rec); }catch(e){} try{ if(typeof loadHeavy==='function') loadHeavy('inventory'); }catch(e){} if(typeof editQuote==='function') editQuote(id); };
+  if(typeof loadHeavy==='function' && !(typeof quotes!=='undefined'&&quotes&&quotes.length)){ loadHeavy('quotes').then(function(){ apiAdd('quotes',rec).then(go).catch(function(e){alert('Error: '+(e.message||e));}); }); }
+  else { apiAdd('quotes',rec).then(go).catch(function(e){alert('Error: '+(e.message||e));}); }
 }
 function sedraDeleteAllProjects(){
   if(!isAdmin()){ alert('Super Admin only'); return; }
@@ -10884,13 +10910,8 @@ function scSuspReasons(target,coords,ip){
   return reasons;
 }
 function scCamBody(ar){
-  return '<div class="card mini" style="margin-bottom:8px">'+(ar?'📸 لازم صورة حيّة من الموقع + تحديد مكانك — عشان نتأكد إنك فعلاً في المشروع. الصورة إجبارية.':'📸 A live site photo + your location are required. The photo is mandatory.')+'</div>'
-   +'<div style="position:relative;background:#000;border-radius:10px;overflow:hidden">'
-   +'<video id="scVid" autoplay playsinline muted style="width:100%;max-height:300px;object-fit:cover;display:block"></video>'
-   +'<img id="scShot" alt="" style="width:100%;max-height:300px;object-fit:cover;display:none">'
-   +'</div><canvas id="scCanvas" style="display:none"></canvas>'
-   +'<div id="scStatus" class="mini" style="margin-top:8px">'+(ar?'⏳ بفتح الكاميرا وبحدّد موقعك…':'⏳ Opening camera & locating…')+'</div>'
-   +'<div style="margin-top:8px"><button type="button" class="btn cy sm" id="scShotBtn" onclick="scSnap()">📸 '+(ar?'التقط صورة':'Take photo')+'</button> <button type="button" class="btn gh sm" id="scRetakeBtn" onclick="scRetake()" style="display:none">↩ '+(ar?'إعادة':'Retake')+'</button></div>';
+  return '<div class="card mini" style="margin-bottom:8px">'+(ar?'📍 هيتم تسجيل موقعك (GPS) وعنوان الإنترنت للتأكد إنك في المشروع.':'📍 Your location (GPS) and IP will be recorded to confirm you are on site.')+'</div>'
+   +'<div id="scStatus" class="mini" style="margin-top:8px">'+(ar?'⏳ بحدّد موقعك…':'⏳ Locating…')+'</div>';
 }
 function scSnap(){
   var ar=(lang==='ar'); var vid=g('scVid'); if(!vid||!vid.videoWidth){ alert(ar?'الكاميرا لسه بتفتح، استنى ثانية…':'Camera still loading…'); return; }
@@ -10919,7 +10940,6 @@ function scGather(){
 }
 function scCommit(){
   var ctx=_scCtx; if(!ctx)return; var ar=(lang==='ar');
-  if(!ctx.photo){ alert(ar?'لازم تلتقط صورة الأول 📸':'Take a photo first 📸'); return; }
   if(ctx.target){
     if(!ctx.geo){ alert(ar?'لازم نحدّد موقعك (GPS) — فعّل الموقع وجرّب تاني':'Location required — enable GPS and retry'); return; }
     if(ctx.dist>SITE_RADIUS_M){
@@ -10936,20 +10956,18 @@ function scCommit(){
   if(ctx.mode==='in'){
     var rec={emp:(me&&me.name)||'',empEmail:(me&&me.email||'').toLowerCase(),project:ctx.proj,site:ctx.site,inTs:Date.now(),outTs:0,date:today(),branch:defBranch(),note:'',
       gpsIn:gpsStr, distM:(ctx.target&&ctx.dist!=null)?Math.round(ctx.dist):null, accIn:ctx.geo?Math.round(ctx.geo.accuracy||0):null,
-      ipIn:ctx.ip?ctx.ip.ip:'', ipCityIn:ctx.ip?((ctx.ip.city?ctx.ip.city+', ':'')+(ctx.ip.country||'')):'', ispIn:ctx.ip?ctx.ip.isp:'', suspIn:susp, hasPhotoIn:true};
+      ipIn:ctx.ip?ctx.ip.ip:'', ipCityIn:ctx.ip?((ctx.ip.city?ctx.ip.city+', ':'')+(ctx.ip.country||'')):'', ispIn:ctx.ip?ctx.ip.isp:'', suspIn:susp, hasPhotoIn:false};
     if(ctx.override)rec.override=true;
     apiAdd('sitevisits',rec).then(function(id){
-      if(id){ apiCall('PUT','/sitephotos/'+id+'.json',{in:photo,inAt:rec.inTs}).catch(function(){}); }
       logAudit('checkin','sitevisits',id||'',ctx.proj);
       try{ notifyLeaders(ctx.pobj||{name:ctx.proj,branch:rec.branch},(ar?'📍 تسجيل حضور — ':'📍 Check-in — ')+ctx.proj,(rec.emp||'')+(ar?' سجّل حضور في ':' checked in at ')+ctx.proj+' · '+hhmm(rec.inTs)+(susp?('\n⚠️ '+(ar?'تنبيه: ':'Flag: ')+susp):'')); }catch(_n){}
       scStopCam(); closeModal(); synced();
     }).catch(function(e){ var s2=g('mSave'); if(s2){s2.disabled=false;} alert('Error: '+(e.message||e)); });
   } else {
-    var id=ctx.visitId; var patch={outTs:Date.now(),gpsOut:gpsStr,accOut:ctx.geo?Math.round(ctx.geo.accuracy||0):null,ipOut:ctx.ip?ctx.ip.ip:'',suspOut:susp,hasPhotoOut:true};
+    var id=ctx.visitId; var patch={outTs:Date.now(),gpsOut:gpsStr,accOut:ctx.geo?Math.round(ctx.geo.accuracy||0):null,ipOut:ctx.ip?ctx.ip.ip:'',suspOut:susp,hasPhotoOut:false};
     if(ctx.target&&ctx.dist!=null)patch.distOut=Math.round(ctx.dist);
     if(ctx.override)patch.overrideOut=true;
     apiMerge('sitevisits',id,patch).then(function(){
-      apiCall('PATCH','/sitephotos/'+id+'.json',{out:photo,outAt:patch.outTs}).catch(function(){});
       logAudit('checkout','sitevisits',id,ctx.proj||'');
       try{ notifyLeaders(ctx.pobj||{name:ctx.proj,branch:defBranch()},(ar?'📤 تسجيل انصراف — ':'📤 Check-out — ')+(ctx.proj||''),(((me&&me.name)||'')+(ar?' سجّل انصراف من ':' checked out from ')+(ctx.proj||''))+(susp?('\n⚠️ '+(ar?'تنبيه: ':'Flag: ')+susp):'')); }catch(_n){}
       scStopCam(); closeModal(); synced();
@@ -10970,7 +10988,7 @@ function siteCheckIn(){
   var ar=(lang==='ar');
   openModal((ar?'📍 تسجيل حضور — ':'📍 Check-in — ')+proj, scCamBody(ar), function(){ scCommit(); return false; });
   var sb=g('mSave'); if(sb)sb.textContent=(ar?'✓ سجّل حضور':'✓ Check in');
-  scStartCam(); scGather();
+  scGather();
 }
 function siteCheckOut(id){
   var v=(sitevisits||[]).find(function(x){return x.id===id;}); if(!v)return;
@@ -10981,7 +10999,7 @@ function siteCheckOut(id){
   var ar=(lang==='ar');
   openModal((ar?'📤 تسجيل انصراف — ':'📤 Check-out — ')+(v.project||''), scCamBody(ar), function(){ scCommit(); return false; });
   var sb=g('mSave'); if(sb)sb.textContent=(ar?'✓ سجّل انصراف':'✓ Check out');
-  scStartCam(); scGather();
+  scGather();
 }
 function scNote(id){ var v=(sitevisits||[]).find(x=>x.id===id); if(!v)return; var n=prompt(lang==='ar'?'ملاحظة عن الزيارة:':'Visit note:',v.note||''); if(n===null)return; apiMerge('sitevisits',id,{note:n}).then(()=>synced()); }
 function vSiteCheck(){
@@ -10993,7 +11011,7 @@ function vSiteCheck(){
   const totToday=todayV.reduce((a,v)=>a+scHours(v),0);
   const off=isOffDay(T,defBranch()), hol=holidayOn(T,defBranch());
   let h=`<div class="sect"><h2>📍 Site Check-in</h2><div class="sp"></div>${mgr?`<input type="month" value="${esc(scMonth)}" onchange="scMonth=this.value;render()" style="max-width:150px"> <button class="btn gh sm" onclick="scExport('csv')">⬇ Excel</button> <button class="btn gh sm" onclick="scReport()">🖨 Report</button> <button class="btn gh sm" onclick="scView=(scView==='mine'?'team':'mine');render()">${scView==='team'?'👤 My visits':'👥 Team'}</button>`:''}</div>`;
-  h+=`<div class="card mini" style="margin-bottom:8px">سجّل حضورك (Check-in) وانصرافك (Check-out) من موقع المشروع نفسه. <b>لازم تكون خلال ${SITE_RADIUS_M} متر من موقع المشروع</b> و<b>تاخد صورة حيّة بالكاميرا</b> في الحضور والانصراف — النظام بيتأكد من موقعك (GPS) وبيسجّل دقّة الموقع وعنوان الإنترنت ويحسب ساعات شغلك تلقائيًا. المدير بس اللي يقدر يتجاوز شرط المسافة.</div>`;
+  h+=`<div class="card mini" style="margin-bottom:8px">سجّل حضورك (Check-in) وانصرافك (Check-out) من موقع المشروع نفسه. <b>لازم تكون خلال ${SITE_RADIUS_M} متر من موقع المشروع</b> — النظام بيتأكد من موقعك (GPS) وبيسجّل دقّة الموقع وعنوان الإنترنت ويحسب ساعات شغلك تلقائيًا. المدير بس اللي يقدر يتجاوز شرط المسافة.</div>`;
   if(off) h+=`<div class="card" style="background:#fff6e6;border-color:#e0a93b;color:#8a5a00;margin-bottom:10px">🌴 ${hol?(lang==='ar'?'اليوم إجازة رسمية: ':'Official holiday: ')+esc(hol.name||''):(lang==='ar'?'اليوم إجازة أسبوعية (جمعة/سبت)':'Weekly day off (Fri/Sat)')}</div>`;
   // check-in panel
   h+=`<div class="card" style="margin-bottom:12px">`;
