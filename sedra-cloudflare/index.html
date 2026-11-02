@@ -2960,7 +2960,11 @@ function playbookHtml(seg){ var p=segPlaybook(seg); if(!p)return '';
 function leadLifecycle(r){ if(r.lifecycle)return r.lifecycle; if(r.stage==='Won')return 'Customer'; if(r.stage==='Lost')return 'Recycled'; if(['Qualified','Site Survey','BOQ / Design','Quotation Sent','Negotiation'].indexOf(r.stage)>=0)return 'SQL'; if(isMQL(r))return 'MQL'; return 'Lead'; }
 function lifeBadge(r){ var l=leadLifecycle(r); var c=LIFE_COL[l]||'#5A6B7B'; return '<span class="tag" style="background:'+c+'22;color:'+c+'">'+l+'</span>'; }
 function bantCount(r){ return ['bantB','bantA','bantN','bantT'].filter(function(k){return r[k]==='Yes';}).length; }
-function slaBreached(r){ if(r.firstResponseAt||r.stage==='Won'||r.stage==='Lost'||leadLifecycle(r)==='Recycled')return false; if(!r.created)return false; var hrs=(Date.now()-new Date(r.created).getTime())/3600000; return hrs>4; }
+/* A record that came from an import (Zoho / Facebook / CSV) rather than being entered in the ERP.
+   Imported records carry historical/garbage dates, so we EXCLUDE them from auto date-based alerts
+   and auto analytics — those should reflect only what the team enters here (fresh start). */
+function isImported(r){ return !!(r && (r.zohoId || r.importId || r.imported)); }
+function slaBreached(r){ if(isImported(r))return false; if(r.firstResponseAt||r.stage==='Won'||r.stage==='Lost'||leadLifecycle(r)==='Recycled')return false; if(!r.created)return false; var hrs=(Date.now()-new Date(r.created).getTime())/3600000; return hrs>4; }
 function slaMins(r){ if(!r.created||!r.firstResponseAt)return null; return Math.round((new Date(r.firstResponseAt)-new Date(r.created))/60000); }
 function leadFirstResponse(id){ var l=leads.find(function(x){return x.id===id;}); if(!l)return; apiMerge('leads',id,{firstResponseAt:new Date().toISOString()}).then(function(){ logAudit('update','leads',id,'first response'); synced(); }); }
 function leadRecycle(id){ var l=leads.find(function(x){return x.id===id;}); if(!l)return; if(!confirm(lang==='ar'?'تدوير الـlead للتغذية (nurture)؟':'Recycle to nurture?'))return; apiMerge('leads',id,{lifecycle:'Recycled',recycledAt:today()}).then(function(){ logAudit('update','leads',id,'recycled'); synced(); }); }
@@ -2968,6 +2972,7 @@ function leadAcceptSAL(id){ var l=leads.find(function(x){return x.id===id;}); if
 function scoreColor(s){ return s>=70?'#1a7a4f':s>=40?'#e0a93b':'#c0392b'; }
 function scoreBadge(r){ const s=leadScore(r); return `<span class="tag" title="Lead score (source · stage · value)" style="background:${scoreColor(s)}22;color:${scoreColor(s)}">${s}</span>`; }
 let salesTab='overview';
+let salesStatsAll=false; /* analytics default to manually-added leads only (imported Zoho data excluded) */
 function nfmt(v){ return curBranch!=='All'?money(curBranch,v):Math.round(num(v)).toLocaleString(); }
 
 let openLeadId='';
@@ -3363,6 +3368,8 @@ function crmFunnel(rows){
   return tog+rowsH;
 }
 function salesOverview(rows){
+  var _allRows=rows; var _impN=rows.filter(isImported).length;
+  if(!salesStatsAll){ rows=rows.filter(function(r){return !isImported(r);}); }
   const cs=r=>canonStage(r.stage||'New');
   const won=rows.filter(r=>cs(r)==='Won'), lost=rows.filter(r=>cs(r)==='Lost'), open=rows.filter(r=>cs(r)!=='Won'&&cs(r)!=='Lost');
   const closed=won.length+lost.length, winRate=closed?Math.round(won.length/closed*100):0;
@@ -3381,7 +3388,11 @@ function salesOverview(rows){
     [_ar?'نسبة الفوز':'Win rate', winRate+'%', 'var(--cyan)', ''],
     [_ar?'إيراد محقّق':'Won revenue', nfmt(wonRev), 'var(--ok)', '']
   ];
-  let h=`<div class="grid kpis">`+kpis.map(k=>`<div class="card kpi"${k[3]?' onclick="'+k[3]+'" style="cursor:pointer" title="'+(_ar?'اضغط للفلترة':'click to filter')+'"':''}><div class="n" style="${k[2]?'color:'+k[2]:''}">${k[1]}</div><div class="l">${k[0]}</div></div>`).join('')+`</div>`;
+  let h='';
+  if(_impN){ h+=`<div class="card mini" style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;background:#eef6fb;border-color:#bcdcef">`
+    +`<span>${_ar?('📊 التحليلات محسوبة على الليدز المُدخَلة يدوي بس — <b>'+_impN+'</b> ليد مستورد من Zoho متخفيين عن الإحصائيات (موجودين في القائمة عادي).'):('📊 Analytics are on manually-added leads only — <b>'+_impN+'</b> imported (Zoho) leads are excluded from stats (still in the list).')}</span>`
+    +`<button class="btn gh sm" style="white-space:nowrap" onclick="salesStatsAll=${!salesStatsAll};render()">${salesStatsAll?(_ar?'إخفاء المستورد':'Hide imported'):(_ar?'إظهار الكل':'Show all')}</button></div>`; }
+  h+=`<div class="grid kpis">`+kpis.map(k=>`<div class="card kpi"${k[3]?' onclick="'+k[3]+'" style="cursor:pointer" title="'+(_ar?'اضغط للفلترة':'click to filter')+'"':''}><div class="n" style="${k[2]?'color:'+k[2]:''}">${k[1]}</div><div class="l">${k[0]}</div></div>`).join('')+`</div>`;
   h+=salesActionPanel(rows);
   const funnel=STAGES.filter(s=>s!=='Lost').map(s=>({label:s,value:rows.filter(r=>r.stage===s).length,color:STAGE_COL[s]}));
   const months=lastMonths(6);
@@ -7470,11 +7481,11 @@ function getNotifications(){
   if(hrIsMgr()){ const bl=allowedBranches(); const p=leaves.filter(l=>(l.status||'Pending')==='Pending'&&(curBranch==='All'?bl.indexOf(l.branch)>=0:l.branch===curBranch)); if(p.length)list.push({ico:'🌴',title:'Leave requests',sub:p.length+' awaiting approval',count:p.length,act:()=>{curView='hr';hrTab='leave';openProjectId=null;closeBell();render();}}); }
   if(isMgr()||me.dept==='Management'||me.dept==='HR'){ const de=hrDocRows().filter(r=>r.dl!==null&&r.dl<=30); if(de.length)list.push({ico:'📄',title:'Document expiry',sub:de.length+' doc(s) expiring/expired',count:de.length,act:()=>{curView='hr';hrTab='docs';closeBell();render();}}); var ce=certs.filter(inBranch).filter(c=>{var dl=daysLeft(c.expiry);return dl!==null&&dl<=30;}); if(ce.length)list.push({ico:'🎓',title:'Certificate expiry',sub:ce.length+' cert(s) expiring/expired',count:ce.length,act:()=>{curView='hr';hrTab='certs';closeBell();render();}}); var pr=hrPeople().filter(e=>e.active!==false).map(probInfo).filter(p=>p&&p.on&&p.daysLeft<=14); if(pr.length)list.push({ico:'⏳',title:'Probation ending',sub:pr.length+' employee(s) within 14 days',count:pr.length,act:()=>{curView='hr';hrTab='directory';closeBell();render();}}); }
   if(cvAllowed('sales')){ const mgr=isMgr()||me.dept==='Management';
-    const fu=leads.filter(inBranch).filter(l=>l.next&&l.next<=today()&&l.stage!=='Won'&&l.stage!=='Lost'&&canSeeLead(l));
+    const fu=leads.filter(inBranch).filter(l=>!isImported(l)&&l.next&&l.next<=today()&&l.stage!=='Won'&&l.stage!=='Lost'&&canSeeLead(l));
     if(fu.length)list.push({ico:'📞',title:'Lead follow-ups due',sub:fu.length+' lead'+(fu.length>1?'s':'')+' to follow up',count:fu.length,act:()=>{curView='sales';salesTab='leads';closeBell();render();}});
     var slaB=leads.filter(inBranch).filter(canSeeLead).filter(slaBreached);
     if(slaB.length)list.unshift({ico:'⏰',title:'SLA breached leads',sub:slaB.length+' lead'+(slaB.length>1?'s':'')+' past 4h — no response',count:slaB.length,act:()=>{curView='revops';closeBell();render();}});
-    if(mgr){ var salQ=leads.filter(inBranch).filter(canSeeLead).filter(l=>leadLifecycle(l)==='MQL');
+    if(mgr){ var salQ=leads.filter(inBranch).filter(canSeeLead).filter(l=>!isImported(l)&&leadLifecycle(l)==='MQL');
       if(salQ.length)list.push({ico:'🎯',title:'MQLs to accept',sub:salQ.length+' awaiting Sales acceptance (SAL)',count:salQ.length,act:()=>{curView='sales';salesTab='leads';closeBell();render();}}); } }
   if(cvAllowed('operations')){ const ot=tasks.filter(t=>(t.assignee||'')===myName&&t.status!=='Done'&&t.due&&t.due<today()); if(ot.length)list.push({ico:'⏰',title:'Overdue tasks',sub:ot.length+' past due',count:ot.length,act:()=>{curView='operations';opsScope='mine';closeBell();render();}}); }
   if(cvAllowed('inventory')){ const low=inventory.filter(inBranch).filter(i=>num(i.qty)<=num(i.min)&&num(i.min)>0); if(low.length)list.push({ico:'📦',title:'Low stock',sub:low.length+' item(s) below minimum',count:low.length,act:()=>{curView='inventory';invTab='items';closeBell();render();}}); }
