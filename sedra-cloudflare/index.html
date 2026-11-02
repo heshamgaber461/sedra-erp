@@ -1578,6 +1578,19 @@ function resolveMe(){
     return;
   }
   if(me.active===false){ block("Your account has been disabled. Contact the administrator."); return; }
+  // Email verification — required for accounts created from 2 Nov 2026 onward. Existing staff are
+  // grandfathered (their account was created earlier), and the Super Admin is exempt, so nobody
+  // currently signed up gets locked out.
+  try{
+    var _ct=(u.metadata&&u.metadata.creationTime)?Date.parse(u.metadata.creationTime):0;
+    if(email!==SUPER_ADMIN_EMAIL && !u.emailVerified && _ct && _ct>=Date.parse('2026-11-02T11:00:00Z')){
+      if(window.__verSent!==email){ window.__verSent=email; try{ u.sendEmailVerification(); }catch(_s){} }
+      var _arv=(typeof lang!=='undefined'&&lang==='ar');
+      try{ auth.signOut(); }catch(_so){}
+      block(_arv?('لازم تأكّد إيميلك الأول. بعتنا لينك تأكيد على '+email+' — افتح الإيميل ودوس على اللينك، وبعدين ارجع سجّل دخول. (لو اللينك مجاش، بصّ في Spam).'):('Please verify your email first. We sent a verification link to '+email+' — open it, click the link, then sign in again. (Check your Spam folder if you don\'t see it.)'));
+      return;
+    }
+  }catch(_ev){}
   if(me.mustChangePass){ showGate('gChange'); return; }
   // logged in OK
   const a=allowedBranches();
