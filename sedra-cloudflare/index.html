@@ -272,8 +272,9 @@
     #app.navopen .side{transform:translateX(0)}
     [dir=rtl] .side{left:auto;right:0;transform:translateX(100%)}
     [dir=rtl] #app.navopen .side{transform:translateX(0)}
-    .side nav{display:flex;flex-direction:column;flex-wrap:nowrap}
-    .side nav button{width:100%;text-align:start}
+    .side nav{display:flex;flex-direction:row;flex-wrap:nowrap}
+    .side nav button{text-align:start}
+    #nav .npanel button{width:100%}
     #navOverlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:55}
     #app.navopen #navOverlay{display:block}
     main{width:100%;min-width:0}
