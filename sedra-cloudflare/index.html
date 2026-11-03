@@ -1575,8 +1575,18 @@ function applyAll(all){
     courses=listToArr(all.courses);
     stockcounts=listToArr(all.stockcounts);
     settings=Object.assign({loc:{},social:{}},(all.meta&&all.meta.settings)||{});
+    try{ rebuildLists(); }catch(_rl){}
     try{ applyTheme(); }catch(_t){}
 }
+/* ===== Editable dropdown lists (Super Admin → Admin → 📋 Lists). Resolved from settings.lists after
+   each data load; defaults (incl. logic-critical values) stay available, custom values just add on. ===== */
+function LIST(key,def){ try{ var l=(typeof settings!=='undefined'&&settings&&settings.lists)?settings.lists[key]:null; return (Array.isArray(l)&&l.length)?l.slice():def.slice(); }catch(e){ return def.slice(); } }
+function rebuildLists(){ try{
+  STAGES=LIST('leadStages',STAGES_DEF); LEAD_SOURCES=LIST('leadSources',LEAD_SOURCES_DEF); PSTAT=LIST('projStatus',PSTAT_DEF); TSTAT=LIST('taskStatus',TSTAT_DEF); QSERVICES=LIST('services',QSERVICES_DEF); EXP_CATS=LIST('expCats',EXP_CATS_DEF);
+  STAGES.forEach(function(s){ if(STAGE_PROB[s]==null) STAGE_PROB[s]=0.3; }); /* custom stages get a default win-probability */
+  PSTAT.forEach(function(s){ if(!PSTAT_COL[s]) PSTAT_COL[s]='#5A6B7B'; });   /* custom statuses get a default colour */
+  TSTAT.forEach(function(s){ if(!TSTAT_COL[s]) TSTAT_COL[s]='#5A6B7B'; });
+}catch(e){} }
 /* ===== Theme / Appearance (Super Admin can recolor the whole system) ===== */
 function _darkHex(hex,amt){ try{ hex=String(hex||'').replace('#',''); if(hex.length===3)hex=hex.split('').map(function(c){return c+c;}).join(''); var n=parseInt(hex,16); if(isNaN(n))return '#'+hex; var r=Math.max(0,((n>>16)&255)-amt),g=Math.max(0,((n>>8)&255)-amt),b=Math.max(0,(n&255)-amt); return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1); }catch(e){ return '#143F63'; } }
 function applyTheme(){ try{ var t=(typeof settings!=='undefined'&&settings&&settings.theme)||{}; var root=document.documentElement; if(t.primary){ root.style.setProperty('--navy',t.primary); root.style.setProperty('--navy-d',_darkHex(t.primary,24)); root.style.setProperty('--z-accent',t.primary); } else { root.style.removeProperty('--navy'); root.style.removeProperty('--navy-d'); root.style.removeProperty('--z-accent'); } if(t.accent){ root.style.setProperty('--cyan',t.accent); } else { root.style.removeProperty('--cyan'); } }catch(e){} }
@@ -2914,7 +2924,7 @@ function tvSort(key,si){ if(!TV[key])return; TV[key].state.s=si; TV[key].state.p
 /* Canonical, de-duplicated & correctly ordered sales pipeline. Legacy Zoho-import
    synonyms (Qualification, Pending Quotation, Quotation Ready, Quote Sent, Closed Won,
    Closed Lost) are migrated to these by migrateStagesOnce() on first admin load. */
-const STAGES=['New','Contacted','Qualified','Site Survey','BOQ / Design','Quotation Sent','Negotiation','Won','Lost'];
+var STAGES_DEF=['New','Contacted','Qualified','Site Survey','BOQ / Design','Quotation Sent','Negotiation','Won','Lost']; var STAGES=STAGES_DEF.slice();
 const STAGE_ALIAS={'Qualification':'Qualified','Pending Quotation':'BOQ / Design','Quotation Ready':'Quotation Sent','Quote Sent':'Quotation Sent','Closed Won':'Won','Closed Lost':'Lost'};
 function canonStage(s){ s=s||'New'; return STAGE_ALIAS[s]||s; }
 async function migrateStagesOnce(){
@@ -2969,7 +2979,7 @@ function addPosition(){ var el=g('pos_new'); if(!el||!el.value.trim())return; va
   apiAdd('positions',{name:nm,by:(me&&me.name)||'',created:new Date().toISOString()}).then(function(id){ positions.push({id:id,name:nm}); logAudit('create','positions',id||'',nm); managePositions(); if(appReady)refreshAll(); }); }
 function delPosition(id){ if(!confirm(lang==='ar'?'حذف هذه الوظيفة؟':'Delete this job position?'))return; positions=positions.filter(function(p){return p.id!==id;}); apiDelete('positions',id); managePositions(); }
 const STAGE_COL={New:'#5A6B7B',Contacted:'#2C77B0',Qualified:'#36C5E0','Site Survey':'#8e44ad','BOQ / Design':'#5b6bd6','Quotation Sent':'#e0a93b',Negotiation:'#d3742a',Won:'#1a7a4f',Lost:'#c0392b',Qualification:'#0aa2c0','Pending Quotation':'#d4a017','Quotation Ready':'#6f42c1','Quote Sent':'#e0722a','Closed Won':'#157347','Closed Lost':'#a02722'};
-const LEAD_SOURCES=['Meta Ads','Google Ads','LinkedIn','Organic / SEO','Website','Referral','WhatsApp','Event / Expo','Designer/Architect','Contractor','Walk-in','Instagram','Facebook','Direct','Yasir BD List','Other'];
+var LEAD_SOURCES_DEF=['Meta Ads','Google Ads','LinkedIn','Organic / SEO','Website','Referral','WhatsApp','Event / Expo','Designer/Architect','Contractor','Walk-in','Instagram','Facebook','Direct','Yasir BD List','Other']; var LEAD_SOURCES=LEAD_SOURCES_DEF.slice();
 const WONLOST_REASONS=['Price','Product fit','Competitor','Timing / not now','No budget','Trust / referral','Service quality','Location','Specs / scope','Other'];
 const STAGE_SCORE={New:10,Contacted:25,Qualified:45,Proposal:65,Negotiation:85,Won:100,Lost:0};
 const SOURCE_SCORE={Referral:20,'Designer/Architect':18,Contractor:16,'Campaign Ad':12,'Walk-in':12,Website:10,WhatsApp:10,Direct:10,Instagram:8,Facebook:8,Other:6};
@@ -3661,7 +3671,7 @@ function mktPerf(){
 }
 
 /* ===================== PROJECTS ===================== */
-const PSTAT=['Planning','In Progress','On Hold','Completed','Cancelled'];
+var PSTAT_DEF=['Planning','In Progress','On Hold','Completed','Cancelled']; var PSTAT=PSTAT_DEF.slice();
 const PSTAT_COL={Planning:'#5A6B7B','In Progress':'#2C77B0','On Hold':'#e0a93b',Completed:'#1a7a4f',Cancelled:'#c0392b'};
 let openProjectId=null;
 function projProgress(p){ const ts=tasks.filter(t=>t.project===p.id); if(ts.length){ return Math.round(ts.filter(t=>t.status==='Done').length/ts.length*100); } return num(p.progress); }
@@ -3772,7 +3782,7 @@ function projectDetail(p){
   try{ h+=projExtraDetail(p); }catch(e){ h+='<div class="card mini">⚠ materials/analytics: '+(e.message||e)+'</div>'; }
   return h;
 }
-const TSTAT=['To Do','In Progress','Done'];
+var TSTAT_DEF=['To Do','In Progress','Done']; var TSTAT=TSTAT_DEF.slice();
 const TSTAT_COL={'To Do':'#5A6B7B','In Progress':'#2C77B0','Done':'#1a7a4f'};
 function taskRow(t){ const st=t.status||'To Do', overdue=t.due&&t.due<today()&&st!=='Done'; return `<tr>
   <td><b>${esc(t.title)}</b>${t.projectName?`<div class="mini">${esc(t.projectName)}</div>`:''}</td><td>${esc(t.assignee||'—')}</td>
@@ -4640,7 +4650,7 @@ function qRecalc(){ qReadDOM(); const cur=(g('q_cur')&&val('q_cur'))||'EGP'; con
   if(tot)tot.innerHTML=html+baseNote;
   var sv=g('qStickyVal'); if(sv)sv.textContent=f(grandTot)+' '+cur;
 }
-const QSERVICES=['Home Automation','Smart Home','Home Cinema','Indoor Sound System','Outdoor Sound System','Security Camera','Intrusion System','Safety System','Intercom System','Structured Cabling System','MATV Satellite System','Solar Energy','Smart Gates'];
+var QSERVICES_DEF=['Home Automation','Smart Home','Home Cinema','Indoor Sound System','Outdoor Sound System','Security Camera','Intrusion System','Safety System','Intercom System','Structured Cabling System','MATV Satellite System','Solar Energy','Smart Gates']; var QSERVICES=QSERVICES_DEF.slice();
 /* Systems that can each become a page inside one quotation (Hesham: choose one or more, each system prints on its own page with its own title). Images per system are wired via SYS_IMG when supplied. */
 const QSYSTEMS=['KNX','Wireless','Light Current','Sound System','CCTV'];
 const SCOPE_SYSTEMS=['KNX','Wireless','Light Current'];
@@ -5198,7 +5208,7 @@ function genContractInvoice(id){
 /* ===================== ACCOUNTING / INVOICES ===================== */
 let accTab='overview';
 const INV_STAT_COL={Paid:'#1a7a4f',Partial:'#e0a93b',Unpaid:'#2C77B0',Overdue:'#c0392b'};
-const EXP_CATS=['Salaries','Rent','Utilities','Marketing','Materials','Logistics','Maintenance','Office','Taxes','Other'];
+var EXP_CATS_DEF=['Salaries','Rent','Utilities','Marketing','Materials','Logistics','Maintenance','Office','Taxes','Other']; var EXP_CATS=EXP_CATS_DEF.slice();
 function invStatus(v){ const amt=num(v.amount),paid=num(v.paid); if(amt>0&&paid>=amt)return'Paid'; if(v.due&&v.due<today()&&paid<amt)return'Overdue'; if(paid>0)return'Partial'; return'Unpaid'; }
 let ledgerTab='chart';
 const ACCT_TYPES=['Asset','Liability','Equity','Income','Expense'];
@@ -7025,6 +7035,7 @@ function vAdmin(){
     <button class="${adminTab==='data'?'active':''}" onclick="adminTab='data';render()">Import &amp; Backup</button>
     <button class="${adminTab==='sections'?'active':''}" onclick="adminTab='sections';render()">🧩 Sections</button>
     <button class="${adminTab==='theme'?'active':''}" onclick="adminTab='theme';render()">🎨 Appearance</button>
+    <button class="${adminTab==='lists'?'active':''}" onclick="adminTab='lists';render()">📋 Lists</button>
     <button class="${adminTab==='imports'?'active':''}" onclick="adminTab='imports';render()">📥 Imports</button>
     <button class="${adminTab==='audit'?'active':''}" onclick="adminTab='audit';render()">Activity log</button></div>`;
   if(adminTab==='users')return h+adminUsers();
@@ -7032,6 +7043,7 @@ function vAdmin(){
   if(adminTab==='data')return h+adminData();
   if(adminTab==='sections')return h+adminSections();
   if(adminTab==='theme')return h+adminTheme();
+  if(adminTab==='lists')return h+adminLists();
   if(adminTab==='imports')return h+adminImports();
   if(adminTab==='audit')return h+adminAudit();
   return h+adminSocial();
@@ -7082,6 +7094,38 @@ function themePreview(){ try{ var root=document.documentElement; var p=val('th_p
 function themeSetPreset(i){ var p=THEME_PRESETS[i]; if(!p)return; var el=g('th_primary'),ea=g('th_accent'); if(el)el.value=p[1]; if(ea)ea.value=p[2]; themePreview(); }
 function themeSave(){ var p=val('th_primary'),a=val('th_accent'); var th={}; if(p&&p.toLowerCase()!=='#143f63')th.primary=p; if(a&&a.toLowerCase()!=='#36c5e0')th.accent=a; settings.theme=th; saveSetting('theme',th); applyTheme(); alert(lang==='ar'?'اتحفظ ✔ — اتطبّق على كل المستخدمين.':'Saved ✔ — applied for everyone.'); }
 function themeReset(){ settings.theme={}; saveSetting('theme',{}); applyTheme(); var el=g('th_primary'),ea=g('th_accent'); if(el)el.value='#143F63'; if(ea)ea.value='#36C5E0'; }
+var adminListSel='leadStages';
+function listsMeta(){ var ar=(lang==='ar'); return [
+  {key:'leadStages',def:STAGES_DEF,label:(ar?'مراحل الـ Leads':'Lead stages'),locked:STAGES_DEF.slice(),note:(ar?'القيم الأساسية مقفولة لأن الحسابات (نسبة الإغلاق/التنبيهات) بتعتمد عليها — تقدر تضيف مراحل جديدة.':'Core stages are locked (analytics depend on them) — you can add new ones.')},
+  {key:'leadSources',def:LEAD_SOURCES_DEF,label:(ar?'مصادر الـ Leads':'Lead sources'),locked:[]},
+  {key:'services',def:QSERVICES_DEF,label:(ar?'أنواع الخدمات (الكوتيشن)':'Service types (quotes)'),locked:[]},
+  {key:'projStatus',def:PSTAT_DEF,label:(ar?'حالات المشاريع':'Project statuses'),locked:['Completed','Cancelled']},
+  {key:'taskStatus',def:TSTAT_DEF,label:(ar?'حالات المهام':'Task statuses'),locked:['To Do','In Progress','Done']},
+  {key:'expCats',def:EXP_CATS_DEF,label:(ar?'تصنيفات المصاريف':'Expense categories'),locked:[]}
+]; }
+function _listMeta(k){ return listsMeta().filter(function(m){return m.key===k;})[0]; }
+function adminLists(){
+  var ar=(lang==='ar'); var metas=listsMeta();
+  var h='<div class="sect"><h2>📋 '+(ar?'القوائم المنسدلة':'Dropdown lists')+'</h2></div>';
+  h+='<div class="card mini" style="background:#eef6ff;border-color:#bcd6ee;margin-bottom:12px">'+(ar?'تحكّم في القوائم اللي بتظهر في النظام — إضافة / تعديل / حذف. القيم المقفولة 🔒 أساسية للنظام ومتتحذفش. تنبيه: لو عدّلت اسم قيمة، السجلات القديمة المسجّلة بالاسم القديم هتفضل بالاسم القديم.':'Control the dropdown lists used across the system — add / rename / remove. Locked 🔒 values are core and cannot be removed. Note: renaming a value does not change records already saved with the old name.')+'</div>';
+  h+='<div class="fld" style="max-width:340px"><label>'+(ar?'اختر القائمة':'Choose a list')+'</label><select onchange="adminListSel=this.value;render()" style="padding:9px;border:1px solid #d5deea;border-radius:9px;width:100%">'+metas.map(function(m){return '<option value="'+m.key+'"'+(m.key===adminListSel?' selected':'')+'>'+esc(m.label)+'</option>';}).join('')+'</select></div>';
+  var m=_listMeta(adminListSel)||metas[0]; var arr=LIST(m.key,m.def);
+  h+='<div class="card" style="max-width:540px;margin-top:12px">';
+  if(m.note)h+='<div class="mini" style="color:var(--muted);margin-bottom:8px">'+esc(m.note)+'</div>';
+  h+=arr.map(function(it,i){ var lk=m.locked.indexOf(it)>=0; return '<div style="display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid #eef2f6"><span style="flex:1">'+esc(it)+(lk?' <span class="tag" style="font-size:9px;background:#eef2f8;color:#5b6b7b">🔒 '+(ar?'أساسي':'core')+'</span>':'')+'</span>'
+    +'<button class="btn gh sm" onclick="listMove(\''+m.key+'\','+i+',-1)" '+(i===0?'disabled':'')+'>↑</button>'
+    +'<button class="btn gh sm" onclick="listMove(\''+m.key+'\','+i+',1)" '+(i===arr.length-1?'disabled':'')+'>↓</button>'
+    +(lk?'':'<button class="btn gh sm" onclick="listRename(\''+m.key+'\','+i+')">✏️</button> <button class="btn dn sm" onclick="listRemove(\''+m.key+'\','+i+')">✕</button>')+'</div>'; }).join('');
+  h+='<div style="display:flex;gap:6px;margin-top:12px"><input id="newListItem" placeholder="'+(ar?'قيمة جديدة…':'New value…')+'" style="flex:1;padding:9px;border:1px solid #d5deea;border-radius:9px" onkeydown="if(event.key===\'Enter\'){event.preventDefault();listAdd(\''+m.key+'\');}"><button class="btn cy" onclick="listAdd(\''+m.key+'\')">➕ '+(ar?'إضافة':'Add')+'</button></div>';
+  h+='<div style="margin-top:10px"><button class="btn gh sm" onclick="listResetDefault(\''+m.key+'\')">↺ '+(ar?'رجّع الافتراضي':'Reset to default')+'</button></div></div>';
+  return h;
+}
+function _listSave(key,arr){ settings.lists=settings.lists||{}; settings.lists[key]=arr; saveSetting('lists',settings.lists); try{rebuildLists();}catch(e){} render(); }
+function listAdd(key){ var m=_listMeta(key); if(!m)return; var el=g('newListItem'); var v=(el&&el.value||'').trim(); if(!v)return; var arr=LIST(key,m.def); if(arr.indexOf(v)>=0){ alert(lang==='ar'?'موجودة بالفعل':'Already exists'); return; } arr.push(v); _listSave(key,arr); }
+function listRemove(key,i){ var m=_listMeta(key); if(!m)return; var arr=LIST(key,m.def); var it=arr[i]; if(it==null)return; if(m.locked.indexOf(it)>=0){ alert(lang==='ar'?'القيمة دي أساسية ومتتحذفش':'This value is core and cannot be removed'); return; } if(!confirm((lang==='ar'?'تحذف «':'Remove "')+it+(lang==='ar'?'»؟ (السجلات القديمة بالاسم ده هتفضل زي ما هي)':'"? (existing records keep this value)')))return; arr.splice(i,1); _listSave(key,arr); }
+function listRename(key,i){ var m=_listMeta(key); if(!m)return; var arr=LIST(key,m.def); var it=arr[i]; if(it==null)return; if(m.locked.indexOf(it)>=0){ alert(lang==='ar'?'القيمة دي أساسية ومتتعدّلش':'This value is core and cannot be renamed'); return; } var nv=prompt(lang==='ar'?'الاسم الجديد:':'New name:',it); if(nv===null)return; nv=nv.trim(); if(!nv||nv===it)return; if(arr.indexOf(nv)>=0){ alert(lang==='ar'?'موجودة بالفعل':'Already exists'); return; } arr[i]=nv; _listSave(key,arr); }
+function listMove(key,i,dir){ var m=_listMeta(key); if(!m)return; var arr=LIST(key,m.def); var j=i+dir; if(j<0||j>=arr.length)return; var t=arr[i]; arr[i]=arr[j]; arr[j]=t; _listSave(key,arr); }
+function listResetDefault(key){ if(!confirm(lang==='ar'?'ترجّع القائمة للافتراضي؟':'Reset this list to default?'))return; settings.lists=settings.lists||{}; delete settings.lists[key]; saveSetting('lists',settings.lists); try{rebuildLists();}catch(e){} render(); }
 function adminImports(){
   var iv=settings.importVisibility||{};
   var map={};
