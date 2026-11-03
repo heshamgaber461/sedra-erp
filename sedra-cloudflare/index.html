@@ -640,6 +640,7 @@ const MODULES = [
   {id:'documents',  label:'Documents', icon:'📁', access:'all'},
   {id:'approvals',  label:'Approvals', icon:'✅', access:'all'},
   {id:'maintenance',label:'Maintenance', icon:'🛠️', depts:['Operations','Technical']},
+  {id:'devroadmap',label:'Development Roadmap', icon:'🛣️', depts:['Management']},
   {id:'automation',label:'Automation', icon:'⚡', adminOnly:true},
   {id:'admin',     label:'Admin', icon:'⚙️', adminOnly:true},
   {id:'claims',    label:'Expense Claims', icon:'🧾', access:'all'},
@@ -799,7 +800,7 @@ let sitevisits=[];
 let matreqs=[];
 let reccmts=[], wfappr=[];
 let rfis=[], dsrs=[], contacts=[];
-let announcements=[], suggestions=[], overtimes=[];
+let announcements=[], suggestions=[], overtimes=[], devideas=[];
 let taxcodes=[], transfers=[], capitals=[], creditnotes=[], debitnotes=[];
 let fxrates=[], billabletime=[];
 let openbals=[], intangibles=[], investments=[];
@@ -1416,7 +1417,7 @@ async function refreshHot(){
    this known list. 'blobs' (big files) and 'attachments'/'attachmentAccess' (own per-user
    rules) are loaded on demand, not here. New collections auto-appear once a service account
    is configured again (the shallow discovery below succeeds); until then, add them here. */
-var BULK_COLLS=['_backups','accounts','activities','adcampaigns','announcements','approvals','attendance','audit','bookings','botChats','campaigns','chats','clientaccounts','clientspace','comments','contacts','customers','employees','events','expclaims','feedbacks','goals','groups','imports','inventory','invoices','jobreqs','leads','leaves','matreqs','locchangereqs','messages','meta','mktasks','mktplans','notifications','orbit','payments','paySchedule','payslips','posts','projects','prs','pushsubs','quotes','schedules','servicereqs','sheets','siteLabor','sitevisits','staffEmails','suggestions','suppliers','tasks','tickets','todos','trash','wfappr','workorders'];
+var BULK_COLLS=['_backups','accounts','activities','adcampaigns','announcements','approvals','attendance','audit','bookings','botChats','campaigns','chats','clientaccounts','clientspace','comments','contacts','customers','devideas','employees','events','expclaims','feedbacks','goals','groups','imports','inventory','invoices','jobreqs','leads','leaves','matreqs','locchangereqs','messages','meta','mktasks','mktplans','notifications','orbit','payments','paySchedule','payslips','posts','projects','prs','pushsubs','quotes','schedules','servicereqs','sheets','siteLabor','sitevisits','staffEmails','suggestions','suppliers','tasks','tickets','todos','trash','wfappr','workorders'];
 /* HEAVY collections are EXCLUDED from the initial blocking load and loaded in the
    background right after the app opens (loadHeavy). They are large (e.g. quotes carries
    inline images, ~10 MB), so pulling them in the first load froze the browser and burned
@@ -1564,7 +1565,7 @@ function applyAll(all){
     tenders=listToArr(all.tenders); drawings=listToArr(all.drawings); toolbox=listToArr(all.toolbox);
     submittals=listToArr(all.submittals); ipcs=listToArr(all.ipcs); risks=listToArr(all.risks); permits=listToArr(all.permits); requisitions=listToArr(all.requisitions); tandc=listToArr(all.tandc); ncrs=listToArr(all.ncrs); gatepasses=listToArr(all.gatepasses); bonds=listToArr(all.bonds); calibrations=listToArr(all.calibrations); handovers=listToArr(all.handovers); retentions=listToArr(all.retentions); insurances=listToArr(all.insurances); methods=listToArr(all.methods); siteinstr=listToArr(all.siteinstr); subipcs=listToArr(all.subipcs); asbuilts=listToArr(all.asbuilts); wastelogs=listToArr(all.wastelogs); prequals=listToArr(all.prequals); drills=listToArr(all.drills); sheets=listToArr(all.sheets); worddocs=listToArr(all.worddocs); decks=listToArr(all.decks); positions=listToArr(all.positions); mktasks=listToArr(all.mktasks); mktlib=listToArr(all.mktlib); mktplans=listToArr(all.mktplans); growthexp=listToArr(all.growthexp); sitevisits=listToArr(all.sitevisits); matreqs=listToArr(all.matreqs); reccmts=listToArr(all.comments); wfappr=listToArr(all.wfappr);
     rfis=listToArr(all.rfis); dsrs=listToArr(all.dsrs); contacts=listToArr(all.contacts);
-    announcements=listToArr(all.announcements); suggestions=listToArr(all.suggestions); overtimes=listToArr(all.overtimes);
+    announcements=listToArr(all.announcements); suggestions=listToArr(all.suggestions); overtimes=listToArr(all.overtimes); devideas=listToArr(all.devideas);
     taxcodes=listToArr(all.taxcodes); transfers=listToArr(all.transfers); capitals=listToArr(all.capitals); creditnotes=listToArr(all.creditnotes); debitnotes=listToArr(all.debitnotes);
     fxrates=listToArr(all.fxrates); billabletime=listToArr(all.billabletime);
     openbals=listToArr(all.openbals); intangibles=listToArr(all.intangibles); investments=listToArr(all.investments);
@@ -1992,7 +1993,7 @@ const NAV_GROUPS=[
   {k:'hr',t:'HR & People',ic:'👔',ids:['hr','myhr','recruit','applicants','courses','attendance','overtime','leavecal','birthdays','fleet','assets','goals']},
   {k:'gov',t:'Governance & Docs',ic:'🛡️',ids:['safety','toolbox','insurance','waste','drills','workflow','hsereport','agreements','documents','esign','approvals','kbase','meetings','licenses','auditlog','exporthub']},
   {k:'workspace',t:'Workspace',ic:'🗓️',ids:['calendar','todo','workplan','sheets','worddocs','slides','weekly','chat','announcements','suggestions','training','profile']},
-  {k:'admin',t:'Admin',ic:'⚙️',ids:['automation','admin']}
+  {k:'admin',t:'Admin',ic:'⚙️',ids:['devroadmap','automation','admin']}
 ];
 function navActiveKey(){ for(var i=0;i<NAV_GROUPS.length;i++){ if(NAV_GROUPS[i].ids.indexOf(curView)>=0) return NAV_GROUPS[i].k; } return NAV_GROUPS[0].k; }
 function navOpenKey(){ try{ var v=localStorage.getItem('sedra_navopen'); return (v!=null&&v!=='')?v:navActiveKey(); }catch(e){ return navActiveKey(); } }
@@ -2573,7 +2574,7 @@ function render(keepScroll){
   if(!canSee(m)){ curView='hub'; m=MODULES.find(function(x){return x.id==='hub';})||MODULES[0]; }
   g('viewTitle').textContent=m.label;
   markNav();
-  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,clientreqs:vClientReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,trash:vTrash,findreplace:vFindReplace,quoterequests:vQuoteRequests,admin:vAdmin,profile:vProfile}[curView];
+  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,clientreqs:vClientReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,devroadmap:vDevRoadmap,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,trash:vTrash,findreplace:vFindReplace,quoterequests:vQuoteRequests,admin:vAdmin,profile:vProfile}[curView];
   g('view').innerHTML = fn?fn():'';
   if(curView==='sales' && window._afterSales)window._afterSales();
   if(curView==='chat' && window._afterChat)window._afterChat();
@@ -11547,6 +11548,266 @@ function editOvertime(id){
     selEl('Branch','ot_branch',branchOpts(),r.branch),
     ()=>{ const emp=employees.find(e=>nameEq(e.name,val('ot_emp'))); const d={employee:val('ot_emp'),email:emp?(emp.email||'').toLowerCase():'',date:val('ot_date'),hours:num(val('ot_hours')),reason:val('ot_reason'),branch:val('ot_branch')};
       if(!d.hours){alert('Hours required');return false;} if(!id){d.status='Pending';d.created=new Date().toISOString();} saveDoc('overtimes',d,id); });
+}
+/* ===================== DEVELOPMENT ROADMAP (اقتراحات تطوير النظام) =====================
+   160 built-in suggestions (20 per department) + per-item status/priority/note tracking,
+   plus user-added custom ideas. State is stored in the 'devideas' collection keyed by item id;
+   custom ideas are full records with custom:true. Base suggestions live in DEV_SEED (code). */
+var DEV_DEPTS=[['Management','الإدارة'],['Sales','المبيعات / CRM'],['Marketing','الماركتينج'],['Operations','العمليات / المشاريع'],['Technical','المكتب الفني'],['Inventory','المخزن / المشتريات'],['Accounting','الحسابات'],['HR','الموارد البشرية']];
+var DEV_STATUS=[['idea','مقترح','#5A6B7B'],['planned','مخطّط','#1aa3c4'],['doing','تحت التنفيذ','#e0a93b'],['done','اتعمل','#1a7a4f'],['skip','مؤجّل','#9aa7b2']];
+var DEV_PRIO=[['high','ضروري','#c0392b'],['med','متوسط','#e0a93b'],['low','لاحقًا','#5A6B7B']];
+var _devDept='', _devStat='';
+var DEV_SEED=[
+/* الإدارة */
+{id:'mg1',dept:'Management',tag:'⭐',t:'لوحة تحكم تنفيذية لحظية',d:'إيراد/بايبلاين/كاش/هامش ربح/استغلال الفريق للفروع الـ3 بعملة واحدة في شاشة واحدة.'},
+{id:'mg2',dept:'Management',tag:'🤖',t:'ملخص يومي الصبح للإدارة',d:'8 ص واتساب/إيميل: ليدز جديدة، صفقات مكسوبة، تحصيلات متأخرة، حضور مشكوك، موافقات معلّقة.'},
+{id:'mg3',dept:'Management',tag:'🛡',t:'هدف مقابل فعلي (ميزانية)',d:'شهري لكل فرع وقسم مع إشارة أحمر/أصفر/أخضر وتنبيه الانحراف.'},
+{id:'mg4',dept:'Management',tag:'⭐',t:'توقّع كاش 90 يوم',d:'تحصيلات متوقّعة مقابل مدفوعات/مرتبات/إيجار — تشوف فجوة الكاش قبل ما تحصل.'},
+{id:'mg5',dept:'Management',tag:'📱',t:'مركز موافقات موحّد على الموبايل',d:'كوتيشن/خصم/أمر شراء/إجازة/مصروف — موافقة أو رفض بضغطة.'},
+{id:'mg6',dept:'Management',tag:'',t:'تحليل كسب/خسارة الصفقات',d:'ليه خسرنا (سعر/توقيت/منافس) بالفرع والمندوب.'},
+{id:'mg7',dept:'Management',tag:'',t:'إنذار مبكر لربحية المشروع',d:'تنبيه لما التكلفة الفعلية تعدّي نسبة من الميزانية قبل قفل المشروع.'},
+{id:'mg8',dept:'Management',tag:'',t:'قيمة العميل مدى الحياة (CLV)',d:'وتقرير تكرار الشغل — مين العملاء اللي بيجيبوا مشاريع/صيانة متكررة.'},
+{id:'mg9',dept:'Management',tag:'🛡',t:'مراجعة صلاحيات ربع سنوية',d:'تقرير "مين يشوف ويعمل إيه" بعد توزيع الأدوار الجديد.'},
+{id:'mg10',dept:'Management',tag:'',t:'مولّد باكدج اجتماعات الإدارة',d:'تجميع الأرقام المهمة PDF شهري للشركاء/المستثمرين.'},
+{id:'mg11',dept:'Management',tag:'',t:'تخطيط سيناريوهات',d:'"لو ضفنا 2 مندوب / فتحنا فرع" موديل بسيط للتأثير.'},
+{id:'mg12',dept:'Management',tag:'🤖',t:'تصعيد أوتوماتيك',d:'أي صفقة/مشروع/تحصيل واقف أكتر من X يوم يطلع للإدارة لوحده.'},
+{id:'mg13',dept:'Management',tag:'',t:'متابعة أسعار المنافسين',d:'نسجّل كوتيشنات المنافسين اللي العملاء بيبعتوها عشان نظبط التسعير.'},
+{id:'mg14',dept:'Management',tag:'',t:'شجرة KPI للشركة',d:'كل مؤشر قسم بيتجمّع لهدف الشركة — كل حد يشوف إزاي بيساهم.'},
+{id:'mg15',dept:'Management',tag:'🛡',t:'لوحة صحة البيانات',d:'تكرار، ليدز بدون مسؤول، مشاريع بدون GPS/قيمة، كوتيشن بدون بنود.'},
+{id:'mg16',dept:'Management',tag:'🔗',t:'توقيع إلكتروني على العقود/الكوتيشن',d:'العميل يوقّع ديجيتال — إغلاق أسرع وسجل موثّق.'},
+{id:'mg17',dept:'Management',tag:'',t:'سجل القرارات',d:'القرارات الكبيرة (تسعير/توظيف/موردين) بالتاريخ والمسؤول والسبب.'},
+{id:'mg18',dept:'Management',tag:'',t:'مقارنة الفروع',d:'تكلفة الليد، نسبة الإغلاق، متوسط قيمة المشروع، الهامش — مرتّبين.'},
+{id:'mg19',dept:'Management',tag:'🤖',t:'باك أب أوتوماتيك مجدول',d:'+ تذكير شهري باختبار الاسترجاع — الأمان يبقى أوتوماتيك.'},
+{id:'mg20',dept:'Management',tag:'',t:'سجل المخاطر',d:'أهم مخاطر الشغل والمشاريع، المسؤول، خطة التعامل، تاريخ المراجعة.'},
+/* المبيعات */
+{id:'sl1',dept:'Sales',tag:'⭐🤖',t:'استقبال ليد واتساب + رد أوتوماتيك',d:'أي ليد من ميتا/جوجل/الموقع يجيله رد فوري "شكرًا هنكلمك" ويتوزّع على مندوب.'},
+{id:'sl2',dept:'Sales',tag:'🤖',t:'تطبيق الـ SLA فعليًا',d:'ليد مامتكلّمش عليه خلال X ساعة يتنقل لمندوب تاني أو ينبّه المدير.'},
+{id:'sl3',dept:'Sales',tag:'📱',t:'شاشة "النهاردة" للمندوب',d:'متابعاتي، زياراتي، كوتيشناتي المعلّقة بس — من غير زحمة.'},
+{id:'sl4',dept:'Sales',tag:'⭐',t:'قمع ليد→كوتيشن→مشروع',d:'نسبة التحويل في كل مرحلة + تحديد الاختناق.'},
+{id:'sl5',dept:'Sales',tag:'🤖',t:'سلسلة متابعة أوتوماتيك',d:'مفيش رد؟ تذكيرات مجدولة (يوم 1/3/7) برسالة مقترحة.'},
+{id:'sl6',dept:'Sales',tag:'',t:'منع الليد المكرر وقت الإدخال',d:'تحذير بالتليفون/الإيميل قبل إنشاء ليد موجود.'},
+{id:'sl7',dept:'Sales',tag:'',t:'قوالب كوتيشن لكل خدمة',d:'سمارت هوم/أمن/طاقة — المندوب يبني أسرع بالبنود والهوامش الصح.'},
+{id:'sl8',dept:'Sales',tag:'🛡',t:'موافقة على الخصم',d:'خصم فوق X% لازم موافقة المدير قبل طبع الكوتيشن.'},
+{id:'sl9',dept:'Sales',tag:'',t:'تقييم الليد (Lead scoring)',d:'ميزانية/صلاحية/حاجة/توقيت — شارة سكور للأولوية.'},
+{id:'sl10',dept:'Sales',tag:'🔗',t:'اتصال بضغطة + تسجيل المكالمة',d:'ونتيجتها على الليد.'},
+{id:'sl11',dept:'Sales',tag:'',t:'متابعة الترشيحات (Referrals)',d:'مين رشّح الليد (عميل/مهندس/مقاول) ومكافأة الأعلى.'},
+{id:'sl12',dept:'Sales',tag:'',t:'توزيع الليدز بقواعد',d:'أوتوماتيك حسب المنطقة/الفرع/اللغة.'},
+{id:'sl13',dept:'Sales',tag:'',t:'متابعة فتح الكوتيشن',d:'تعرف إمتى العميل فتح الـPDF عشان تتابع في الوقت الصح.'},
+{id:'sl14',dept:'Sales',tag:'🤖',t:'تذكير "الكوتيشن قرب ينتهي"',d:'للمندوب والعميل قبل انتهاء الصلاحية.'},
+{id:'sl15',dept:'Sales',tag:'',t:'تسجيل سبب الخسارة إجباري',d:'عند وسم الليد "خسارة" — بيغذّي تحليل الكسب/الخسارة.'},
+{id:'sl16',dept:'Sales',tag:'',t:'اقتراحات بيع إضافي (Upsell)',d:'العميل اشترى أمن؟ اقترح سمارت هوم/صيانة.'},
+{id:'sl17',dept:'Sales',tag:'',t:'عمولة المبيعات أوتوماتيك',d:'على المُحصّل مش المكسوب — شفاف لكل مندوب.'},
+{id:'sl18',dept:'Sales',tag:'',t:'بايبلاين موزون بالاحتمالية',d:'قيمة البايبلاين موزونة باحتمالية المرحلة على لوحة المندوب.'},
+{id:'sl19',dept:'Sales',tag:'🔗',t:'صندوق واتساب بيزنس مشترك',d:'مربوط بالليد — تاريخ المحادثة على السجل.'},
+{id:'sl20',dept:'Sales',tag:'',t:'بوابة العميل',d:'يشوف كوتيشناته ويوافق أونلاين ويتابع مشروعه.'},
+/* الماركتينج */
+{id:'mk1',dept:'Marketing',tag:'⭐🔗',t:'سحب مصاريف ميتا+جوجل أوتوماتيك',d:'الـROI (تكلفة الليد/الصفقة) يطلع لوحده مش يدوي.'},
+{id:'mk2',dept:'Marketing',tag:'',t:'إسناد الحملة→ليد→إيراد',d:'أي حملة جابت مشاريع مدفوعة فعلًا.'},
+{id:'mk3',dept:'Marketing',tag:'🤖',t:'تقويم محتوى بتذكيرات أوتوماتيك',d:'للمصمّم/المصوّر قبل الديدلاين.'},
+{id:'mk4',dept:'Marketing',tag:'',t:'وسم المصدر (UTM) أوتوماتيك',d:'على الموقع واللاندنج — بيانات مصدر نضيفة.'},
+{id:'mk5',dept:'Marketing',tag:'',t:'مكتبة أصول الهوية',d:'لوجوهات/صور/لقطات مشاريع/ألوان معتمدة في مكان واحد.'},
+{id:'mk6',dept:'Marketing',tag:'',t:'لوحة ROI لمصادر الليدز',d:'مرتّبة بتكلفة الليد المؤهّل.'},
+{id:'mk7',dept:'Marketing',tag:'🔗',t:'برودكاست/نشرة واتساب',d:'لعملاء مقسّمين (عروض/خدمات جديدة) مع إلغاء الاشتراك.'},
+{id:'mk8',dept:'Marketing',tag:'',t:'اختبار A/B للاندنج/الفورم',d:'أنهي فورم بيحوّل أحسن.'},
+{id:'mk9',dept:'Marketing',tag:'',t:'متابعة التقييمات والسمعة',d:'جوجل/فيسبوك + طلب تقييم أوتوماتيك بعد التسليم.'},
+{id:'mk10',dept:'Marketing',tag:'',t:'مراقبة إعلانات المنافسين',d:'سجل بإيه اللي المنافسين بيشغّلوه.'},
+{id:'mk11',dept:'Marketing',tag:'',t:'مولّد عرض المشاريع (case study)',d:'نحوّل مشروع خالص لبوست بورتفوليو before/after.'},
+{id:'mk12',dept:'Marketing',tag:'🤖',t:'تقرير أداء ماركتينج شهري',d:'أوتوماتيك: مصاريف/ليدز/CPL/تحويلات.'},
+{id:'mk13',dept:'Marketing',tag:'',t:'متابعة أداء المحتوى',d:'أنهي بوست/مقال جاب ليدز للموقع.'},
+{id:'mk14',dept:'Marketing',tag:'',t:'متابعة صرف الميزانية',d:'تنبيه لما حملة بتتخطى المخطّط.'},
+{id:'mk15',dept:'Marketing',tag:'',t:'بانِي شرائح جمهور',d:'مدينة/اهتمام/قيمة مشروع — للحملات الموجّهة.'},
+{id:'mk16',dept:'Marketing',tag:'',t:'برنامج شراكة المهندسين',d:'متابعة التعاون مع المصممين/الـinfluencers.'},
+{id:'mk17',dept:'Marketing',tag:'',t:'متابعة السيو والترتيب',d:'كلمات مفتاحية وترتيب مربوطين بالموقع.'},
+{id:'mk18',dept:'Marketing',tag:'',t:'التقاط ليدز المعارض',d:'فورم موبايل سريع للبوث → CRM على طول.'},
+{id:'mk19',dept:'Marketing',tag:'',t:'تشك ليست اتساق الهوية',d:'لكل المواد الخارجة.'},
+{id:'mk20',dept:'Marketing',tag:'🤖',t:'تسلسلات رعاية (nurture)',d:'إيميل/واتساب للليدز الباردة — نفضل في بالهم.'},
+/* العمليات */
+{id:'op1',dept:'Operations',tag:'⭐',t:'Gantt/تايم لاين لكل مشروع',d:'بالاعتماديات والمسار الحرج.'},
+{id:'op2',dept:'Operations',tag:'🤖',t:'تذكير بالمعالم والديدلاينات',d:'لصاحب المشروع والليدرز قبل التأخير مش بعده.'},
+{id:'op3',dept:'Operations',tag:'📱',t:'تطبيق الفيلد للفني',d:'يشوف مشاريعه بس + تشك ليست + حضور + طلب خامات.'},
+{id:'op4',dept:'Operations',tag:'⭐',t:'طلب خامات → أمر شراء أوتوماتيك',d:'يفحص مخزن المشروع والمخزن، ولو ناقص يعمل أمر شراء مسوّدة للمورد.'},
+{id:'op5',dept:'Operations',tag:'',t:'تقرير موقع يومي (DSR)',d:'بالصور يتجمّع تلقائي لتحديث أسبوعي للعميل.'},
+{id:'op6',dept:'Operations',tag:'',t:'جدولة العمالة',d:'مين في أي موقع أي يوم — نمنع الحجز المزدوج.'},
+{id:'op7',dept:'Operations',tag:'🛡',t:'قايمة ملاحظات (Snags)',d:'لكل مشروع بصورة ومسؤول وحالة وتوقيع العميل عند القفل.'},
+{id:'op8',dept:'Operations',tag:'',t:'مولّد باكدج التسليم',d:'as-built/ضمانات/أدلة PDF واحد للعميل.'},
+{id:'op9',dept:'Operations',tag:'🤖',t:'نسبة التقدّم أوتوماتيك',d:'تتحسب من بنود التشك ليست/المعالم المكتملة.'},
+{id:'op10',dept:'Operations',tag:'',t:'متابعة المعدات/العِدَد',d:'أي عُدّة في أي موقع ومع مين.'},
+{id:'op11',dept:'Operations',tag:'',t:'أوامر التغيير (Variations)',d:'تغيير النطاق→سعر→موافقة العميل→يضاف لقيمة المشروع.'},
+{id:'op12',dept:'Operations',tag:'',t:'تخطيط مسار الزيارات',d:'تجميع المواقع القريبة ليوم الفني.'},
+{id:'op13',dept:'Operations',tag:'',t:'ساعات العمالة مقابل الميزانية',d:'لكل مشروع (من حضور الموقع) مع تنبيه التجاوز.'},
+{id:'op14',dept:'Operations',tag:'🤖',t:'إنشاء مشروع من كوتيشن مكسوب',d:'بنود→تشك ليست + تكليف — بضغطة.'},
+{id:'op15',dept:'Operations',tag:'',t:'إدارة مقاولي الباطن',d:'تكليف/متابعة/تقييم/دفع لكل مشروع.'},
+{id:'op16',dept:'Operations',tag:'',t:'تشك ليست سلامة (QHSE)',d:'لكل زيارة موقع — سجل التزام.'},
+{id:'op17',dept:'Operations',tag:'📱',t:'وضع أوفلاين لتطبيق الفيلد',d:'مواقع بدون شبكة، يزامن لما يرجع النت.'},
+{id:'op18',dept:'Operations',tag:'',t:'بوابات موافقة العميل بين المراحل',d:'العميل يأكّد المرحلة قبل اللي بعدها.'},
+{id:'op19',dept:'Operations',tag:'',t:'جدولة ضمان/صيانة دورية',d:'أوتوماتيك بعد التسليم.'},
+{id:'op20',dept:'Operations',tag:'',t:'التحكم في مستندات المشروع',d:'رسومات/نسخ بتاريخ نسخة وعلامة "آخر معتمد".'},
+/* المكتب الفني */
+{id:'tc1',dept:'Technical',tag:'⭐',t:'كتالوج منتجات/أسعار',d:'بالتكلفة والهامش وسعر المورد الحالي — الكوتيشن يستخدم تكلفة لايف.'},
+{id:'tc2',dept:'Technical',tag:'',t:'قوالب BOQ لكل نظام',d:'KNX فيلا/CCTV/كابلات — تسريع الكوتيشن الفني.'},
+{id:'tc3',dept:'Technical',tag:'🔗',t:'إدراج داتاشيت/صور المنتجات',d:'في الكوتيشن أوتوماتيك — عروض احترافية.'},
+{id:'tc4',dept:'Technical',tag:'',t:'التحكم في نسخ الكوتيشن',d:'مقارنة v1 مقابل v2.'},
+{id:'tc5',dept:'Technical',tag:'🤖',t:'ورك فلو RFQ',d:'المبيعات تطلب→المكتب الفني يستلم بمؤقّت SLA→يسلّم كوتيشن جاهز.'},
+{id:'tc6',dept:'Technical',tag:'',t:'مكتبة تصميمات',d:'تصميمات/رسومات قابلة لإعادة الاستخدام لكل نوع مشروع.'},
+{id:'tc7',dept:'Technical',tag:'',t:'حارس الهامش',d:'تحذير لو بند اتسعّر تحت التكلفة أو تحت الهامش المستهدف.'},
+{id:'tc8',dept:'Technical',tag:'',t:'بنود بديلة/اختيارية',d:'باكدجات good/better/best للعميل.'},
+{id:'tc9',dept:'Technical',tag:'',t:'جداول الأحمال/الكابلات/النقاط',d:'تتولّد أوتوماتيك من الـBOQ.'},
+{id:'tc10',dept:'Technical',tag:'',t:'استيراد قوائم أسعار الموردين',d:'+ تحديث تكلفة الكتالوج أوتوماتيك.'},
+{id:'tc11',dept:'Technical',tag:'',t:'مطابقة BOM',d:'المقترح مقابل المركّب فعلًا — للربحية.'},
+{id:'tc12',dept:'Technical',tag:'',t:'موافقة فنية قبل الإرسال',d:'مراجعة جودة النطاق/السعر قبل إرسال الكوتيشن.'},
+{id:'tc13',dept:'Technical',tag:'',t:'مكتبة شروط واستثناءات قياسية',d:'لكل خدمة — كوتيشنات متسقة وصح.'},
+{id:'tc14',dept:'Technical',tag:'🔗',t:'تصدير BOQ لإكسل/PDF',d:'بالشكل اللي العميل عايزه.'},
+{id:'tc15',dept:'Technical',tag:'',t:'علامات تقادم المنتجات',d:'المنتج المتوقّف مايتعرضش في الكوتيشن.'},
+{id:'tc16',dept:'Technical',tag:'',t:'أساس تكلفة متعدد العملات',d:'استيراد بالدولار/يورو، كوتيشن بالجنيه/درهم/ريال بسعر لحظي.'},
+{id:'tc17',dept:'Technical',tag:'',t:'تتبّع وقت الهندسة لكل كوتيشن',d:'التصميم بياخد قد إيه فعلًا — مدخل للتسعير.'},
+{id:'tc18',dept:'Technical',tag:'',t:'بلوكات "نطاق العمل"',d:'قابلة لإعادة الاستخدام لتجميع الكوتيشن أسرع.'},
+{id:'tc19',dept:'Technical',tag:'',t:'حلقة feedback بعد المشروع',d:'ملاحظات التركيب الفعلي تحسّن BOQ المستقبل.'},
+{id:'tc20',dept:'Technical',tag:'',t:'قاعدة معرفة فنية',d:'FAQ/حلول للفريق وللشات بوت.'},
+/* المخزن */
+{id:'iv1',dept:'Inventory',tag:'⭐🛡',t:'مخزون لحظي لكل فرع ومخزن مشروع',d:'مع تنبيه إعادة الطلب عند النقص.'},
+{id:'iv2',dept:'Inventory',tag:'🤖',t:'اقتراح إعادة طلب',d:'لما المخزون يوصل الحد الأدنى — مسوّدة أمر شراء للمورد المعتاد.'},
+{id:'iv3',dept:'Inventory',tag:'',t:'باركود/QR للأصناف',d:'للإدخال والصرف السريع (موبايل).'},
+{id:'iv4',dept:'Inventory',tag:'',t:'تتبّع السيريال/الضمان لكل وحدة',d:'مهم للإلكترونيات — أنهي سيريال راح لأنهي عميل.'},
+{id:'iv5',dept:'Inventory',tag:'',t:'إذن استلام بضاعة (GRN)',d:'بصورة ومعالجة التسليم الجزئي.'},
+{id:'iv6',dept:'Inventory',tag:'',t:'مقارنة أسعار الموردين لكل صنف',d:'مين الأرخص دلوقتي قبل إصدار أمر الشراء.'},
+{id:'iv7',dept:'Inventory',tag:'',t:'تقييم المخزون + الراكد',d:'FIFO/متوسط + تقرير الأصناف اللي مامتحرّكتش من X شهر.'},
+{id:'iv8',dept:'Inventory',tag:'',t:'تحويلات بين المخازن',d:'مخزن المشروع/الرئيسي بموافقة وتتبّع.'},
+{id:'iv9',dept:'Inventory',tag:'🤖',t:'مطابقة ثلاثية (3-way match)',d:'PO→GRN→فاتورة المورد→الدفع لكشف الزيادة في الفوترة.'},
+{id:'iv10',dept:'Inventory',tag:'',t:'مخزون محجوز',d:'تخصيص أصناف لمشروع عشان ماتتحجزش مرتين.'},
+{id:'iv11',dept:'Inventory',tag:'',t:'بطاقة تقييم أداء الموردين',d:'التسليم في الميعاد/السعر/الجودة/المرتجع.'},
+{id:'iv12',dept:'Inventory',tag:'',t:'حد أدنى/أقصى لكل صنف لكل فرع',d:'مش مقاس واحد للكل.'},
+{id:'iv13',dept:'Inventory',tag:'',t:'تتبّع الدفعات (Batch/Lot)',d:'للأصناف اللي محتاجة كده.'},
+{id:'iv14',dept:'Inventory',tag:'',t:'مرتجع للمورد (RMA)',d:'ورك فلو للأصناف المعيبة.'},
+{id:'iv15',dept:'Inventory',tag:'🔗',t:'استيراد كتالوجات الموردين',d:'قوائم أسعار بالجملة.'},
+{id:'iv16',dept:'Inventory',tag:'',t:'وضع الجرد/العدّ الدوري',d:'بتقرير الفروقات.'},
+{id:'iv17',dept:'Inventory',tag:'',t:'حساب التكلفة الواصلة',d:'جمرك/شحن ضمن تكلفة الصنف.'},
+{id:'iv18',dept:'Inventory',tag:'',t:'فصل المستهلكات عن الأصول',d:'العُدّة أصل، الكابل مستهلك.'},
+{id:'iv19',dept:'Inventory',tag:'',t:'خصم مخزن المشروع أوتوماتيك',d:'عند صرف الخامات — ربط باستهلاك الموقع.'},
+{id:'iv20',dept:'Inventory',tag:'',t:'بحث مخزون للفيلد',d:'"عندنا الصنف ده قبل ما أوعد العميل؟".'},
+/* الحسابات */
+{id:'ac1',dept:'Accounting',tag:'⭐🔗',t:'ربط بالبرنامج المحاسبي + ETA',d:'فاتورة إلكترونية (مصر) — نلغي الإدخال المزدوج.'},
+{id:'ac2',dept:'Accounting',tag:'🛡',t:'أعمار الديون + تذكير دفع أوتوماتيك',d:'مين عليه كام ومتأخر قد إيه + تذكير للعملاء واتساب/إيميل.'},
+{id:'ac3',dept:'Accounting',tag:'',t:'جدول دفعات لكل مشروع',d:'مقدّم/عند التسليم/محتجز بتذكير بالاستحقاق.'},
+{id:'ac4',dept:'Accounting',tag:'',t:'قائمة التدفق النقدي + التوقّع',d:'داخل مقابل خارج لكل فرع.'},
+{id:'ac5',dept:'Accounting',tag:'',t:'دفاتر متعددة العملات',d:'مع فرق العملة (مصر/الإمارات/السعودية).'},
+{id:'ac6',dept:'Accounting',tag:'🤖',t:'فواتير متكررة',d:'للصيانة/الاشتراكات — تتولّد شهري/سنوي.'},
+{id:'ac7',dept:'Accounting',tag:'',t:'موافقة المصروفات + العُهدة',d:'ورك فلو + تسوية العُهدة لكل فرع.'},
+{id:'ac8',dept:'Accounting',tag:'',t:'تسوية البنك',d:'مطابقة كشف البنك بالمدفوعات المسجّلة.'},
+{id:'ac9',dept:'Accounting',tag:'',t:'قائمة الدخل والميزانية',d:'لكل فرع ومجمّعة.'},
+{id:'ac10',dept:'Accounting',tag:'',t:'متابعة المحتجزات',d:'فلوس متحجّزة على المشاريع، تتحرّر عند التسليم.'},
+{id:'ac11',dept:'Accounting',tag:'🛡',t:'تقرير ضريبة لكل فرع',d:'مصر 14%/الإمارات 5%/السعودية 15% جاهز للتقديم.'},
+{id:'ac12',dept:'Accounting',tag:'',t:'أعمار مستحقات الموردين (AP)',d:'+ تخطيط دُفعات الدفع.'},
+{id:'ac13',dept:'Accounting',tag:'',t:'شاشة مالية واحدة للمشروع',d:'التكلفة مقابل المحصّل مقابل المتبقّي.'},
+{id:'ac14',dept:'Accounting',tag:'',t:'حد ائتمان لكل عميل',d:'+ تنبيه قبل تجاوزه.'},
+{id:'ac15',dept:'Accounting',tag:'',t:'حساب صرف العمولة',d:'مربوط بالتحصيل (ربط بالمبيعات).'},
+{id:'ac16',dept:'Accounting',tag:'',t:'ميزانية مقابل فعلي',d:'لكل مركز تكلفة/قسم.'},
+{id:'ac17',dept:'Accounting',tag:'🔗',t:'لينك دفع أونلاين على الفاتورة',d:'العميل يدفع بكارت/محفظة.'},
+{id:'ac18',dept:'Accounting',tag:'',t:'سجل الأصول الثابتة',d:'+ جدول الإهلاك.'},
+{id:'ac19',dept:'Accounting',tag:'',t:'مسار مستندات جاهز للتدقيق',d:'فاتورة→PO→GRN→دفع مربوطين.'},
+{id:'ac20',dept:'Accounting',tag:'',t:'تشك ليست الإقفال الشهري',d:'عشان مايفوتش حاجة.'},
+/* الموارد البشرية */
+{id:'hr1',dept:'HR',tag:'⭐📱',t:'حضور → ساعات المرتب أوتوماتيك',d:'حضور المكتب والموقع (geofence) شغّال → حضور شهري → ساعات المرتب.'},
+{id:'hr2',dept:'HR',tag:'🤖',t:'إدارة الإجازات',d:'طلب→موافقة→الرصيد يتحدّث لوحده + تقويم — نقلّل لفّ الواتساب.'},
+{id:'hr3',dept:'HR',tag:'',t:'تشغيل المرتبات',d:'راتب+بدلات+خصومات+أوفر تايم، قسيمة PDF لكل موظف.'},
+{id:'hr4',dept:'HR',tag:'🛡',t:'تنبيه انتهاء المستندات',d:'بطاقة/عقد/إقامة/رخصة/تأمين قبل ما تنتهي.'},
+{id:'hr5',dept:'HR',tag:'',t:'تعيين وإنهاء خدمة',d:'تشك ليست الجديد (حسابات/عُدد) + إنهاء الخدمة (سحب صلاحيات/تسليم أصول).'},
+{id:'hr6',dept:'HR',tag:'',t:'الهيكل التنظيمي',d:'مين بيرفع لمين — خصوصًا بعد هيكلة الأدوار الجديدة.'},
+{id:'hr7',dept:'HR',tag:'',t:'تقييمات الأداء/KPI',d:'لكل موظف باعتماد المدير.'},
+{id:'hr8',dept:'HR',tag:'',t:'متابعة التدريب والشهادات',d:'KNX/سلامة + تذكير التجديد.'},
+{id:'hr9',dept:'HR',tag:'',t:'جدولة الورديات (Roster)',d:'لفرق الفيلد.'},
+{id:'hr10',dept:'HR',tag:'',t:'تسجيل الأوفر تايم',d:'من ساعات الموقع + الموافقة.'},
+{id:'hr11',dept:'HR',tag:'',t:'خدمة ذاتية للموظف',d:'قسيمة/رصيد إجازات/مستندات/طلب خطابات.'},
+{id:'hr12',dept:'HR',tag:'',t:'بايبلاين التوظيف + التدريب',d:'المتقدّمين موجودين → نضيف جدولة المقابلات والحالة.'},
+{id:'hr13',dept:'HR',tag:'',t:'متابعة فترة الاختبار',d:'بتنبيه تاريخ الانتهاء + خطوة المراجعة.'},
+{id:'hr14',dept:'HR',tag:'',t:'تقرير عدد الموظفين والتكلفة',d:'لكل قسم.'},
+{id:'hr15',dept:'HR',tag:'',t:'أعياد الميلاد/سنوات الخدمة',d:'+ تقدير بسيط.'},
+{id:'hr16',dept:'HR',tag:'',t:'سجل الإنذارات/الجزاءات',d:'موثّق وسري.'},
+{id:'hr17',dept:'HR',tag:'',t:'متابعة السُلف والقروض',d:'بجدول سداد (ربط بالمرتب).'},
+{id:'hr18',dept:'HR',tag:'',t:'لوحة استثناءات الحضور',d:'تأخير/غياب/حضور مشكوك لمراجعة HR.'},
+{id:'hr19',dept:'HR',tag:'',t:'مكتبة السياسات + الإقرار',d:'الموظف يأكّد إنه قرأها.'},
+{id:'hr20',dept:'HR',tag:'',t:'مقابلات الخروج',d:'+ تحليل دوران الموظفين.'}
+];
+function devStateOf(id){ for(var i=0;i<devideas.length;i++){ if(devideas[i].id===id) return devideas[i]; } return {}; }
+function devItems(){
+  var out=DEV_SEED.map(function(s){ var st=devStateOf(s.id); return {id:s.id,dept:s.dept,t:s.t,d:s.d,tag:s.tag||'',custom:false,status:st.status||'idea',prio:st.prio||'med',note:st.note||''}; });
+  devideas.forEach(function(r){ if(r&&r.custom){ out.push({id:r.id,dept:r.dept,t:r.t,d:r.d,tag:r.tag||'',custom:true,status:r.status||'idea',prio:r.prio||'med',note:r.note||'',by:r.by}); } });
+  return out;
+}
+function devSet(id,patch){ var r=devStateOf(id); if(r&&r.id){ for(var k in patch)r[k]=patch[k]; } else { r={id:id}; for(var k2 in patch)r[k2]=patch[k2]; devideas.push(r); } apiMerge('devideas',id,patch).then(synced).catch(function(e){ alert('Save error: '+(e.message||e)); }); render(); }
+function devPick(d){ _devDept=d; _devStat=''; render(); }
+function devBack(){ _devDept=''; render(); }
+function devFilterStat(s){ _devStat=s; render(); }
+function devNote(id){ var it=null,a=devItems(); for(var i=0;i<a.length;i++){ if(a[i].id===id){it=a[i];break;} } openModal('ملاحظة داخلية', fTa('ملاحظة','dv_note',(it&&it.note)||''), function(){ devSet(id,{note:val('dv_note')}); }); }
+function devAddCustom(){
+  var deptSel='<div class="fld"><label>القسم</label><select id="dv_dept">'+DEV_DEPTS.map(function(d){return '<option value="'+d[0]+'">'+d[1]+'</option>';}).join('')+'</select></div>';
+  var tagSel='<div class="fld"><label>النوع</label><select id="dv_tag"><option value="">—</option><option value="⭐">⭐ أولوية عالية</option><option value="🤖">🤖 أتمتة</option><option value="🔗">🔗 ربط</option><option value="📱">📱 موبايل</option><option value="🛡">🛡 بيانات/تحكم</option></select></div>';
+  openModal('اقتراح تطوير جديد',
+    deptSel+fEl('العنوان','dv_t','')+fTa('الوصف','dv_d','')+tagSel,
+    function(){ var t=val('dv_t'); if(!t){alert('العنوان مطلوب');return false;} var d={custom:true,dept:val('dv_dept'),t:t,d:val('dv_d'),tag:val('dv_tag'),status:'idea',prio:'med',by:(me&&me.name)||'',created:new Date().toISOString()}; apiAdd('devideas',d).then(function(nid){ d.id=nid; devideas.push(d); logAudit('create','devideas',nid,t); if(d.dept)_devDept=d.dept; synced(); }); });
+}
+function devDelCustom(id){ delDoc('devideas',id); }
+function vDevRoadmap(){
+  if(!me) return '';
+  var can=isAdmin()||(me.dept==='Management');
+  var items=devItems();
+  var statMap={}; DEV_STATUS.forEach(function(s){statMap[s[0]]=s;});
+  var prioMap={}; DEV_PRIO.forEach(function(p){prioMap[p[0]]=p;});
+  var total=items.length;
+  var done=items.filter(function(x){return x.status==='done';}).length;
+  var doing=items.filter(function(x){return x.status==='doing';}).length;
+  var planned=items.filter(function(x){return x.status==='planned';}).length;
+  var pct=total?Math.round(done/total*100):0;
+  var h='<div class="sect"><h2>🛣️ خريطة التطوير — اقتراحات النظام</h2><div class="sp"></div>'+(can?'<button class="btn cy" onclick="devAddCustom()">+ اقتراح جديد</button>':'')+'</div>';
+  h+='<div class="card mini" style="margin-bottom:10px">'+total+' اقتراح لتطوير النظام متقسّمين على '+DEV_DEPTS.length+' أقسام. غيّر حالة أي اقتراح وأولويته وضيف ملاحظة، أو ضيف اقتراحاتك. ⭐ أولوية عالية · 🤖 أتمتة · 🔗 ربط · 📱 موبايل · 🛡 بيانات/تحكم.</div>';
+  h+='<div class="grid kpis"><div class="card kpi"><div class="n">'+total+'</div><div class="l">إجمالي الاقتراحات</div></div>'+
+     '<div class="card kpi"><div class="n" style="color:#1a7a4f">'+done+'</div><div class="l">اتعمل</div></div>'+
+     '<div class="card kpi"><div class="n" style="color:#e0a93b">'+doing+'</div><div class="l">تحت التنفيذ</div></div>'+
+     '<div class="card kpi"><div class="n" style="color:#1aa3c4">'+planned+'</div><div class="l">مخطّط</div></div>'+
+     '<div class="card kpi"><div class="n">'+pct+'%</div><div class="l">نسبة الإنجاز</div></div></div>';
+  if(!_devDept){
+    h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-top:10px">';
+    DEV_DEPTS.forEach(function(d){
+      var di=items.filter(function(x){return x.dept===d[0];});
+      var dd=di.filter(function(x){return x.status==='done';}).length;
+      var dp=di.length?Math.round(dd/di.length*100):0;
+      h+='<div class="card" style="cursor:pointer" onclick="devPick(\''+d[0]+'\')"><div style="display:flex;justify-content:space-between;align-items:center"><b>'+d[1]+'</b><span class="mini">'+di.length+' اقتراح</span></div>'+
+         '<div style="height:8px;background:var(--mist);border-radius:6px;margin-top:8px;overflow:hidden"><div style="height:100%;width:'+dp+'%;background:var(--cyan)"></div></div>'+
+         '<div class="mini" style="margin-top:6px">'+dd+' اتعمل · '+dp+'%</div></div>';
+    });
+    h+='</div>';
+    return h;
+  }
+  var drow=DEV_DEPTS.filter(function(d){return d[0]===_devDept;})[0];
+  var dname=drow?drow[1]:_devDept;
+  h+='<div class="sect" style="margin-top:6px;align-items:center"><button class="btn gh sm" onclick="devBack()">← كل الأقسام</button><div class="sp"></div><h3 style="margin:0">'+dname+'</h3></div>';
+  h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0">';
+  h+='<button class="btn '+(_devStat===''?'cy':'gh')+' sm" onclick="devFilterStat(\'\')">الكل</button>';
+  DEV_STATUS.forEach(function(s){ h+='<button class="btn '+(_devStat===s[0]?'cy':'gh')+' sm" onclick="devFilterStat(\''+s[0]+'\')">'+s[1]+'</button>'; });
+  h+='</div>';
+  var list=items.filter(function(x){return x.dept===_devDept && (!_devStat||x.status===_devStat);});
+  if(!list.length) return h+'<div class="card empty">مفيش اقتراحات في الفلتر ده.</div>';
+  h+=list.map(function(it){
+    var srow=statMap[it.status]||['','','#5A6B7B']; var sc=srow[2];
+    var prow=prioMap[it.prio]||['','',''];
+    var out='<div class="card" style="margin-bottom:8px;border-left:4px solid '+sc+'">';
+    out+='<div><b>'+(it.tag?it.tag+' ':'')+esc(it.t)+'</b>'+(it.custom?' <span class="mini">(مضاف)</span>':'')+' <span class="tag" style="background:'+prow[2]+'22;color:'+prow[2]+'">'+prow[1]+'</span>';
+    out+='<div class="mini" style="margin-top:3px">'+esc(it.d||'')+'</div>';
+    if(it.note) out+='<div class="mini" style="margin-top:3px;color:var(--cyan)">📝 '+esc(it.note)+'</div>';
+    out+='</div>';
+    if(can){
+      out+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center">';
+      out+='<select onchange="devSet(\''+it.id+'\',{status:this.value})" style="padding:5px 7px;border:1px solid var(--mist);border-radius:6px;background:#fff">'+DEV_STATUS.map(function(s){return '<option value="'+s[0]+'" '+(it.status===s[0]?'selected':'')+'>'+s[1]+'</option>';}).join('')+'</select>';
+      out+='<select onchange="devSet(\''+it.id+'\',{prio:this.value})" style="padding:5px 7px;border:1px solid var(--mist);border-radius:6px;background:#fff">'+DEV_PRIO.map(function(p){return '<option value="'+p[0]+'" '+(it.prio===p[0]?'selected':'')+'>أولوية: '+p[1]+'</option>';}).join('')+'</select>';
+      out+='<button class="btn gh sm" onclick="devNote(\''+it.id+'\')">📝 ملاحظة</button>';
+      if(it.custom) out+='<button class="btn dn sm" onclick="devDelCustom(\''+it.id+'\')">✕ حذف</button>';
+      out+='</div>';
+    } else {
+      out+='<div class="mini" style="margin-top:6px"><span class="tag" style="background:'+sc+'22;color:'+sc+'">'+srow[1]+'</span></div>';
+    }
+    out+='</div>';
+    return out;
+  }).join('');
+  return h;
 }
 /* ===================== MANAGER-PARITY: TAX CODES · TRANSFERS · CAPITAL · CREDIT/DEBIT NOTES ===================== */
 function acctSel(idAttr,label,sel,filterType){ const list=accounts.slice().filter(a=>!filterType||a.type===filterType).sort((a,b)=>(a.code||'').localeCompare(b.code||'')); return `<div class="fld"><label>${label}</label><select id="${idAttr}"><option value="">— account —</option>${list.map(a=>`<option value="${esc(a.code)}" ${a.code===sel?'selected':''}>${esc(a.code)} ${esc(a.name)}</option>`).join('')}</select></div>`; }
