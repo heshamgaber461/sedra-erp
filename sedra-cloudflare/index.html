@@ -585,7 +585,7 @@ function isExec(){ return !!(me && roleRank(me.role)>=ROLE_RANK['Director']); }
 /* Who may CREATE a quotation. From the Sales team only a Team Leader or Manager (and above)
    can; regular sales members cannot. Super Admin, Management and other departments (e.g. the
    Technical office that prepares quotes) are unaffected. */
-function canCreateQuote(){ if(!me) return false; if(isAdmin()||me.dept==='Management') return true; if(me.dept==='Sales') return roleRank(me.role)>=ROLE_RANK['Team Leader']; return true; }
+function canCreateQuote(){ if(!me) return false; if(isAdmin()||me.dept==='Management') return true; /* owner / management */ if(me.dept==='Technical') return true; /* technical office prepares quotes */ if(me.dept==='Sales') return roleRank(me.role)>=ROLE_RANK['Team Leader']; /* Sales: Team Leader & up only */ return false; /* every other dept/role cannot create a quotation */ }
 /* Who may SEND A REQUEST to the Technical Office (an RFQ). All sales staff can request even
    if they can't build a quote themselves; anyone who can create can obviously request too. */
 function canRequestQuote(){ if(!me) return false; if(canCreateQuote()) return true; if(me.dept==='Sales') return true; return (me.accessModules||[]).indexOf('quotes')>=0; }
@@ -1575,7 +1575,11 @@ function applyAll(all){
     courses=listToArr(all.courses);
     stockcounts=listToArr(all.stockcounts);
     settings=Object.assign({loc:{},social:{}},(all.meta&&all.meta.settings)||{});
+    try{ applyTheme(); }catch(_t){}
 }
+/* ===== Theme / Appearance (Super Admin can recolor the whole system) ===== */
+function _darkHex(hex,amt){ try{ hex=String(hex||'').replace('#',''); if(hex.length===3)hex=hex.split('').map(function(c){return c+c;}).join(''); var n=parseInt(hex,16); if(isNaN(n))return '#'+hex; var r=Math.max(0,((n>>16)&255)-amt),g=Math.max(0,((n>>8)&255)-amt),b=Math.max(0,(n&255)-amt); return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1); }catch(e){ return '#143F63'; } }
+function applyTheme(){ try{ var t=(typeof settings!=='undefined'&&settings&&settings.theme)||{}; var root=document.documentElement; if(t.primary){ root.style.setProperty('--navy',t.primary); root.style.setProperty('--navy-d',_darkHex(t.primary,24)); root.style.setProperty('--z-accent',t.primary); } else { root.style.removeProperty('--navy'); root.style.removeProperty('--navy-d'); root.style.removeProperty('--z-accent'); } if(t.accent){ root.style.setProperty('--cyan',t.accent); } else { root.style.removeProperty('--cyan'); } }catch(e){} }
 function afterData(){
   if(!appReady){ resolveMe(); return; }
   try{ checkChatNotifications(); updateBadges(); }catch(e){}
@@ -7020,12 +7024,14 @@ function vAdmin(){
     <button class="${adminTab==='social'?'active':''}" onclick="adminTab='social';render()">Social links</button>
     <button class="${adminTab==='data'?'active':''}" onclick="adminTab='data';render()">Import &amp; Backup</button>
     <button class="${adminTab==='sections'?'active':''}" onclick="adminTab='sections';render()">🧩 Sections</button>
+    <button class="${adminTab==='theme'?'active':''}" onclick="adminTab='theme';render()">🎨 Appearance</button>
     <button class="${adminTab==='imports'?'active':''}" onclick="adminTab='imports';render()">📥 Imports</button>
     <button class="${adminTab==='audit'?'active':''}" onclick="adminTab='audit';render()">Activity log</button></div>`;
   if(adminTab==='users')return h+adminUsers();
   if(adminTab==='loc')return h+adminLoc();
   if(adminTab==='data')return h+adminData();
   if(adminTab==='sections')return h+adminSections();
+  if(adminTab==='theme')return h+adminTheme();
   if(adminTab==='imports')return h+adminImports();
   if(adminTab==='audit')return h+adminAudit();
   return h+adminSocial();
@@ -7057,6 +7063,25 @@ function adminSections(){
 }
 function secFilter(q){ q=(q||'').toLowerCase().trim(); var els=document.querySelectorAll('.secrow'); for(var i=0;i<els.length;i++){ var el=els[i]; el.style.display=(!q||(el.getAttribute('data-lbl')||'').indexOf(q)>=0)?'':'none'; } }
 function toggleSection(id){ if(id==='admin')return; var hm=Object.assign({},settings.hiddenModules||{}); if(hm[id])delete hm[id]; else hm[id]=true; settings.hiddenModules=hm; saveSetting('hiddenModules',hm); if(typeof buildNav==='function'){try{buildNav();}catch(e){}} render(); }
+var THEME_PRESETS=[['Sedra (default)','#143F63','#36C5E0'],['Emerald','#0f6b4f','#3fd0a0'],['Royal purple','#4b2e83','#b388ff'],['Graphite','#2b3d4f','#4db8e8'],['Crimson','#8a1f2b','#ff6b6b'],['Teal','#0d5c63','#2fd0c8'],['Amber','#8a5a00','#f5b43b']];
+function adminTheme(){
+  var t=(settings&&settings.theme)||{}; var ar=(lang==='ar');
+  var curP=t.primary||'#143F63', curA=t.accent||'#36C5E0';
+  var h='<div class="sect"><h2>🎨 '+(ar?'مظهر النظام':'System appearance')+'</h2></div>';
+  h+='<div class="card mini" style="background:#eef6ff;border-color:#bcd6ee;margin-bottom:12px">'+(ar?'غيّر ألوان النظام — بيتطبّق على الكل فورًا. (الوضع الليلي 🌙 موجود في الشريط العلوي.)':'Change the system colors — applies to everyone instantly. (Dark mode 🌙 is in the top bar.)')+'</div>';
+  h+='<div class="card" style="max-width:540px"><div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end">';
+  h+='<div class="fld" style="flex:1;min-width:150px"><label>'+(ar?'اللون الأساسي':'Primary color')+'</label><input type="color" id="th_primary" value="'+esc(curP)+'" oninput="themePreview()" style="width:100%;height:46px;padding:2px;border:1px solid #d5deea;border-radius:9px;cursor:pointer"></div>';
+  h+='<div class="fld" style="flex:1;min-width:150px"><label>'+(ar?'لون التمييز (Accent)':'Accent color')+'</label><input type="color" id="th_accent" value="'+esc(curA)+'" oninput="themePreview()" style="width:100%;height:46px;padding:2px;border:1px solid #d5deea;border-radius:9px;cursor:pointer"></div></div>';
+  h+='<div style="margin:14px 0 6px;font-size:12px;color:var(--muted)">'+(ar?'قوالب جاهزة:':'Presets:')+'</div><div style="display:flex;gap:8px;flex-wrap:wrap">';
+  THEME_PRESETS.forEach(function(p,i){ h+='<button class="btn gh sm" onclick="themeSetPreset('+i+')" style="display:flex;align-items:center;gap:6px"><span style="width:14px;height:14px;border-radius:4px;background:'+p[1]+';display:inline-block;border:1px solid #0002"></span><span style="width:14px;height:14px;border-radius:4px;background:'+p[2]+';display:inline-block;border:1px solid #0002"></span> '+esc(p[0])+'</button>'; });
+  h+='</div><div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn cy" onclick="themeSave()">💾 '+(ar?'حفظ':'Save')+'</button><button class="btn gh" onclick="themeReset()">↺ '+(ar?'الافتراضي':'Reset')+'</button></div>';
+  h+='<div class="mini" style="margin-top:8px;color:var(--muted)">'+(ar?'معاينة حيّة أول ما تغيّر — اضغط حفظ عشان يتثبّت للكل.':'Live preview as you change — Save to apply for everyone.')+'</div></div>';
+  return h;
+}
+function themePreview(){ try{ var root=document.documentElement; var p=val('th_primary'),a=val('th_accent'); if(p){root.style.setProperty('--navy',p);root.style.setProperty('--navy-d',_darkHex(p,24));root.style.setProperty('--z-accent',p);} if(a)root.style.setProperty('--cyan',a); }catch(e){} }
+function themeSetPreset(i){ var p=THEME_PRESETS[i]; if(!p)return; var el=g('th_primary'),ea=g('th_accent'); if(el)el.value=p[1]; if(ea)ea.value=p[2]; themePreview(); }
+function themeSave(){ var p=val('th_primary'),a=val('th_accent'); var th={}; if(p&&p.toLowerCase()!=='#143f63')th.primary=p; if(a&&a.toLowerCase()!=='#36c5e0')th.accent=a; settings.theme=th; saveSetting('theme',th); applyTheme(); alert(lang==='ar'?'اتحفظ ✔ — اتطبّق على كل المستخدمين.':'Saved ✔ — applied for everyone.'); }
+function themeReset(){ settings.theme={}; saveSetting('theme',{}); applyTheme(); var el=g('th_primary'),ea=g('th_accent'); if(el)el.value='#143F63'; if(ea)ea.value='#36C5E0'; }
 function adminImports(){
   var iv=settings.importVisibility||{};
   var map={};
