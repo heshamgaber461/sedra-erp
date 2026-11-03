@@ -838,7 +838,7 @@ function baseOut(v){ return (num(v.amount)-num(v.paid))*fxOf(v); }
 function isForeign(v){ return v.currency && v.currency!==(CUR[v.branch]||''); }
 function allowedBranches(){ if(!me)return[]; return (roleRank(me.role)>=ROLE_RANK['Director']||me.role==='Viewer')?BRANCHES.slice():(me.branches&&me.branches.length?me.branches:BRANCHES.slice()); }
 function inBranch(item){ const a=allowedBranches(); const b=item&&item.branch; if(!b)return true; /* no branch = shared/catalog item, always visible */ if(curBranch!=='All'&&b!==curBranch)return false; return a.includes(b); }
-var LOCK_PERSONAL=['hub','dashboard','profile','myhr','todo','calendar','sitecheck','announcements','leavecal','birthdays','suggestions','chat','training'];
+var LOCK_PERSONAL=['hub','dashboard','profile','myhr','todo','calendar','sitecheck','attendance','announcements','leavecal','birthdays','suggestions','chat','training'];
 var DEPT_HOME={Sales:'sales',Marketing:'marketing',Operations:'projects',Technical:'projects',Accounting:'accounting',Inventory:'inventory',HR:'hr',Management:'dashboard'};
 var SENSITIVE_MODS=['hr','accounting','finance','payroll','payslips','loans'];
 function canSee(m){ if(!me)return false; if(m&&m.id!=='admin'&&settings&&settings.hiddenModules&&settings.hiddenModules[m.id])return false; if(me.role==='Super Admin')return true; if(m.adminOnly)return false; if(me.role==='Viewer'){ return SENSITIVE_MODS.indexOf(m.id)<0; } if(SENSITIVE_MODS.indexOf(m.id)>=0){ if((me.accessModules||[]).indexOf(m.id)>=0)return true; var essS=(typeof ROLE_ESSENTIALS!=='undefined'&&(ROLE_ESSENTIALS[me.dept]||ROLE_ESSENTIALS._default))||[]; return essS.indexOf(m.id)>=0; } if(LOCK_PERSONAL.indexOf(m.id)>=0)return true; if((me.accessModules||[]).indexOf(m.id)>=0)return true; var ess=(typeof ROLE_ESSENTIALS!=='undefined'&&(ROLE_ESSENTIALS[me.dept]||ROLE_ESSENTIALS._default))||[]; return ess.indexOf(m.id)>=0; }
@@ -1350,6 +1350,7 @@ function startData(){ if(started)return; started=true;
   })(0);
   setInterval(function(){ if(document.visibilityState!=='hidden' && !_modalOpen()) refreshLight(); }, 300000);
   setInterval(function(){ if(document.visibilityState!=='hidden' && curView==='chat' && !_modalOpen()) refreshLight(); }, 20000);
+  setInterval(function(){ if(document.visibilityState!=='hidden' && !_modalOpen()) refreshHot(); }, 60000);
   document.addEventListener('visibilitychange', function(){ if(document.visibilityState!=='hidden' && appReady && Date.now()-lastRefresh>15000) refreshAll(); });
 }
 var _lightSig='';
@@ -1380,6 +1381,32 @@ async function refreshLight(){
   }catch(e){ setPill(false); if(!appReady){ var _m=String((e&&e.message)||e); if(/\(401\)|\(403\)|expired|Permission denied|Auth|Unauthorized/i.test(_m)){ try{auth.signOut();}catch(_){}} } }
   finally{ polling=false; }
 }
+/* HOT poll — a lightweight near-real-time refresh of ONLY the small operational collections that
+   change during the day and that staff need to see promptly (material requests, site check-ins,
+   projects, client service requests). These are small, so polling them every ~60s is cheap and does
+   NOT touch the big collections (leads/quotes/inventory) that would burn the free DB quota. This is
+   what makes a material request / check-in appear for a manager without a manual refresh. */
+var _hotPolling=false, _hotSig='';
+async function refreshHot(){
+  if(_hotPolling||polling||OFF.offline) return;
+  try{ var ae=document.activeElement; if(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return; }catch(_e){}
+  _hotPolling=true;
+  try{
+    var HK=['matreqs','sitevisits','projects','servicereqs'];
+    var res=await Promise.all(HK.map(function(k){ return apiCall('GET','/'+k+'.json').catch(function(){return undefined;}); }));
+    if(res.every(function(x){return x===undefined;})) return;
+    var m={}; HK.forEach(function(k,i){ m[k]=res[i]; });
+    var sig=''; try{ sig=String(JSON.stringify(m).length); }catch(e){}
+    if(sig && sig===_hotSig) return;
+    _hotSig=sig;
+    if(m.matreqs!==undefined) matreqs=listToArr(m.matreqs);
+    if(m.sitevisits!==undefined) sitevisits=listToArr(m.sitevisits);
+    if(m.projects!==undefined) projects=listToArr(m.projects).sort(function(x,y){return (y.created||'').localeCompare(x.created||'');});
+    if(m.servicereqs!==undefined) servicereqs=listToArr(m.servicereqs);
+    try{ if(appReady && typeof render==='function' && !_modalOpen()) render(true); }catch(_r){}
+  }catch(e){}
+  finally{ _hotPolling=false; }
+}
 /* Every top-level collection the whole-DB read loads. We read each ONE INDIVIDUALLY
    (never the DB root) because the Realtime-Database security rules authorise a signed-in
    user to read each collection but DENY a read at the root ('/.json'). A root read only
@@ -1388,7 +1415,7 @@ async function refreshLight(){
    this known list. 'blobs' (big files) and 'attachments'/'attachmentAccess' (own per-user
    rules) are loaded on demand, not here. New collections auto-appear once a service account
    is configured again (the shallow discovery below succeeds); until then, add them here. */
-var BULK_COLLS=['_backups','accounts','activities','adcampaigns','announcements','approvals','attendance','audit','bookings','botChats','campaigns','chats','clientaccounts','clientspace','comments','contacts','customers','employees','events','expclaims','feedbacks','goals','groups','imports','inventory','invoices','jobreqs','leads','leaves','matreqs','messages','meta','mktasks','mktplans','notifications','orbit','payments','paySchedule','payslips','posts','projects','prs','pushsubs','quotes','schedules','servicereqs','sheets','siteLabor','sitevisits','staffEmails','suggestions','suppliers','tasks','tickets','todos','trash','wfappr','workorders'];
+var BULK_COLLS=['_backups','accounts','activities','adcampaigns','announcements','approvals','attendance','audit','bookings','botChats','campaigns','chats','clientaccounts','clientspace','comments','contacts','customers','employees','events','expclaims','feedbacks','goals','groups','imports','inventory','invoices','jobreqs','leads','leaves','matreqs','locchangereqs','messages','meta','mktasks','mktplans','notifications','orbit','payments','paySchedule','payslips','posts','projects','prs','pushsubs','quotes','schedules','servicereqs','sheets','siteLabor','sitevisits','staffEmails','suggestions','suppliers','tasks','tickets','todos','trash','wfappr','workorders'];
 /* HEAVY collections are EXCLUDED from the initial blocking load and loaded in the
    background right after the app opens (loadHeavy). They are large (e.g. quotes carries
    inline images, ~10 MB), so pulling them in the first load froze the browser and burned
@@ -2013,6 +2040,7 @@ function buildBranchSel(){
 function changeBranch(b){ curBranch=b; localStorage.setItem('sedra_branch',b); render(); }
 function go(v){ const m=MODULES.find(x=>x.id===v); if(!m||!canSee(m))return; curView=v; try{navBump(v);}catch(e){} openProjectId=null; try{localStorage.setItem('orbit_view',v);}catch(e){} try{ for(var _i=0;_i<NAV_GROUPS.length;_i++){ if(NAV_GROUPS[_i].ids.indexOf(v)>=0){ localStorage.setItem('sedra_navopen',NAV_GROUPS[_i].k); navSel=NAV_GROUPS[_i].k; break; } } }catch(e){} buildNav(); closeSide(); render();
   if(Date.now()-lastRefresh>10000) refreshLight();  /* perf: light refresh on navigation instead of full-DB reload */
+  try{ if(['projects','operations','sitecheck','support','servicereqs','clientreqs','hub','dashboard','workqueue'].indexOf(v)>=0) refreshHot(); }catch(_e){}
 }
 /* ===== RESTORED: Customers + Inventory module (from Orbit base) ===== */
 var custOpen=null;
@@ -3665,6 +3693,19 @@ function projectsPanel(rows){
     +'<div class="card"><div class="ch-t">📊 '+(ar?'حالة المشاريع':'Project status')+'</div>'+bars+'</div>'
     +'</div>';
 }
+/* Global list of ALL pending material requests across projects — shown to approvers at the top of
+   Projects so they see WHICH project each request is for and can approve/reject from one place. */
+function pendingMatPanel(){
+  if(!canApproveMat()) return '';
+  var ar=(lang==='ar');
+  var pend=(typeof matreqs!=='undefined'?matreqs:[]).filter(inBranch).filter(function(r){return (r.status||'Pending')==='Pending';}).sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});
+  if(!pend.length) return '';
+  var h='<div class="card" style="border-left:4px solid #e0a93b;margin-bottom:12px"><div class="ch-t" style="color:#a9781a">🧰 '+(ar?'طلبات مواد معلّقة':'Pending material requests')+' <span class="tag" style="background:#e0a93b22;color:#a9781a">'+pend.length+'</span></div>';
+  h+='<div style="overflow-x:auto"><table><thead><tr><th>'+(ar?'المشروع':'Project')+'</th><th>'+(ar?'الصنف':'Item')+'</th><th>'+(ar?'كمية':'Qty')+'</th><th>'+(ar?'الطالب':'By')+'</th><th>'+(ar?'التاريخ':'Date')+'</th><th></th></tr></thead><tbody>';
+  pend.forEach(function(r){ h+='<tr><td><b>'+esc(r.project||'—')+'</b></td><td>'+esc(r.item||'')+(r.note?'<div class="mini">'+esc(r.note)+'</div>':'')+'</td><td>'+num(r.qty)+'</td><td>'+esc(r.by||'')+'</td><td class="mini">'+esc((r.date||'').slice(0,10))+'</td><td style="white-space:nowrap"><button class="btn cy sm" onclick="decideMatReq(\''+r.id+'\',true)">'+(ar?'موافقة':'Approve')+'</button> <button class="btn dn sm" onclick="decideMatReq(\''+r.id+'\',false)">'+(ar?'رفض':'Reject')+'</button></td></tr>'; });
+  h+='</tbody></table></div></div>';
+  return h;
+}
 function vProjects(){
   if(openProjectId){ const p=projects.find(x=>x.id===openProjectId); if(p)return projectDetail(p); openProjectId=null; }
   const rows=projects.filter(inBranch).filter(p=>{
@@ -3675,6 +3716,7 @@ function vProjects(){
   });
   let h=`<div class="tabs"><button class="${projTab==='list'?'active':''}" onclick="projTab='list';render()">🏗️ ${lang==='ar'?'المشاريع':'Projects'}</button><button class="${projTab==='profit'?'active':''}" onclick="projTab='profit';render()">💹 ${lang==='ar'?'الربحية':'Profitability'}</button></div>`;
   if(projTab==='profit') return h+vProfit(rows);
+  h+=pendingMatPanel();
   h+=projectsPanel(rows);
   h+=`<div class="sect"><h2>Projects</h2><div class="sp"></div>${isAdmin()?`<button class="btn gh sm" onclick="sedraImportProjects()" title="Import projects from /projects-seed.json">⬆ Import</button> <button class="btn dn sm" onclick="sedraDeleteAllProjects()" title="Move all projects to Recycle Bin">🗑 Clear all</button> `:''}${canApproveMat()?`<button class="btn cy" onclick="editProject()">+ Add project</button>`:''}</div>`;
   if(!rows.length)return h+`<div class="card empty">No projects yet.</div>`;
@@ -3760,19 +3802,22 @@ function delMilestone(pid,i){ const p=projects.find(x=>x.id===pid); if(!p)return
 function editProject(id){
   if(!canApproveMat()){ alert(lang==='ar'?'🚫 تعديل تفاصيل المشاريع للمدير أو Team Leader فقط.':'🚫 Editing project details is restricted to a manager / team leader.'); return; }
   const r=id?projects.find(x=>x.id===id):{branch:defBranch(),status:'Planning',progress:0,dept:(me.dept==='Management'?'Operations':me.dept),owner:me.name};
+  var _gpsLocked=!!(id&&r&&r.gps&&!isAdmin()); /* location set once: locked for everyone except Super Admin; others request a change */
   openModal(id?'Edit project':'Add project',
     fEl('Project name','p_name',r.name)+fEl('Client','p_client',r.client)+
     `<div class="row2">${selEl('Branch','p_branch',branchOpts(),r.branch)}${selEl('Department','p_dept',['Operations','Technical'],r.dept||'Operations')}</div>`+
     `<div class="row2">${selEl('Status','p_status',PSTAT,r.status||'Planning')}${fEl('Progress %','p_progress',r.progress,'number')}</div>`+
     `<div class="row2">${fEl('Start date','p_start',r.start,'date')}${fEl('End date','p_end',r.end,'date')}</div>`+
     `<div class="row2">${fEl('Owner','p_owner',r.owner)}${fEl('Value','p_value',r.value,'number')}</div>`+
-    `<div class="row2"><div class="fld"><label>${lang==='ar'?'موقع المشروع على الخريطة (GPS)':'GPS location (lat,lng or link)'}</label><input id="p_gps" value="${esc(r.gps||'')}" placeholder="${lang==='ar'?'مثال: 30.0512, 31.2405 أو لينك خرائط جوجل':'e.g. 30.0512, 31.2405 or a Google Maps link'}"><button type="button" class="btn gh sm" style="margin-top:6px" onclick="fillMyGps()">📍 ${lang==='ar'?'استخدم موقعي الحالي':'Use my current location'}</button></div>${selEl('Drawings approved?','p_draw',['No','Yes'],r.drawingApproved?'Yes':'No')}</div>`+
+    `<div class="row2"><div class="fld"><label>${lang==='ar'?'موقع المشروع على الخريطة (GPS)':'GPS location (lat,lng or link)'}</label>`+(_gpsLocked?`<input id="p_gps" value="${esc(r.gps||'')}" readonly style="background:#eef2f6;color:#5A6B7B"><div class="mini" style="margin-top:6px">🔒 ${lang==='ar'?'الموقع متسجّل ومتقفل — أي تغيير لازم موافقة الإدارة':'Location set & locked — any change needs management approval'}</div><button type="button" class="btn gh sm" style="margin-top:6px" onclick="reqLocChange('${id}')">📍 ${lang==='ar'?'اطلب تغيير الموقع':'Request location change'}</button>`:`<input id="p_gps" value="${esc(r.gps||'')}" placeholder="${lang==='ar'?'مثال: 30.0512, 31.2405 أو إحداثيات DMS':'e.g. 30.0512, 31.2405'}"><button type="button" class="btn gh sm" style="margin-top:6px" onclick="fillMyGps()">📍 ${lang==='ar'?'استخدم موقعي الحالي':'Use my current location'}</button>`)+`</div>${selEl('Drawings approved?','p_draw',['No','Yes'],r.drawingApproved?'Yes':'No')}</div>`+
     fEl('Site address (text)','p_address',r.address)+
     `<div class="row2">${fEl('Collected so far','p_collected',r.collected,'number')}${fEl('Assigned technicians (emails, comma-separated)','p_assigned',(r.assignedTo||[]).join(', '))}</div>`+
     fEl('Estimated / actual cost','p_cost',r.cost,'number')+
     fileField('p_file','Attach a file (contract / drawing / site photo / PDF)',r.file)+
     fTa('Notes','p_notes',r.notes),
-    ()=>{ const d={name:val('p_name'),client:val('p_client'),branch:val('p_branch'),dept:val('p_dept'),status:val('p_status'),progress:num(val('p_progress')),start:val('p_start'),end:val('p_end'),owner:val('p_owner'),value:num(val('p_value')),gps:val('p_gps'),address:val('p_address'),collected:num(val('p_collected')),assignedTo:(val('p_assigned')||'').split(',').map(function(s){return s.trim().toLowerCase();}).filter(Boolean),drawingApproved:val('p_draw')==='Yes',cost:num(val('p_cost')),notes:val('p_notes'),file:fileVal('p_file')};
+    ()=>{ var _gps=_gpsLocked?(r.gps||''):val('p_gps');
+      if(_gps && typeof scLatLng==='function' && !scLatLng(_gps)){ alert(lang==='ar'?'⚠️ الموقع اللي دخلته مش بإحداثيات مقروءة. استخدم زرار «📍 استخدم موقعي الحالي» وانت في الموقع، أو الصق إحداثيات زي 30.0512, 31.2405. (اللينكات المختصرة maps.app.goo.gl مش بتشتغل مع تحديد الحضور.)':'⚠️ Location has no readable coordinates. Use "📍 Use my current location" on-site, or paste coordinates like 30.0512, 31.2405. (Shortened maps.app.goo.gl links do not work for check-in.)'); return false; }
+      const d={name:val('p_name'),client:val('p_client'),branch:val('p_branch'),dept:val('p_dept'),status:val('p_status'),progress:num(val('p_progress')),start:val('p_start'),end:val('p_end'),owner:val('p_owner'),value:num(val('p_value')),gps:_gps,address:val('p_address'),collected:num(val('p_collected')),assignedTo:(val('p_assigned')||'').split(',').map(function(s){return s.trim().toLowerCase();}).filter(Boolean),drawingApproved:val('p_draw')==='Yes',cost:num(val('p_cost')),notes:val('p_notes'),file:fileVal('p_file')};
       if(!d.name){alert('Name required');return false;} if(!dupGuard('projects',d,id))return false; if(!id)d.created=new Date().toISOString(); d.ownerEmail=ownerEmailFor(d.owner); saveDoc('projects',d,id); try{ notifyLeaders(d,(lang==='ar'?(id?'✏️ تعديل مشروع — ':'➕ مشروع جديد — '):(id?'✏️ Project edited — ':'➕ New project — '))+d.name,((me&&me.name)||'')+(lang==='ar'?(id?' عدّل بيانات المشروع':' أضاف مشروع'):(id?' edited the project':' added a project'))); }catch(_n){} });
 }
 
@@ -3785,6 +3830,19 @@ function fillMyGps(){
     el.disabled=false; el.value=p.coords.latitude.toFixed(6)+','+p.coords.longitude.toFixed(6);
     var acc=Math.round(p.coords.accuracy||0); if(acc>80){ alert(ar?('تنبيه: دقّة الموقع ضعيفة (±'+acc+' متر). يفضّل تكون في الموقع نفسه وتحت السما المكشوفة.'):('Note: low accuracy (±'+acc+'m). Best taken on-site, outdoors.')); }
   }, function(){ el.disabled=false; el.value=old; alert(ar?'مش قادر أحدد موقعك. فعّل الـ GPS واسمح للمتصفح بالوصول للموقع، وحاول تاني.':'Could not get your location. Enable GPS and allow access, then retry.'); }, {timeout:12000,enableHighAccuracy:true,maximumAge:0});
+}
+/* Request a change to a LOCKED project location → recorded + Super Admin notified; only the admin edits it. */
+function reqLocChange(pid){
+  var ar=(lang==='ar'); var p=(projects||[]).find(function(x){return x.id===pid;}); if(!p)return;
+  var nl=prompt(ar?'الموقع الجديد المطلوب (إحداثيات زي 30.0512, 31.2405):':'Requested new location (coordinates like 30.0512, 31.2405):',''); if(nl===null)return; nl=(nl||'').trim();
+  if(!nl || !scLatLng(nl)){ alert(ar?'لازم تدخل إحداثيات مقروءة.':'Readable coordinates required.'); return; }
+  var why=prompt(ar?'سبب التغيير:':'Reason for the change:',''); if(why===null)return;
+  apiAdd('locchangereqs',{projectId:pid,project:p.name,oldGps:p.gps||'',newGps:nl,reason:why||'',by:(me&&me.name)||'',byEmail:((me&&me.email)||'').toLowerCase(),branch:p.branch||'',status:'Pending',date:new Date().toISOString()}).then(function(){
+    try{ if(typeof sendEmailAuto==='function' && typeof SUPER_ADMIN_EMAIL!=='undefined') sendEmailAuto(SUPER_ADMIN_EMAIL,(ar?'📍 طلب تغيير موقع مشروع — ':'📍 Project location-change request — ')+p.name,((me&&me.name)||'')+(ar?' طلب تغيير موقع المشروع ':' requested changing the location of ')+p.name+' → '+nl+(why?('\n'+(ar?'السبب: ':'Reason: ')+why):'')); }catch(_){}
+    try{ logAudit('locchange-request','projects',pid,p.name); }catch(_){}
+    try{ closeModal(); }catch(_){}
+    alert(ar?'اتبعت طلب تغيير الموقع للإدارة ✔ — هيتغيّر بعد الموافقة.':'Location-change request sent to management ✔ — it will change after approval.');
+  }).catch(function(e){ alert('Error: '+(e&&e.message||e)); });
 }
 /* ===================== PROJECTS — Checklist / Project store / Usage / Financials / Import (Claude 2026-10-29) ===================== */
 function projChecklist(p){ return (p&&p.checklist)||[]; }
@@ -7505,6 +7563,7 @@ function getNotifications(){
     if(mgr){ var salQ=leads.filter(inBranch).filter(canSeeLead).filter(l=>!isImported(l)&&leadLifecycle(l)==='MQL');
       if(salQ.length)list.push({ico:'🎯',title:'MQLs to accept',sub:salQ.length+' awaiting Sales acceptance (SAL)',count:salQ.length,act:()=>{curView='sales';salesTab='leads';closeBell();render();}}); } }
   if(cvAllowed('operations')){ const ot=tasks.filter(t=>(t.assignee||'')===myName&&t.status!=='Done'&&t.due&&t.due<today()); if(ot.length)list.push({ico:'⏰',title:'Overdue tasks',sub:ot.length+' past due',count:ot.length,act:()=>{curView='operations';opsScope='mine';closeBell();render();}}); }
+  if(canApproveMat()){ var _pm=(matreqs||[]).filter(inBranch).filter(function(r){return (r.status||'Pending')==='Pending';}); if(_pm.length){ var _pmP=Array.from(new Set(_pm.map(function(r){return r.project;}).filter(Boolean))); list.unshift({ico:'🧰',title:(lang==='ar'?'طلبات مواد للموافقة':'Material requests'),sub:_pm.length+' '+(lang==='ar'?'طلب معلّق':'pending')+(_pmP.length?(' · '+_pmP.slice(0,2).join('، ')+(_pmP.length>2?'…':'')):''),count:_pm.length,act:function(){curView='projects';openProjectId=null;closeBell();render();}}); } }
   if(cvAllowed('inventory')){ const low=inventory.filter(inBranch).filter(i=>num(i.qty)<=num(i.min)&&num(i.min)>0); if(low.length)list.push({ico:'📦',title:'Low stock',sub:low.length+' item(s) below minimum',count:low.length,act:()=>{curView='inventory';invTab='items';closeBell();render();}}); }
   if(cvAllowed('accounting')){ const od=invoices.filter(inBranch).filter(v=>invStatus(v)==='Overdue'); if(od.length)list.push({ico:'💰',title:'Overdue invoices',sub:od.length+' overdue',count:od.length,act:()=>{curView='accounting';accTab='invoices';closeBell();render();}}); }
   if(cvAllowed('accounting')){ const cd=contracts.filter(inBranch).filter(c=>(c.status||'Active')==='Active'&&c.nextDue&&c.nextDue<=today()); if(cd.length)list.push({ico:'🔁',title:'AMC contracts due',sub:cd.length+' ready to invoice',count:cd.length,act:()=>{curView='accounting';accTab='contracts';closeBell();render();}}); }
@@ -10938,7 +10997,13 @@ function scHours(v){ if(!v.inTs)return 0; var end=v.outTs||Date.now(); return Ma
 function hhmm(ts){ if(!ts)return '—'; var d=new Date(num(ts)); return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); }
 function fmtHrs(h){ var m=Math.round(h*60); return Math.floor(m/60)+'h '+(m%60)+'m'; }
 var SITE_RADIUS_M=300; /* meters allowed from the project's GPS to check in */
-function scLatLng(sx){ if(!sx)return null; var m=String(sx).match(/(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/); return m?{lat:parseFloat(m[1]),lng:parseFloat(m[2])}:null; }
+function scLatLng(sx){ if(!sx)return null; var s=String(sx);
+  /* DMS format e.g. 30°05'18.6"N 31°19'32.3"E (Google Maps "copy coordinates") */
+  var dms=s.match(/(\d{1,3})\s*[°]\s*(\d{1,2})\s*['′]\s*([\d.]+)\s*["″]?\s*([NnSs])[\s,]+(\d{1,3})\s*[°]\s*(\d{1,2})\s*['′]\s*([\d.]+)\s*["″]?\s*([EeWw])/);
+  if(dms){ var la=(+dms[1])+(+dms[2])/60+(+dms[3])/3600; if(/[Ss]/.test(dms[4]))la=-la; var ln=(+dms[5])+(+dms[6])/60+(+dms[7])/3600; if(/[Ww]/.test(dms[8]))ln=-ln; if(isFinite(la)&&isFinite(ln))return {lat:la,lng:ln}; }
+  /* decimal pair anywhere (covers 30.0512,31.2405 and maps links like @30.05,31.24 / q=30.05,31.24) */
+  var m=s.match(/(-?\d{1,2}\.\d{3,})\s*,\s*(-?\d{1,3}\.\d{3,})/);
+  return m?{lat:parseFloat(m[1]),lng:parseFloat(m[2])}:null; }
 /* ===== Site check-in: live photo + GPS accuracy + IP cross-check + spoof flag ===== */
 var _scStream=null, _scCtx=null;
 function scStopCam(){ if(_scStream){ try{_scStream.getTracks().forEach(function(t){t.stop();});}catch(e){} _scStream=null; } }
@@ -10995,13 +11060,21 @@ function scGather(){
 }
 function scCommit(){
   var ctx=_scCtx; if(!ctx)return; var ar=(lang==='ar');
-  if(ctx.target){
-    if(!ctx.geo){ alert(ar?'لازم نحدّد موقعك (GPS) — فعّل الموقع وجرّب تاني':'Location required — enable GPS and retry'); return; }
-    if(ctx.dist>SITE_RADIUS_M){
-      var dtxt=(ctx.dist>=1000?(ctx.dist/1000).toFixed(1)+(ar?' كم':' km'):Math.round(ctx.dist)+(ar?' متر':' m'));
-      var msg=(ar?('إنت على بُعد '+dtxt+' من موقع المشروع. لازم تكون خلال '+SITE_RADIUS_M+' متر.'):('You are '+dtxt+' from the site. Must be within '+SITE_RADIUS_M+'m.'));
-      if(ctx.canOverride){ if(!confirm(msg+'\n\n'+(ar?'تسجيل بصلاحية المدير رغم البُعد؟':'Override as manager?')))return; ctx.override=true; }
-      else { alert(msg); return; }
+  /* Geofence applies to CHECK-IN only. Check-out is never blocked (a worker who left the site must still be able to check out); distance is just recorded. */
+  if(ctx.mode==='in'){
+    if(!ctx.target){
+      /* project has no valid/parseable GPS → cannot verify location → block (managers may override) */
+      var noLoc=(ar?'المشروع ده لسه ملوش موقع GPS مظبوط. كلّم مديرك يسجّل موقع المشروع الأول (بإحداثيات أو من زرار «استخدم موقعي الحالي») عشان تقدر تسجّل حضور.':'This project has no valid GPS location yet. Ask your manager to set the project location first, so check-in can be verified.');
+      if(ctx.canOverride){ if(!confirm(noLoc+'\n\n'+(ar?'تسجيل حضور بصلاحية المدير برغم كده؟':'Check in as manager anyway?')))return; ctx.override=true; }
+      else { alert(noLoc); return; }
+    } else {
+      if(!ctx.geo){ alert(ar?'لازم نحدّد موقعك (GPS) — فعّل الموقع وجرّب تاني':'Location required — enable GPS and retry'); return; }
+      if(ctx.dist>SITE_RADIUS_M){
+        var dtxt=(ctx.dist>=1000?(ctx.dist/1000).toFixed(1)+(ar?' كم':' km'):Math.round(ctx.dist)+(ar?' متر':' m'));
+        var msg=(ar?('إنت على بُعد '+dtxt+' من موقع المشروع. لازم تكون خلال '+SITE_RADIUS_M+' متر.'):('You are '+dtxt+' from the site. Must be within '+SITE_RADIUS_M+'m.'));
+        if(ctx.canOverride){ if(!confirm(msg+'\n\n'+(ar?'تسجيل بصلاحية المدير رغم البُعد؟':'Override as manager?')))return; ctx.override=true; }
+        else { alert(msg); return; }
+      }
     }
   }
   var susp=scSuspReasons(ctx.target,ctx.geo,ctx.ip).join(' · ');
