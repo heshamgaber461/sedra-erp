@@ -626,7 +626,7 @@ const MODULES = [
   {id:'weekly',    label:'Weekly Reports', icon:'🗒️', access:'all'},
   {id:'bot',       label:'Bot Training', icon:'🤖', depts:['Marketing']},
   {id:'hr',        label:'HR', icon:'👔', depts:['HR']},
-  {id:'applicants', label:'Applicants / Interns', icon:'\uD83C\uDF93', depts:['HR']},
+  {id:'applicants', label:'Internship', icon:'\uD83C\uDF93', depts:['HR']},
   {id:'recruit',   label:'Recruitment', icon:'🧑‍💼', depts:['HR']},
   {id:'fleet',     label:'Fleet', icon:'🚗', depts:['HR','Operations']},
   {id:'assets',    label:'Assets', icon:'🏷️', depts:['Accounting']},
@@ -5385,7 +5385,7 @@ function vApplicants(){
   var govs=Array.from(new Set(applicants.map(function(r){return r.governorate;}).filter(Boolean))).sort();
   var total=applicants.length,stu=applicants.filter(function(r){return r.status==='Student';}).length,grad=applicants.filter(function(r){return r.status==='Graduate';}).length;
   var ym=today().slice(0,7),mo=applicants.filter(function(r){return (r.created||'').slice(0,7)===ym;}).length;
-  var h=`<div class="sect"><h2>🎓 Applicants / Interns</h2><div class="sp"></div>${isAdmin()?`<button class="btn gh sm" onclick="exportApplicants()">⬇ Excel</button>`:''}</div>`;
+  var h=`<div class="sect"><h2>🎓 Internship</h2><div class="sp"></div>${isAdmin()?`<button class="btn gh sm" onclick="exportApplicants()">⬇ Excel</button>`:''}</div>`;
   h+=`<div class="card mini" style="margin-bottom:8px">Internship applications received from the public apply page (apply.html) — students & graduates.</div>`;
   h+=`<div class="grid kpis"><div class="card kpi"><div class="n">${total}</div><div class="l">Total</div></div><div class="card kpi"><div class="n" style="color:var(--cyan)">${stu}</div><div class="l">Students</div></div><div class="card kpi"><div class="n" style="color:var(--ok)">${grad}</div><div class="l">Graduates</div></div><div class="card kpi"><div class="n">${mo}</div><div class="l">This month</div></div></div>`;
   h+=`<div class="sect" style="flex-wrap:wrap;gap:8px"><input type="search" placeholder="🔍 Search…" value="${esc(apQ)}" oninput="apQ=this.value;render()" style="max-width:200px"><select onchange="apGov=this.value;render()"><option value="">All governorates</option>${govs.map(function(g){return `<option ${g===apGov?'selected':''}>${esc(g)}</option>`;}).join('')}</select><select onchange="apStatus=this.value;render()"><option value="">All status</option><option ${apStatus==='Student'?'selected':''}>Student</option><option ${apStatus==='Graduate'?'selected':''}>Graduate</option></select></div>`;
