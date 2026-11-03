@@ -11168,21 +11168,17 @@ function scGather(){
 }
 function scCommit(){
   var ctx=_scCtx; if(!ctx)return; var ar=(lang==='ar');
-  /* Geofence applies to CHECK-IN only. Check-out is never blocked (a worker who left the site must still be able to check out); distance is just recorded. */
+  /* Geofence applies to CHECK-IN only, and is STRICT for EVERYONE — no override, not even Super Admin (Hesham 3 Nov). Check-out is never blocked. */
   if(ctx.mode==='in'){
     if(!ctx.target){
-      /* project has no valid/parseable GPS → cannot verify location → block (managers may override) */
-      var noLoc=(ar?'المشروع ده لسه ملوش موقع GPS مظبوط. كلّم مديرك يسجّل موقع المشروع الأول (بإحداثيات أو من زرار «استخدم موقعي الحالي») عشان تقدر تسجّل حضور.':'This project has no valid GPS location yet. Ask your manager to set the project location first, so check-in can be verified.');
-      if(ctx.canOverride){ if(!confirm(noLoc+'\n\n'+(ar?'تسجيل حضور بصلاحية المدير برغم كده؟':'Check in as manager anyway?')))return; ctx.override=true; }
-      else { alert(noLoc); return; }
-    } else {
-      if(!ctx.geo){ alert(ar?'لازم نحدّد موقعك (GPS) — فعّل الموقع وجرّب تاني':'Location required — enable GPS and retry'); return; }
-      if(ctx.dist>SITE_RADIUS_M){
-        var dtxt=(ctx.dist>=1000?(ctx.dist/1000).toFixed(1)+(ar?' كم':' km'):Math.round(ctx.dist)+(ar?' متر':' m'));
-        var msg=(ar?('إنت على بُعد '+dtxt+' من موقع المشروع. لازم تكون خلال '+SITE_RADIUS_M+' متر.'):('You are '+dtxt+' from the site. Must be within '+SITE_RADIUS_M+'m.'));
-        if(ctx.canOverride){ if(!confirm(msg+'\n\n'+(ar?'تسجيل بصلاحية المدير رغم البُعد؟':'Override as manager?')))return; ctx.override=true; }
-        else { alert(msg); return; }
-      }
+      alert(ar?'المشروع ده لسه ملوش موقع GPS مظبوط — مش هتقدر تسجّل حضور عليه لحد ما الموقع يتسجّل. كلّم مديرك.':'This project has no valid GPS location yet — check-in is not possible until the location is set. Ask your manager.');
+      return;
+    }
+    if(!ctx.geo){ alert(ar?'لازم نحدّد موقعك (GPS) — فعّل الموقع وجرّب تاني':'Location required — enable GPS and retry'); return; }
+    if(ctx.dist>SITE_RADIUS_M){
+      var dtxt=(ctx.dist>=1000?(ctx.dist/1000).toFixed(1)+(ar?' كم':' km'):Math.round(ctx.dist)+(ar?' متر':' m'));
+      alert(ar?('إنت على بُعد '+dtxt+' من موقع المشروع. لازم تكون خلال '+SITE_RADIUS_M+' متر عشان تسجّل حضور.'):('You are '+dtxt+' from the site. You must be within '+SITE_RADIUS_M+'m to check in.'));
+      return;
     }
   }
   var susp=scSuspReasons(ctx.target,ctx.geo,ctx.ip).join(' · ');
@@ -11247,7 +11243,7 @@ function vSiteCheck(){
   const totToday=todayV.reduce((a,v)=>a+scHours(v),0);
   const off=isOffDay(T,defBranch()), hol=holidayOn(T,defBranch());
   let h=`<div class="sect"><h2>📍 Site Check-in</h2><div class="sp"></div>${mgr?`<input type="month" value="${esc(scMonth)}" onchange="scMonth=this.value;render()" style="max-width:150px"> <button class="btn gh sm" onclick="scExport('csv')">⬇ Excel</button> <button class="btn gh sm" onclick="scReport()">🖨 Report</button> <button class="btn gh sm" onclick="scView=(scView==='mine'?'team':'mine');render()">${scView==='team'?'👤 My visits':'👥 Team'}</button>`:''}</div>`;
-  h+=`<div class="card mini" style="margin-bottom:8px">سجّل حضورك (Check-in) وانصرافك (Check-out) من موقع المشروع نفسه. <b>لازم تكون خلال ${SITE_RADIUS_M} متر من موقع المشروع</b> — النظام بيتأكد من موقعك (GPS) وبيسجّل دقّة الموقع وعنوان الإنترنت ويحسب ساعات شغلك تلقائيًا. المدير بس اللي يقدر يتجاوز شرط المسافة.</div>`;
+  h+=`<div class="card mini" style="margin-bottom:8px">سجّل حضورك (Check-in) وانصرافك (Check-out) من موقع المشروع نفسه. <b>لازم تكون خلال ${SITE_RADIUS_M} متر من موقع المشروع</b> — النظام بيتأكد من موقعك (GPS) وبيسجّل دقّة الموقع وعنوان الإنترنت ويحسب ساعات شغلك تلقائيًا. <b>لازم تكون في الموقع فعلًا عشان تسجّل حضور — مفيش استثناءات لأي حد.</b></div>`;
   if(off) h+=`<div class="card" style="background:#fff6e6;border-color:#e0a93b;color:#8a5a00;margin-bottom:10px">🌴 ${hol?(lang==='ar'?'اليوم إجازة رسمية: ':'Official holiday: ')+esc(hol.name||''):(lang==='ar'?'اليوم إجازة أسبوعية (جمعة/سبت)':'Weekly day off (Fri/Sat)')}</div>`;
   // check-in panel
   h+=`<div class="card" style="margin-bottom:12px">`;
