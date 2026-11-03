@@ -648,6 +648,11 @@ const MODULES = [
   {id:'policies',  label:'Policies', icon:'📜', access:'all'},
   {id:'exitiv',    label:'Exit Interviews', icon:'🚪', depts:['HR','Management']},
   {id:'calllog',   label:'Call Log', icon:'📞', depts:['Sales','Management']},
+  {id:'docexp',    label:'Document Expiry', icon:'📅', depts:['HR','Management']},
+  {id:'probation', label:'Probation Tracking', icon:'⏳', depts:['HR','Management']},
+  {id:'roster',    label:'Shift Roster', icon:'📆', depts:['HR','Operations','Management']},
+  {id:'headcount', label:'Headcount & Cost', icon:'👥', depts:['HR','Management']},
+  {id:'clientportal',label:'Client Portal', icon:'🌐', depts:['Sales','Operations','Management']},
   {id:'automation',label:'Automation', icon:'⚡', adminOnly:true},
   {id:'admin',     label:'Admin', icon:'⚙️', adminOnly:true},
   {id:'claims',    label:'Expense Claims', icon:'🧾', access:'all'},
@@ -807,7 +812,7 @@ let sitevisits=[];
 let matreqs=[];
 let reccmts=[], wfappr=[];
 let rfis=[], dsrs=[], contacts=[];
-let announcements=[], suggestions=[], overtimes=[], devideas=[], calls=[], policies=[], exits=[];
+let announcements=[], suggestions=[], overtimes=[], devideas=[], calls=[], policies=[], exits=[], shifts=[];
 let taxcodes=[], transfers=[], capitals=[], creditnotes=[], debitnotes=[];
 let fxrates=[], billabletime=[];
 let openbals=[], intangibles=[], investments=[];
@@ -1424,7 +1429,7 @@ async function refreshHot(){
    this known list. 'blobs' (big files) and 'attachments'/'attachmentAccess' (own per-user
    rules) are loaded on demand, not here. New collections auto-appear once a service account
    is configured again (the shallow discovery below succeeds); until then, add them here. */
-var BULK_COLLS=['_backups','accounts','activities','adcampaigns','announcements','approvals','attendance','audit','bookings','botChats','campaigns','chats','clientaccounts','clientspace','comments','contacts','customers','devideas','employees','events','expclaims','feedbacks','goals','groups','imports','inventory','invoices','jobreqs','leads','leaves','matreqs','locchangereqs','messages','meta','mktasks','mktplans','notifications','orbit','payments','paySchedule','payslips','posts','projects','prs','pushsubs','quotes','schedules','servicereqs','sheets','siteLabor','sitevisits','calls','exits','policies','staffEmails','suggestions','suppliers','tasks','tickets','todos','trash','wfappr','workorders'];
+var BULK_COLLS=['_backups','accounts','activities','adcampaigns','announcements','approvals','attendance','audit','bookings','botChats','campaigns','chats','clientaccounts','clientspace','comments','contacts','customers','devideas','employees','events','expclaims','feedbacks','goals','groups','imports','inventory','invoices','jobreqs','leads','leaves','matreqs','locchangereqs','messages','meta','mktasks','mktplans','notifications','orbit','payments','paySchedule','payslips','posts','projects','prs','pushsubs','quotes','schedules','servicereqs','sheets','siteLabor','sitevisits','calls','exits','policies','shifts','staffEmails','suggestions','suppliers','tasks','tickets','todos','trash','wfappr','workorders'];
 /* HEAVY collections are EXCLUDED from the initial blocking load and loaded in the
    background right after the app opens (loadHeavy). They are large (e.g. quotes carries
    inline images, ~10 MB), so pulling them in the first load froze the browser and burned
@@ -1572,7 +1577,7 @@ function applyAll(all){
     tenders=listToArr(all.tenders); drawings=listToArr(all.drawings); toolbox=listToArr(all.toolbox);
     submittals=listToArr(all.submittals); ipcs=listToArr(all.ipcs); risks=listToArr(all.risks); permits=listToArr(all.permits); requisitions=listToArr(all.requisitions); tandc=listToArr(all.tandc); ncrs=listToArr(all.ncrs); gatepasses=listToArr(all.gatepasses); bonds=listToArr(all.bonds); calibrations=listToArr(all.calibrations); handovers=listToArr(all.handovers); retentions=listToArr(all.retentions); insurances=listToArr(all.insurances); methods=listToArr(all.methods); siteinstr=listToArr(all.siteinstr); subipcs=listToArr(all.subipcs); asbuilts=listToArr(all.asbuilts); wastelogs=listToArr(all.wastelogs); prequals=listToArr(all.prequals); drills=listToArr(all.drills); sheets=listToArr(all.sheets); worddocs=listToArr(all.worddocs); decks=listToArr(all.decks); positions=listToArr(all.positions); mktasks=listToArr(all.mktasks); mktlib=listToArr(all.mktlib); mktplans=listToArr(all.mktplans); growthexp=listToArr(all.growthexp); sitevisits=listToArr(all.sitevisits); matreqs=listToArr(all.matreqs); reccmts=listToArr(all.comments); wfappr=listToArr(all.wfappr);
     rfis=listToArr(all.rfis); dsrs=listToArr(all.dsrs); contacts=listToArr(all.contacts);
-    announcements=listToArr(all.announcements); suggestions=listToArr(all.suggestions); overtimes=listToArr(all.overtimes); devideas=listToArr(all.devideas); calls=listToArr(all.calls); policies=listToArr(all.policies); exits=listToArr(all.exits);
+    announcements=listToArr(all.announcements); suggestions=listToArr(all.suggestions); overtimes=listToArr(all.overtimes); devideas=listToArr(all.devideas); calls=listToArr(all.calls); policies=listToArr(all.policies); exits=listToArr(all.exits); shifts=listToArr(all.shifts);
     taxcodes=listToArr(all.taxcodes); transfers=listToArr(all.transfers); capitals=listToArr(all.capitals); creditnotes=listToArr(all.creditnotes); debitnotes=listToArr(all.debitnotes);
     fxrates=listToArr(all.fxrates); billabletime=listToArr(all.billabletime);
     openbals=listToArr(all.openbals); intangibles=listToArr(all.intangibles); investments=listToArr(all.investments);
@@ -1992,12 +1997,12 @@ function toggleSide(){ var a=g('app'); if(a)a.classList.toggle('navopen'); }
 function closeSide(){ var a=g('app'); if(a)a.classList.remove('navopen'); }
 const NAV_GROUPS=[
   {k:'overview',t:'Overview',ic:'🏠',ids:['workqueue','dashboard','execdash','alerts','datahealth','kpiscore','performance','reports']},
-  {k:'sales',t:'Sales & CRM',ic:'💼',ids:['sales','blueprint','customers','servicereqs','contacts','calllog','cust360','funnel','leadsource','commission','tenders','salesorders','quicksale','quotes','variations','bookings','bot']},
+  {k:'sales',t:'Sales & CRM',ic:'💼',ids:['sales','blueprint','customers','servicereqs','contacts','calllog','clientportal','cust360','funnel','leadsource','commission','tenders','salesorders','quicksale','quotes','variations','bookings','bot']},
   {k:'marketing',t:'Marketing',ic:'📣',ids:['marketing','adspend','revops','mktplan','mktprod','contentcal','growth','mktlib','surveys','feedback']},
   {k:'projects',t:'Projects & Field',ic:'🏗️',ids:['projects','sitecheck','operations','gantt','workorders','issues','scheduling','manpower','dsr','costctrl','ipc','snags','quality','tandc','ncr','calibration','handover','methods','siteinstr','subipc','asbuilt','scurve','ncranalysis','submittals','rfi','doccontrol','risks','permits','maintenance','warranty','support','subcontractors','equipment']},
   {k:'inventory',t:'Inventory & Purchasing',ic:'📦',ids:['inventory','reorder','grn','gatepass','stockcount','stockledger','invvalue','requisitions','purchasereq','rfq','prequal','suppscore']},
   {k:'finance',t:'Finance & Accounting',ic:'💰',ids:['accounting','ledger','glreport','bonds','retention','finance','cashpos','openbal','taxcodes','taxsummary','fxrates','transfers','capital','creditnotes','debitnotes','subscriptions','billabletime','claims','pettycash','deprec','intangibles','investments','araging','apaging','expanalysis','branchcompare','orderbook']},
-  {k:'hr',t:'HR & People',ic:'👔',ids:['hr','myhr','orgchart','onboard','recruit','applicants','courses','attendance','attexcept','overtime','leavecal','birthdays','exitiv','policies','fleet','assets','goals']},
+  {k:'hr',t:'HR & People',ic:'👔',ids:['hr','myhr','orgchart','onboard','recruit','applicants','courses','attendance','attexcept','docexp','probation','roster','headcount','overtime','leavecal','birthdays','exitiv','policies','fleet','assets','goals']},
   {k:'gov',t:'Governance & Docs',ic:'🛡️',ids:['safety','toolbox','insurance','waste','drills','workflow','hsereport','agreements','documents','esign','approvals','kbase','meetings','licenses','auditlog','exporthub']},
   {k:'workspace',t:'Workspace',ic:'🗓️',ids:['calendar','todo','workplan','sheets','worddocs','slides','weekly','chat','announcements','suggestions','training','profile']},
   {k:'admin',t:'Admin',ic:'⚙️',ids:['devroadmap','automation','admin']}
@@ -2581,7 +2586,7 @@ function render(keepScroll){
   if(!canSee(m)){ curView='hub'; m=MODULES.find(function(x){return x.id==='hub';})||MODULES[0]; }
   g('viewTitle').textContent=m.label;
   markNav();
-  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,clientreqs:vClientReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,devroadmap:vDevRoadmap,datahealth:vDataHealth,orgchart:vOrgChart,attexcept:vAttExcept,onboard:vOnboard,policies:vPolicies,exitiv:vExitIv,calllog:vCallLog,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,trash:vTrash,findreplace:vFindReplace,quoterequests:vQuoteRequests,admin:vAdmin,profile:vProfile}[curView];
+  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,clientreqs:vClientReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,devroadmap:vDevRoadmap,datahealth:vDataHealth,orgchart:vOrgChart,attexcept:vAttExcept,onboard:vOnboard,policies:vPolicies,exitiv:vExitIv,calllog:vCallLog,docexp:vDocExp,probation:vProbation,roster:vRoster,headcount:vHeadcount,clientportal:vClientPortal,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,trash:vTrash,findreplace:vFindReplace,quoterequests:vQuoteRequests,admin:vAdmin,profile:vProfile}[curView];
   g('view').innerHTML = fn?fn():'';
   if(curView==='sales' && window._afterSales)window._afterSales();
   if(curView==='chat' && window._afterChat)window._afterChat();
@@ -11987,6 +11992,96 @@ function vExitIv(){
   return h;
 }
 function editExit(id){ var r=id?exits.find(function(x){return x.id===id;}):{branch:defBranch(),date:today(),rating:3}; openModal(id?'تعديل':'مقابلة خروج', '<div class="fld"><label>الموظف</label><input id="ex_emp" list="emp_dl" value="'+esc(r.employee||'')+'">'+empDatalist()+'</div>'+'<div class="row2">'+selEl('سبب الخروج','ex_reason',['راتب أعلى','فرصة أفضل','مشاكل إدارية','ظروف شخصية','انتقال','إنهاء من الشركة','أخرى'],r.reason||'فرصة أفضل')+fEl('التاريخ','ex_date',r.date,'date')+'</div>'+'<div class="row2">'+selEl('تقييم التجربة (1-5)','ex_rating',['1','2','3','4','5'],String(r.rating||3))+selEl('الفرع','ex_branch',branchOpts(),r.branch)+'</div>'+fTa('ملاحظات / اقتراحات','ex_feedback',r.feedback), function(){ var d={employee:val('ex_emp'),reason:val('ex_reason'),rating:num(val('ex_rating')),date:val('ex_date'),branch:val('ex_branch'),feedback:val('ex_feedback')}; if(!d.employee){alert('اسم الموظف مطلوب');return false;} if(!id){d.by=me.name;d.created=new Date().toISOString();} saveDoc('exits',d,id); }); }
+/* ===================== ROADMAP BUILDS 2: Doc Expiry · Probation · Shift Roster · Headcount · Client Portal ===================== */
+function _daysTo(d){ if(!d) return null; var t=new Date(d); if(isNaN(t.getTime())) return null; return Math.round((t-new Date())/86400000); }
+/* --- hr4: Document Expiry --- */
+function vDocExp(){
+  var emps=employees.filter(function(e){return e.active!==false;});
+  var DOCS=[['docPassportExp','جواز السفر'],['docResidenceExp','الإقامة'],['docUaeIdExp','الهوية الإماراتية'],['docLabourExp','تصريح العمل']];
+  var all=[];
+  emps.forEach(function(e){ DOCS.forEach(function(d){ var v=e[d[0]]; if(v){ var days=_daysTo(v); if(days!==null) all.push({name:e.name,doc:d[1],date:v,days:days}); } }); });
+  var expired=all.filter(function(r){return r.days<0;}).sort(function(a,b){return a.days-b.days;});
+  var soon=all.filter(function(r){return r.days>=0&&r.days<=30;}).sort(function(a,b){return a.days-b.days;});
+  var later=all.filter(function(r){return r.days>30&&r.days<=90;}).sort(function(a,b){return a.days-b.days;});
+  var h='<div class="sect"><h2>📅 انتهاء مستندات الموظفين</h2></div>';
+  h+='<div class="card mini" style="margin-bottom:8px">تنبيه بالمستندات المنتهية أو القرّبة تنتهي (جواز/إقامة/هوية/تصريح عمل). حدّث تواريخ الانتهاء من صفحة الموظف.</div>';
+  h+='<div class="grid kpis"><div class="card kpi"><div class="n" style="color:#c0392b">'+expired.length+'</div><div class="l">منتهية</div></div><div class="card kpi"><div class="n" style="color:#e0a93b">'+soon.length+'</div><div class="l">خلال 30 يوم</div></div><div class="card kpi"><div class="n" style="color:#1aa3c4">'+later.length+'</div><div class="l">خلال 90 يوم</div></div></div>';
+  function sec(title,icon,rows,col){ if(!rows.length) return '<div class="card" style="margin-bottom:8px;border-left:4px solid #1a7a4f"><b>✅ '+icon+' '+title+'</b> <span class="mini">مفيش</span></div>'; return '<details class="card" open style="margin-bottom:8px;border-left:4px solid '+col+'"><summary style="cursor:pointer"><b>'+icon+' '+title+'</b> <span class="tag" style="background:'+col+'22;color:'+col+'">'+rows.length+'</span></summary><div style="margin-top:8px">'+rows.map(function(r){ return '<div style="display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid var(--mist)"><span><b>'+esc(r.name)+'</b> — '+esc(r.doc)+'</span><span class="mini">'+esc(r.date)+' · '+(r.days<0?('متأخر '+Math.abs(r.days)+' يوم'):('باقي '+r.days+' يوم'))+'</span></div>'; }).join('')+'</div></details>'; }
+  if(!all.length) return h+'<div class="card empty">مفيش تواريخ انتهاء مسجّلة على الموظفين. ضيفها من صفحة الموظف.</div>';
+  h+=sec('منتهية','🔴',expired,'#c0392b');
+  h+=sec('بتنتهي خلال 30 يوم','🟠',soon,'#e0a93b');
+  h+=sec('بتنتهي خلال 90 يوم','🟡',later,'#1aa3c4');
+  return h;
+}
+/* --- hr13: Probation Tracking --- */
+function vProbation(){
+  var MO=3;
+  var emps=employees.filter(function(e){return e.active!==false && e.hireDate;});
+  var now=new Date();
+  var rows=[];
+  emps.forEach(function(e){ var hd=new Date(e.hireDate); if(isNaN(hd.getTime())) return; var end=new Date(hd); end.setMonth(end.getMonth()+MO); var days=Math.round((end-now)/86400000); if(days>=0) rows.push({name:e.name,dept:e.dept,hire:e.hireDate,end:end.toISOString().slice(0,10),days:days}); });
+  rows.sort(function(a,b){return a.days-b.days;});
+  var h='<div class="sect"><h2>⏳ فترة الاختبار</h2></div>';
+  h+='<div class="card mini" style="margin-bottom:8px">فترة الاختبار '+MO+' شهور من تاريخ التعيين. دول لسه في الفترة؛ الأحمر قرّب يخلص (خلال 14 يوم) — راجع القرار.</div>';
+  if(!rows.length) return h+'<div class="card empty">مفيش موظفين في فترة الاختبار حاليًا.</div>';
+  h+='<div style="overflow-x:auto"><table><thead><tr><th>الموظف</th><th>القسم</th><th>تاريخ التعيين</th><th>نهاية الاختبار</th><th>باقي</th></tr></thead><tbody>'+rows.map(function(r){ var c=r.days<=14?'#c0392b':(r.days<=30?'#e0a93b':'#1a7a4f'); return '<tr><td><b>'+esc(r.name)+'</b></td><td>'+esc(r.dept||'')+'</td><td>'+esc(r.hire)+'</td><td>'+esc(r.end)+'</td><td style="color:'+c+';font-weight:700">باقي '+r.days+' يوم</td></tr>'; }).join('')+'</tbody></table></div>';
+  return h;
+}
+/* --- hr9: Shift Roster --- */
+var _rosDate='';
+function vRoster(){
+  var mgr=isMgr()||me.dept==='HR'||me.dept==='Operations'||me.dept==='Management'||isAdmin();
+  var d=_rosDate||today();
+  var rows=shifts.filter(inBranch).filter(function(s){return s.date===d;}).slice().sort(function(a,b){return (a.employee||'').localeCompare(b.employee||'');});
+  var h='<div class="sect"><h2>📆 جدول الورديات</h2><div class="sp"></div>'+(mgr?'<button class="btn cy" onclick="editShift()">+ وردية</button>':'')+'</div>';
+  h+='<div class="card" style="margin-bottom:8px;display:flex;align-items:center;gap:8px"><label class="mini">اليوم:</label><input type="date" value="'+esc(d)+'" onchange="_rosDate=this.value;render()" style="padding:5px 7px;border:1px solid var(--mist);border-radius:6px"></div>';
+  if(!rows.length) return h+'<div class="card empty">مفيش ورديات لليوم ده.</div>';
+  var SC={'صباحي':'#1aa3c4','مسائي':'#e0a93b','ليلي':'#5A6B7B','إجازة':'#9aa7b2'};
+  h+='<div style="overflow-x:auto"><table><thead><tr><th>الموظف</th><th>الوردية</th><th>الموقع/ملاحظة</th><th></th></tr></thead><tbody>'+rows.map(function(r){ var c=SC[r.shift]||'#5A6B7B'; return '<tr><td><b>'+esc(r.employee||'')+'</b></td><td><span class="tag" style="background:'+c+'22;color:'+c+'">'+esc(r.shift||'')+'</span></td><td>'+esc(r.site||'')+'</td><td style="white-space:nowrap">'+(mgr?('<button class="btn gh sm" onclick="editShift(\''+r.id+'\')">Edit</button> <button class="btn dn sm" onclick="delDoc(\'shifts\',\''+r.id+'\')">🗑</button>'):'')+'</td></tr>'; }).join('')+'</tbody></table></div>';
+  return h;
+}
+function editShift(id){ var r=id?shifts.find(function(x){return x.id===id;}):{branch:defBranch(),date:_rosDate||today(),shift:'صباحي'}; openModal(id?'تعديل وردية':'وردية جديدة', '<div class="fld"><label>الموظف</label><input id="sh_emp" list="emp_dl" value="'+esc(r.employee||'')+'">'+empDatalist()+'</div>'+'<div class="row2">'+selEl('الوردية','sh_shift',['صباحي','مسائي','ليلي','إجازة'],r.shift||'صباحي')+fEl('التاريخ','sh_date',r.date,'date')+'</div>'+'<div class="row2">'+fEl('الموقع/ملاحظة','sh_site',r.site)+selEl('الفرع','sh_branch',branchOpts(),r.branch)+'</div>', function(){ var d={employee:val('sh_emp'),shift:val('sh_shift'),date:val('sh_date'),site:val('sh_site'),branch:val('sh_branch')}; if(!d.employee){alert('اسم الموظف مطلوب');return false;} if(!id){d.created=new Date().toISOString();} saveDoc('shifts',d,id); }); }
+/* --- hr14: Headcount & Cost --- */
+function vHeadcount(){
+  var mgr=isMgr()||me.dept==='HR'||me.dept==='Management'||isAdmin();
+  if(!mgr) return '<div class="card empty">الصفحة دي للإدارة و HR بس.</div>';
+  var emps=employees.filter(function(e){return e.active!==false;});
+  var byDept={};
+  emps.forEach(function(e){ var dp=e.dept||'غير محدد'; byDept[dp]=(byDept[dp]||0)+1; });
+  var costByBranch={};
+  emps.forEach(function(e){ var br=(e.branches&&e.branches[0])||'—'; costByBranch[br]=(costByBranch[br]||0)+num(e.salary); });
+  var h='<div class="sect"><h2>👥 عدد الموظفين والتكلفة</h2></div>';
+  h+='<div class="grid kpis"><div class="card kpi"><div class="n">'+emps.length+'</div><div class="l">إجمالي الموظفين</div></div><div class="card kpi"><div class="n">'+Object.keys(byDept).length+'</div><div class="l">أقسام فيها موظفين</div></div></div>';
+  h+='<div class="card" style="margin-bottom:8px"><b>العدد حسب القسم</b><div style="overflow-x:auto"><table style="margin-top:6px"><thead><tr><th>القسم</th><th class="r">العدد</th></tr></thead><tbody>'+Object.keys(byDept).sort(function(a,b){return byDept[b]-byDept[a];}).map(function(k){ return '<tr><td>'+esc(k)+'</td><td style="text-align:right"><b>'+byDept[k]+'</b></td></tr>'; }).join('')+'</tbody></table></div></div>';
+  h+='<div class="card"><b>تكلفة المرتبات الشهرية حسب الفرع</b><div style="overflow-x:auto"><table style="margin-top:6px"><thead><tr><th>الفرع</th><th class="r">التكلفة الشهرية</th></tr></thead><tbody>'+Object.keys(costByBranch).map(function(br){ var amt=costByBranch[br]; var disp; try{ disp=(br&&br!=='—')?money(br,amt):Math.round(amt).toLocaleString(); }catch(e){ disp=Math.round(amt).toLocaleString(); } return '<tr><td>'+esc(br)+'</td><td style="text-align:right"><b>'+disp+'</b></td></tr>'; }).join('')+'</tbody></table></div><div class="mini" style="margin-top:4px">بعملة كل فرع.</div></div>';
+  return h;
+}
+/* --- sl20: Client Portal (staff-side + printable client copy) --- */
+var _cpCust='';
+function vClientPortal(){
+  var custs=customers.filter(inBranch);
+  var projs=projects.filter(inBranch);
+  var h='<div class="sect"><h2>🌐 بوابة العميل</h2></div>';
+  h+='<div class="card mini" style="margin-bottom:8px">ملف العميل جاهز تبعته/تطبعه له: مشاريعه وحالتها ونسبة التقدّم. (الدخول الذاتي للعميل بلينك خاص = خطوة backend لاحقة.)</div>';
+  if(!_cpCust){
+    var byClient={};
+    projs.forEach(function(p){ var c=(p.client||'').trim(); if(c){ byClient[c]=(byClient[c]||0)+1; } });
+    var names=Object.keys(byClient).sort(function(a,b){return byClient[b]-byClient[a];});
+    h+='<div class="card" style="margin-bottom:8px"><label class="mini">اختار عميل:</label> <input id="cp_pick" list="cp_dl" placeholder="اسم العميل" style="padding:6px 8px;border:1px solid var(--mist);border-radius:6px"><datalist id="cp_dl">'+custs.slice(0,400).map(function(c){return '<option value="'+esc(c.name||'')+'">';}).join('')+names.map(function(n){return '<option value="'+esc(n)+'">';}).join('')+'</datalist> <button class="btn cy sm" onclick="var v=(document.getElementById(\'cp_pick\')||{}).value;if(v){_cpCust=v;render();}">فتح</button></div>';
+    if(names.length){ h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px">'+names.slice(0,60).map(function(n){ var ne=esc(n); return '<div class="card" style="cursor:pointer" onclick="_cpCust=this.getAttribute(\'data-c\');render()" data-c="'+ne+'"><b>'+ne+'</b><div class="mini" style="margin-top:4px">'+byClient[n]+' مشروع</div></div>'; }).join('')+'</div>'; }
+    else h+='<div class="card empty">مفيش مشاريع مربوطة بعملاء بالاسم.</div>';
+    return h;
+  }
+  var cust=custs.filter(function(c){return nameEq(c.name||'',_cpCust);})[0];
+  var cp=projs.filter(function(p){return nameEq(p.client||'',_cpCust);});
+  h+='<div class="sect" style="align-items:center"><button class="btn gh sm" onclick="_cpCust=\'\';render()">← كل العملاء</button><div class="sp"></div><button class="btn cy sm" onclick="cpPrint()">🖨️ نسخة للعميل</button></div>';
+  h+='<div id="cpview"><div class="card" style="margin-bottom:8px"><h3 style="margin:0">'+esc(_cpCust)+'</h3>'+(cust?('<div class="mini" style="margin-top:4px">'+esc(cust.phone||'')+(cust.email?(' · '+esc(cust.email)):'')+(cust.city?(' · '+esc(cust.city)):'')+'</div>'):'')+'</div>';
+  if(!cp.length){ h+='<div class="card empty">مفيش مشاريع للعميل ده.</div>'; }
+  else { h+=cp.map(function(p){ var pr=num(p.progress); return '<div class="card" style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;gap:8px"><b>'+esc(p.name||'')+'</b><span class="tag" style="background:#1aa3c422;color:#1aa3c4">'+esc(p.status||'')+'</span></div><div style="height:8px;background:var(--mist);border-radius:6px;margin:6px 0;overflow:hidden"><div style="height:100%;width:'+Math.max(0,Math.min(100,pr))+'%;background:var(--cyan)"></div></div><div class="mini">التقدّم: '+pr+'%'+(p.value?(' · القيمة: '+money(p.branch,num(p.value))):'')+'</div></div>'; }).join(''); }
+  h+='</div>';
+  return h;
+}
+function cpPrint(){ var el=document.getElementById('cpview'); if(!el){return;} var w=window.open('','_blank'); if(!w){ alert('اسمح بالنوافذ المنبثقة (popups) عشان تطبع'); return; } w.document.write('<html dir="rtl"><head><meta charset="utf-8"><title>'+esc(_cpCust)+'</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#0F2A47}.card{border:1px solid #ddd;border-radius:8px;padding:12px;margin-bottom:8px}.tag{font-size:12px;color:#1aa3c4}.mini{font-size:12px;color:#666}h2{color:#0F2A47}</style></head><body><h2>Sedra Electric — متابعة مشاريع '+esc(_cpCust)+'</h2>'+el.innerHTML+'<p style="color:#888;font-size:12px;margin-top:20px">'+today()+'</p></body></html>'); w.document.close(); setTimeout(function(){try{w.print();}catch(e){}},400); }
 /* ===================== MANAGER-PARITY: TAX CODES · TRANSFERS · CAPITAL · CREDIT/DEBIT NOTES ===================== */
 function acctSel(idAttr,label,sel,filterType){ const list=accounts.slice().filter(a=>!filterType||a.type===filterType).sort((a,b)=>(a.code||'').localeCompare(b.code||'')); return `<div class="fld"><label>${label}</label><select id="${idAttr}"><option value="">— account —</option>${list.map(a=>`<option value="${esc(a.code)}" ${a.code===sel?'selected':''}>${esc(a.code)} ${esc(a.name)}</option>`).join('')}</select></div>`; }
 function cashAccts(){ return accounts.filter(a=>a.type==='Asset'&&(a.code==='1000'||a.code==='1010'||/cash|bank/i.test(a.name||''))); }
