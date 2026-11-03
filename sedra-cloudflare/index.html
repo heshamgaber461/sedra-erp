@@ -642,6 +642,12 @@ const MODULES = [
   {id:'maintenance',label:'Maintenance', icon:'🛠️', depts:['Operations','Technical']},
   {id:'devroadmap',label:'Development Roadmap', icon:'🛣️', depts:['Management']},
   {id:'datahealth',label:'Data Health', icon:'🩺', depts:['Management']},
+  {id:'orgchart',  label:'Org Chart', icon:'🗂️', depts:['HR','Management']},
+  {id:'attexcept', label:'Attendance Exceptions', icon:'⚠️', depts:['HR','Management','Operations']},
+  {id:'onboard',   label:'Onboarding / Offboarding', icon:'🧳', depts:['HR','Management']},
+  {id:'policies',  label:'Policies', icon:'📜', access:'all'},
+  {id:'exitiv',    label:'Exit Interviews', icon:'🚪', depts:['HR','Management']},
+  {id:'calllog',   label:'Call Log', icon:'📞', depts:['Sales','Management']},
   {id:'automation',label:'Automation', icon:'⚡', adminOnly:true},
   {id:'admin',     label:'Admin', icon:'⚙️', adminOnly:true},
   {id:'claims',    label:'Expense Claims', icon:'🧾', access:'all'},
@@ -801,7 +807,7 @@ let sitevisits=[];
 let matreqs=[];
 let reccmts=[], wfappr=[];
 let rfis=[], dsrs=[], contacts=[];
-let announcements=[], suggestions=[], overtimes=[], devideas=[];
+let announcements=[], suggestions=[], overtimes=[], devideas=[], calls=[], policies=[], exits=[];
 let taxcodes=[], transfers=[], capitals=[], creditnotes=[], debitnotes=[];
 let fxrates=[], billabletime=[];
 let openbals=[], intangibles=[], investments=[];
@@ -1418,7 +1424,7 @@ async function refreshHot(){
    this known list. 'blobs' (big files) and 'attachments'/'attachmentAccess' (own per-user
    rules) are loaded on demand, not here. New collections auto-appear once a service account
    is configured again (the shallow discovery below succeeds); until then, add them here. */
-var BULK_COLLS=['_backups','accounts','activities','adcampaigns','announcements','approvals','attendance','audit','bookings','botChats','campaigns','chats','clientaccounts','clientspace','comments','contacts','customers','devideas','employees','events','expclaims','feedbacks','goals','groups','imports','inventory','invoices','jobreqs','leads','leaves','matreqs','locchangereqs','messages','meta','mktasks','mktplans','notifications','orbit','payments','paySchedule','payslips','posts','projects','prs','pushsubs','quotes','schedules','servicereqs','sheets','siteLabor','sitevisits','staffEmails','suggestions','suppliers','tasks','tickets','todos','trash','wfappr','workorders'];
+var BULK_COLLS=['_backups','accounts','activities','adcampaigns','announcements','approvals','attendance','audit','bookings','botChats','campaigns','chats','clientaccounts','clientspace','comments','contacts','customers','devideas','employees','events','expclaims','feedbacks','goals','groups','imports','inventory','invoices','jobreqs','leads','leaves','matreqs','locchangereqs','messages','meta','mktasks','mktplans','notifications','orbit','payments','paySchedule','payslips','posts','projects','prs','pushsubs','quotes','schedules','servicereqs','sheets','siteLabor','sitevisits','calls','exits','policies','staffEmails','suggestions','suppliers','tasks','tickets','todos','trash','wfappr','workorders'];
 /* HEAVY collections are EXCLUDED from the initial blocking load and loaded in the
    background right after the app opens (loadHeavy). They are large (e.g. quotes carries
    inline images, ~10 MB), so pulling them in the first load froze the browser and burned
@@ -1566,7 +1572,7 @@ function applyAll(all){
     tenders=listToArr(all.tenders); drawings=listToArr(all.drawings); toolbox=listToArr(all.toolbox);
     submittals=listToArr(all.submittals); ipcs=listToArr(all.ipcs); risks=listToArr(all.risks); permits=listToArr(all.permits); requisitions=listToArr(all.requisitions); tandc=listToArr(all.tandc); ncrs=listToArr(all.ncrs); gatepasses=listToArr(all.gatepasses); bonds=listToArr(all.bonds); calibrations=listToArr(all.calibrations); handovers=listToArr(all.handovers); retentions=listToArr(all.retentions); insurances=listToArr(all.insurances); methods=listToArr(all.methods); siteinstr=listToArr(all.siteinstr); subipcs=listToArr(all.subipcs); asbuilts=listToArr(all.asbuilts); wastelogs=listToArr(all.wastelogs); prequals=listToArr(all.prequals); drills=listToArr(all.drills); sheets=listToArr(all.sheets); worddocs=listToArr(all.worddocs); decks=listToArr(all.decks); positions=listToArr(all.positions); mktasks=listToArr(all.mktasks); mktlib=listToArr(all.mktlib); mktplans=listToArr(all.mktplans); growthexp=listToArr(all.growthexp); sitevisits=listToArr(all.sitevisits); matreqs=listToArr(all.matreqs); reccmts=listToArr(all.comments); wfappr=listToArr(all.wfappr);
     rfis=listToArr(all.rfis); dsrs=listToArr(all.dsrs); contacts=listToArr(all.contacts);
-    announcements=listToArr(all.announcements); suggestions=listToArr(all.suggestions); overtimes=listToArr(all.overtimes); devideas=listToArr(all.devideas);
+    announcements=listToArr(all.announcements); suggestions=listToArr(all.suggestions); overtimes=listToArr(all.overtimes); devideas=listToArr(all.devideas); calls=listToArr(all.calls); policies=listToArr(all.policies); exits=listToArr(all.exits);
     taxcodes=listToArr(all.taxcodes); transfers=listToArr(all.transfers); capitals=listToArr(all.capitals); creditnotes=listToArr(all.creditnotes); debitnotes=listToArr(all.debitnotes);
     fxrates=listToArr(all.fxrates); billabletime=listToArr(all.billabletime);
     openbals=listToArr(all.openbals); intangibles=listToArr(all.intangibles); investments=listToArr(all.investments);
@@ -1986,12 +1992,12 @@ function toggleSide(){ var a=g('app'); if(a)a.classList.toggle('navopen'); }
 function closeSide(){ var a=g('app'); if(a)a.classList.remove('navopen'); }
 const NAV_GROUPS=[
   {k:'overview',t:'Overview',ic:'🏠',ids:['workqueue','dashboard','execdash','alerts','datahealth','kpiscore','performance','reports']},
-  {k:'sales',t:'Sales & CRM',ic:'💼',ids:['sales','blueprint','customers','servicereqs','contacts','cust360','funnel','leadsource','commission','tenders','salesorders','quicksale','quotes','variations','bookings','bot']},
+  {k:'sales',t:'Sales & CRM',ic:'💼',ids:['sales','blueprint','customers','servicereqs','contacts','calllog','cust360','funnel','leadsource','commission','tenders','salesorders','quicksale','quotes','variations','bookings','bot']},
   {k:'marketing',t:'Marketing',ic:'📣',ids:['marketing','adspend','revops','mktplan','mktprod','contentcal','growth','mktlib','surveys','feedback']},
   {k:'projects',t:'Projects & Field',ic:'🏗️',ids:['projects','sitecheck','operations','gantt','workorders','issues','scheduling','manpower','dsr','costctrl','ipc','snags','quality','tandc','ncr','calibration','handover','methods','siteinstr','subipc','asbuilt','scurve','ncranalysis','submittals','rfi','doccontrol','risks','permits','maintenance','warranty','support','subcontractors','equipment']},
   {k:'inventory',t:'Inventory & Purchasing',ic:'📦',ids:['inventory','reorder','grn','gatepass','stockcount','stockledger','invvalue','requisitions','purchasereq','rfq','prequal','suppscore']},
   {k:'finance',t:'Finance & Accounting',ic:'💰',ids:['accounting','ledger','glreport','bonds','retention','finance','cashpos','openbal','taxcodes','taxsummary','fxrates','transfers','capital','creditnotes','debitnotes','subscriptions','billabletime','claims','pettycash','deprec','intangibles','investments','araging','apaging','expanalysis','branchcompare','orderbook']},
-  {k:'hr',t:'HR & People',ic:'👔',ids:['hr','myhr','recruit','applicants','courses','attendance','overtime','leavecal','birthdays','fleet','assets','goals']},
+  {k:'hr',t:'HR & People',ic:'👔',ids:['hr','myhr','orgchart','onboard','recruit','applicants','courses','attendance','attexcept','overtime','leavecal','birthdays','exitiv','policies','fleet','assets','goals']},
   {k:'gov',t:'Governance & Docs',ic:'🛡️',ids:['safety','toolbox','insurance','waste','drills','workflow','hsereport','agreements','documents','esign','approvals','kbase','meetings','licenses','auditlog','exporthub']},
   {k:'workspace',t:'Workspace',ic:'🗓️',ids:['calendar','todo','workplan','sheets','worddocs','slides','weekly','chat','announcements','suggestions','training','profile']},
   {k:'admin',t:'Admin',ic:'⚙️',ids:['devroadmap','automation','admin']}
@@ -2575,7 +2581,7 @@ function render(keepScroll){
   if(!canSee(m)){ curView='hub'; m=MODULES.find(function(x){return x.id==='hub';})||MODULES[0]; }
   g('viewTitle').textContent=m.label;
   markNav();
-  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,clientreqs:vClientReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,devroadmap:vDevRoadmap,datahealth:vDataHealth,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,trash:vTrash,findreplace:vFindReplace,quoterequests:vQuoteRequests,admin:vAdmin,profile:vProfile}[curView];
+  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,clientreqs:vClientReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,devroadmap:vDevRoadmap,datahealth:vDataHealth,orgchart:vOrgChart,attexcept:vAttExcept,onboard:vOnboard,policies:vPolicies,exitiv:vExitIv,calllog:vCallLog,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,trash:vTrash,findreplace:vFindReplace,quoterequests:vQuoteRequests,admin:vAdmin,profile:vProfile}[curView];
   g('view').innerHTML = fn?fn():'';
   if(curView==='sales' && window._afterSales)window._afterSales();
   if(curView==='chat' && window._afterChat)window._afterChat();
@@ -3581,6 +3587,7 @@ function editLead(id){
     `<div class="fld"><label>Position / job title (contact)${isAdmin()?' · <a onclick="managePositions()" style="cursor:pointer;color:#157f96;font-size:11px">⚙ '+(lang==='ar'?'إدارة الوظائف':'manage')+'</a>':''}</label><select id="l_position">${posOptions(r.position||'')}</select></div>`+
     `<div class="row2">${selEl('Branch','l_branch',branchOpts(),r.branch)}${(bpOn()&&id)?('<div class="fld"><label>Stage</label><input value="'+esc(r.stage||'New')+'" disabled title="'+(lang==='ar'?'المرحلة تتغيّر من أزرار العملية بالأعلى':'Stage changes via the process buttons above')+'"></div>'):selEl('Stage','l_stage',STAGES,r.stage||'New')}</div>`+
     `<div class="row2">${fEl('Sales rep (owner)','l_owner',r.owner)}${selEl('Source','l_source',LEAD_SOURCES,r.source||'Direct')}</div>`+
+    `<div class="fld"><label>🤝 ${lang==='ar'?'اترشّح عن طريق مين؟ (للمصدر Referral)':'Referred by (for Referral source)'}</label><input id="l_referredBy" value="${esc(r.referredBy||'')}" placeholder="${lang==='ar'?'اسم العميل/المهندس/المقاول اللي رشّحه':'name of client/engineer/contractor who referred'}"></div>`+
     `<div class="fld"><label>Campaign (marketing source)</label><select id="l_campaign">${['<option value="">— none —</option>'].concat(campaigns.filter(inBranch).map(c=>`<option value="${c.id}" ${c.id===r.campaignId?'selected':''}>${esc(c.name)}</option>`)).join('')}</select></div>`+
     `<div class="row2">${selEl('Customer type','l_ctype',CUSTOMER_TYPES,r.ctype||'Company')}${selEl('Business / industry','l_btype',BUSINESS_TYPES,r.btype||'Other')}</div>`+
     `<div class="row2">${selEl('Project type','l_ptype',PROJECT_TYPES,r.ptype||'Other')}${fEl('Service / scope','l_service',r.service)}</div>`+
@@ -3598,8 +3605,9 @@ function editLead(id){
     `<div class="row2">${selEl('Win/Loss reason (if Won/Lost)','l_reason',['—'].concat(WONLOST_REASONS),r.reason||'—')}${fEl('Reason note','l_reasonNote',r.reasonNote)}</div>`+
     fileField('l_file','Attach a file (drawing / BOQ / quotation / photo)',r.file)+
     fTa('Notes','l_notes',r.notes),
-    ()=>{ const reason=val('l_reason'); const d={company:val('l_company'),name:val('l_name'),villaOwner:val('l_villaOwner'),phone:val('l_phone'),position:val('l_position'),email:val('l_email'),segment:val('l_segment'),budgetRange:(val('l_budget')==='—'?'':val('l_budget')),solutionInterest:val('l_solution'),currentBill:num(val('l_bill')),lifecycle:(val('l_lifecycle')==='Auto'?'':val('l_lifecycle')),funnel:(val('l_funnel')==='—'?'':val('l_funnel')),bantB:val('l_bantb'),bantA:val('l_banta'),bantN:val('l_bantn'),bantT:val('l_bantt'),branch:val('l_branch'),stage:((bpOn()&&id)?(r.stage||'New'):val('l_stage')),owner:val('l_owner'),source:val('l_source'),campaignId:val('l_campaign'),ctype:val('l_ctype'),btype:val('l_btype'),ptype:val('l_ptype'),service:val('l_service'),area:val('l_area'),address:val('l_address'),location:val('l_location'),projects:val('l_projects'),lastUpdate:val('l_lastUpdate'),updateDate:val('l_updateDate'),website:val('l_website'),social:val('l_social'),value:num(val('l_value')),reason:(reason==='—'?'':reason),reasonNote:val('l_reasonNote'),next:val('l_next'),notes:val('l_notes'),file:fileVal('l_file')};
+    ()=>{ const reason=val('l_reason'); const d={company:val('l_company'),name:val('l_name'),villaOwner:val('l_villaOwner'),phone:val('l_phone'),position:val('l_position'),email:val('l_email'),segment:val('l_segment'),budgetRange:(val('l_budget')==='—'?'':val('l_budget')),solutionInterest:val('l_solution'),currentBill:num(val('l_bill')),lifecycle:(val('l_lifecycle')==='Auto'?'':val('l_lifecycle')),funnel:(val('l_funnel')==='—'?'':val('l_funnel')),bantB:val('l_bantb'),bantA:val('l_banta'),bantN:val('l_bantn'),bantT:val('l_bantt'),branch:val('l_branch'),stage:((bpOn()&&id)?(r.stage||'New'):val('l_stage')),owner:val('l_owner'),source:val('l_source'),referredBy:val('l_referredBy'),campaignId:val('l_campaign'),ctype:val('l_ctype'),btype:val('l_btype'),ptype:val('l_ptype'),service:val('l_service'),area:val('l_area'),address:val('l_address'),location:val('l_location'),projects:val('l_projects'),lastUpdate:val('l_lastUpdate'),updateDate:val('l_updateDate'),website:val('l_website'),social:val('l_social'),value:num(val('l_value')),reason:(reason==='—'?'':reason),reasonNote:val('l_reasonNote'),next:val('l_next'),notes:val('l_notes'),file:fileVal('l_file')};
       if(!d.name){alert('Name required');return false;}
+      if(canonStage(d.stage)==='Lost' && !d.reason){ alert(lang==='ar'?'⚠️ لازم تحدّد سبب الخسارة (Win/Loss reason) قبل ما تقفل الليد كـ Lost.':'Select a loss reason before marking this lead Lost.'); var _rr=g('l_reason'); if(_rr){try{_rr.focus();}catch(e){}} return false; }
       var _needVal=['Qualified','Site Survey','BOQ / Design','Quotation Sent','Negotiation'];
       if(_needVal.indexOf(canonStage(d.stage))>=0 && num(d.value)<=0){ alert(lang==='ar'?('⚠️ لازم تحط قيمة متوقّعة للّيد قبل مرحلة «'+d.stage+'».\nالقيمة دي بتغذّي توقّع المبيعات والقمع.'):('⚠️ An estimated deal value is required at stage "'+d.stage+'".\nIt powers the sales forecast and funnel.')); var _vv=g('l_value'); if(_vv){try{_vv.focus();}catch(e){}} return false; }
       if(!dupGuard('leads',d,id))return false; if(!id)d.created=new Date().toISOString(); d.ownerEmail=ownerEmailFor(d.owner); saveDoc('leads',d,id); });
@@ -11866,6 +11874,119 @@ function vDataHealth(){
   else { h+=_dhCard('📄','كوتيشن من غير بنود',' ',quoteNoItems,function(q){return _dhRow(q.number||q.client||q.id,q.id,'recOpen','');},'med'); }
   return h;
 }
+/* ===================== ROADMAP BUILDS: Call Log · Org Chart · Attendance Exceptions · Onboarding · Policies · Exit Interviews ===================== */
+function telLink(p){ var d=String(p||'').replace(/[^\d+]/g,''); if(!d) return esc(p||''); return '<a href="tel:'+d+'" onclick="event.stopPropagation()" style="color:var(--cyan);text-decoration:none">📞 '+esc(p)+'</a>'; }
+/* --- sl10: Call Log --- */
+function vCallLog(){
+  var mgr=isMgr()||me.dept==='Management'||isAdmin();
+  var rows=calls.filter(inBranch); var myE=(me.email||'').toLowerCase();
+  if(!mgr) rows=rows.filter(function(r){return (r.byEmail||'')===myE;});
+  rows=rows.slice().sort(function(a,b){return (b.ts||b.date||'').localeCompare(a.ts||a.date||'');});
+  var conn=rows.filter(function(r){return r.outcome==='تم الرد';}).length;
+  var h='<div class="sect"><h2>📞 سجل المكالمات</h2><div class="sp"></div><button class="btn cy" onclick="editCall()">+ سجّل مكالمة</button></div>';
+  h+='<div class="card mini" style="margin-bottom:8px">سجّل كل مكالمة مع العميل/الليد ونتيجتها. اضغط على الرقم للاتصال مباشرة.</div>';
+  h+='<div class="grid kpis"><div class="card kpi"><div class="n">'+rows.length+'</div><div class="l">مكالمات</div></div><div class="card kpi"><div class="n" style="color:#1a7a4f">'+conn+'</div><div class="l">تم الرد</div></div></div>';
+  if(!rows.length) return h+'<div class="card empty">مفيش مكالمات متسجّلة.</div>';
+  h+='<div style="overflow-x:auto"><table><thead><tr><th>التاريخ</th><th>الاسم</th><th>التليفون</th><th>النوع</th><th>النتيجة</th><th>اللي كلّم</th><th></th></tr></thead><tbody>'+rows.map(function(r){ var oc={'تم الرد':'#1a7a4f','مردّش':'#c0392b','يتصل تاني':'#e0a93b','مشغول':'#e0a93b','رقم غلط':'#9aa7b2'}[r.outcome]||'#5A6B7B'; return '<tr><td>'+esc(r.date||'')+'</td><td><b>'+esc(r.name||'')+'</b>'+(r.notes?'<div class="mini">'+esc(r.notes)+'</div>':'')+'</td><td>'+telLink(r.phone)+'</td><td>'+esc(r.dir||'')+'</td><td><span class="tag" style="background:'+oc+'22;color:'+oc+'">'+esc(r.outcome||'')+'</span></td><td>'+esc(r.by||'')+'</td><td style="white-space:nowrap"><button class="btn gh sm" onclick="editCall(\''+r.id+'\')">Edit</button> '+(mgr?('<button class="btn dn sm" onclick="delDoc(\'calls\',\''+r.id+'\')">🗑</button>'):'')+'</td></tr>'; }).join('')+'</tbody></table></div>';
+  return h;
+}
+function editCall(id){
+  var r=id?calls.find(function(x){return x.id===id;}):{branch:defBranch(),date:today(),dir:'صادرة',outcome:'تم الرد'};
+  openModal(id?'تعديل مكالمة':'سجّل مكالمة',
+    '<div class="fld"><label>الاسم (عميل / ليد)</label><input id="ca_name" list="call_lead_dl" value="'+esc(r.name||'')+'"><datalist id="call_lead_dl">'+leads.filter(inBranch).slice(0,250).map(function(l){return '<option value="'+esc(l.name||'')+'">';}).join('')+'</datalist></div>'+
+    '<div class="row2">'+fEl('التليفون','ca_phone',r.phone)+selEl('النوع','ca_dir',['صادرة','واردة'],r.dir||'صادرة')+'</div>'+
+    '<div class="row2">'+selEl('النتيجة','ca_outcome',['تم الرد','مردّش','يتصل تاني','مشغول','رقم غلط'],r.outcome||'تم الرد')+fEl('التاريخ','ca_date',r.date,'date')+'</div>'+
+    fTa('ملاحظات','ca_notes',r.notes)+selEl('الفرع','ca_branch',branchOpts(),r.branch),
+    function(){ var d={name:val('ca_name'),phone:val('ca_phone'),dir:val('ca_dir'),outcome:val('ca_outcome'),date:val('ca_date'),notes:val('ca_notes'),branch:val('ca_branch')}; if(!d.name&&!d.phone){alert('الاسم أو التليفون مطلوب');return false;} if(!id){d.by=me.name;d.byEmail=(me.email||'').toLowerCase();d.ts=new Date().toISOString();d.created=d.ts;} saveDoc('calls',d,id); });
+}
+/* --- hr6: Org Chart --- */
+function vOrgChart(){
+  var emps=employees.filter(function(e){return e.active!==false;});
+  var h='<div class="sect"><h2>🗂️ الهيكل التنظيمي</h2></div>';
+  h+='<div class="card mini" style="margin-bottom:8px">مبني على حقل «المدير» لكل موظف. لو حد مش ظاهر تحت مديره، حدّث حقل المدير في صفحته.</div>';
+  if(!emps.length) return h+'<div class="card empty">مفيش موظفين.</div>';
+  function hasMgr(e){ if(!e.manager) return false; return emps.some(function(m){ return m!==e && (nameEq(m.name||'',e.manager) || (m.email||'').toLowerCase()===(e.manager||'').toLowerCase()); }); }
+  var roots=emps.filter(function(e){ return !hasMgr(e); });
+  var seen={};
+  function node(e,depth){
+    if(seen[e.id]) return ''; seen[e.id]=1;
+    var ch=emps.filter(function(c){ return c!==e && (nameEq(c.manager||'',e.name) || (e.email&&(c.manager||'').toLowerCase()===(e.email||'').toLowerCase())); });
+    ch.sort(function(a,b){ return (ROLE_RANK[b.role]||0)-(ROLE_RANK[a.role]||0); });
+    var col=depth===0?'var(--cyan)':'var(--mist)';
+    var pad=(lang==='ar'?'margin-right:':'margin-left:')+(depth*18)+'px';
+    var bd=(lang==='ar'?'border-right:':'border-left:')+'3px solid '+col;
+    var out='<div class="card" style="'+pad+';'+bd+';padding:6px 10px;margin-bottom:5px;background:#fff"><b>'+esc(e.name||'')+'</b> <span class="mini">'+esc(e.title||e.role||'')+(e.dept?(' · '+esc(e.dept)):'')+'</span></div>';
+    ch.forEach(function(c){ out+=node(c,depth+1); });
+    return out;
+  }
+  roots.sort(function(a,b){ return (ROLE_RANK[b.role]||0)-(ROLE_RANK[a.role]||0); });
+  roots.forEach(function(e){ h+=node(e,0); });
+  emps.forEach(function(e){ if(!seen[e.id]) h+=node(e,0); });
+  return h;
+}
+/* --- hr18: Attendance Exceptions --- */
+function vAttExcept(){
+  var d=today();
+  var active=employees.filter(function(e){return e.active!==false;});
+  var att=attendance.filter(function(a){return a.date===d && inBranch(a);});
+  var byEmail={}; att.forEach(function(a){ byEmail[(a.email||'').toLowerCase()]=a; });
+  var absent=active.filter(function(e){ return !byEmail[(e.email||'').toLowerCase()]; });
+  var noOut=att.filter(function(a){ return a.inTime && !a.outTime; });
+  var far=att.filter(function(a){ return num(a.inDist)>300; });
+  var h='<div class="sect"><h2>⚠️ استثناءات الحضور — '+esc(d)+'</h2><div class="sp"></div><button class="btn gh sm" onclick="render()">🔄 تحديث</button></div>';
+  h+='<div class="grid kpis"><div class="card kpi"><div class="n" style="color:#c0392b">'+absent.length+'</div><div class="l">غياب النهاردة</div></div><div class="card kpi"><div class="n" style="color:#e0a93b">'+noOut.length+'</div><div class="l">نسوا الانصراف</div></div><div class="card kpi"><div class="n" style="color:#e0a93b">'+far.length+'</div><div class="l">سجّلوا بعيد</div></div><div class="card kpi"><div class="n" style="color:#1a7a4f">'+att.length+'</div><div class="l">سجّلوا حضور</div></div></div>';
+  function sec(title,icon,rows,render){ if(!rows.length) return '<div class="card" style="margin-bottom:8px;border-left:4px solid #1a7a4f"><b>✅ '+icon+' '+title+'</b> <span class="mini">تمام</span></div>'; return '<details class="card" style="margin-bottom:8px;border-left:4px solid #c0392b"><summary style="cursor:pointer"><b>'+icon+' '+title+'</b> <span class="tag" style="background:#c0392b22;color:#c0392b">'+rows.length+'</span></summary><div style="margin-top:8px">'+rows.map(render).join('')+'</div></details>'; }
+  h+=sec('غياب النهاردة','🚫',absent,function(e){ return '<div style="padding:4px 0;border-bottom:1px solid var(--mist)">'+esc(e.name||'')+' <span class="mini">'+esc(e.dept||'')+'</span></div>'; });
+  h+=sec('نسوا يسجّلوا انصراف','🚪',noOut,function(a){ return '<div style="padding:4px 0;border-bottom:1px solid var(--mist)">'+esc(a.name||'')+' <span class="mini">دخول '+esc(a.inTime||'')+'</span></div>'; });
+  h+=sec('سجّلوا حضور بعيد عن الموقع','📍',far,function(a){ return '<div style="padding:4px 0;border-bottom:1px solid var(--mist)">'+esc(a.name||'')+' <span class="mini">'+Math.round(num(a.inDist))+'م</span></div>'; });
+  return h;
+}
+/* --- hr5: Onboarding / Offboarding --- */
+function vOnboard(){
+  var mgr=isMgr()||me.dept==='HR'||me.dept==='Management'||isAdmin();
+  var rows=(typeof onboarding!=='undefined'?onboarding:[]).filter(inBranch).slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});
+  var h='<div class="sect"><h2>🧳 تعيين / إنهاء خدمة</h2><div class="sp"></div>'+(mgr?'<button class="btn cy" onclick="editOnb()">+ جديد</button>':'')+'</div>';
+  h+='<div class="card mini" style="margin-bottom:8px">تشك ليست استلام الموظف الجديد أو تسليم عند الخروج (حسابات/عُدد/صلاحيات).</div>';
+  if(!rows.length) return h+'<div class="card empty">مفيش سجلات.</div>';
+  h+=rows.map(function(r){ var items=r.items||[]; var done=items.filter(function(i){return i.done;}).length; var pct=items.length?Math.round(done/items.length*100):0; var tc=r.type==='إنهاء خدمة'?'#c0392b':'#1a7a4f'; return '<div class="card" style="margin-bottom:8px;border-left:4px solid '+tc+'"><div style="display:flex;justify-content:space-between;gap:8px"><div><b>'+esc(r.employee||'')+'</b> <span class="tag" style="background:'+tc+'22;color:'+tc+'">'+esc(r.type||'')+'</span> <span class="mini">'+esc(r.date||'')+'</span></div><div style="white-space:nowrap">'+(mgr?('<button class="btn gh sm" onclick="editOnb(\''+r.id+'\')">Edit</button> <button class="btn dn sm" onclick="delDoc(\'onboarding\',\''+r.id+'\')">🗑</button>'):'')+'</div></div><div style="height:7px;background:var(--mist);border-radius:6px;margin:6px 0;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+tc+'"></div></div>'+items.map(function(i,ix){ return '<label style="display:flex;gap:6px;align-items:center;padding:2px 0;font-size:13px"><input type="checkbox" '+(i.done?'checked':'')+' onchange="onbToggle(\''+r.id+'\','+ix+',this.checked)"> '+esc(i.t||'')+'</label>'; }).join('')+'</div>'; }).join('');
+  return h;
+}
+function onbToggle(id,ix,ch){ var r=onboarding.find(function(x){return x.id===id;}); if(!r||!r.items||!r.items[ix])return; r.items[ix].done=ch; apiMerge('onboarding',id,{items:r.items}).then(synced); }
+function editOnb(id){
+  var ONB_DEF=['إنشاء إيميل وحسابات','تسليم لابتوب/عُدة','صلاحيات النظام (ERP)','توقيع العقد','تعريف بالسياسات','إضافة للحضور'];
+  var OFF_DEF=['سحب صلاحيات ERP','استلام لابتوب/عُدة','تسوية مالية نهائية','تسليم العهدة','إلغاء الإيميل'];
+  var r=id?onboarding.find(function(x){return x.id===id;}):{branch:defBranch(),date:today(),type:'تعيين'};
+  openModal(id?'تعديل':'تعيين / إنهاء خدمة',
+    '<div class="fld"><label>الموظف</label><input id="on_emp" list="emp_dl" value="'+esc(r.employee||'')+'">'+empDatalist()+'</div>'+
+    '<div class="row2">'+selEl('النوع','on_type',['تعيين','إنهاء خدمة'],r.type||'تعيين')+fEl('التاريخ','on_date',r.date,'date')+'</div>'+
+    selEl('الفرع','on_branch',branchOpts(),r.branch),
+    function(){ var type=val('on_type'); var d={employee:val('on_emp'),type:type,date:val('on_date'),branch:val('on_branch')}; if(!d.employee){alert('اسم الموظف مطلوب');return false;} if(!id){ d.items=(type==='إنهاء خدمة'?OFF_DEF:ONB_DEF).map(function(t){return {t:t,done:false};}); d.by=me.name; d.created=new Date().toISOString(); } saveDoc('onboarding',d,id); });
+}
+/* --- hr19: Policies + acknowledgment --- */
+function _polSafe(em){ return String(em||'').replace(/[.@#$\[\]]/g,'_').replace(/\//g,'_'); }
+function vPolicies(){
+  var mgr=isMgr()||me.dept==='HR'||me.dept==='Management'||isAdmin();
+  var rows=policies.filter(inBranch).slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});
+  var myS=_polSafe(me.email);
+  var h='<div class="sect"><h2>📜 السياسات واللوائح</h2><div class="sp"></div>'+(mgr?'<button class="btn cy" onclick="editPolicy()">+ سياسة جديدة</button>':'')+'</div>';
+  h+='<div class="card mini" style="margin-bottom:8px">اقرأ السياسة واضغط «أقرّ بالاطّلاع». الإدارة بتشوف مين أقرّ.</div>';
+  if(!rows.length) return h+'<div class="card empty">مفيش سياسات.</div>';
+  h+=rows.map(function(r){ var acks=r.acks||{}; var n=Object.keys(acks).length; var acked=!!acks[myS]; return '<div class="card" style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;gap:8px"><b>'+esc(r.title||'')+'</b><div style="white-space:nowrap">'+(mgr?('<button class="btn gh sm" onclick="editPolicy(\''+r.id+'\')">Edit</button> <button class="btn dn sm" onclick="delDoc(\'policies\',\''+r.id+'\')">🗑</button>'):'')+'</div></div><div class="mini" style="margin:6px 0;white-space:pre-wrap">'+esc(r.body||'')+'</div><div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'+(acked?'<span class="tag" style="background:#1a7a4f22;color:#1a7a4f">✔ أقرّيت بالاطّلاع</span>':'<button class="btn cy sm" onclick="ackPolicy(\''+r.id+'\')">أقرّ بالاطّلاع</button>')+'<span class="mini">'+n+' أقرّوا'+((mgr&&n)?(': '+Object.keys(acks).map(function(k){return esc((acks[k]&&acks[k].name)||k);}).slice(0,25).join('، ')):'')+'</span></div></div>'; }).join('');
+  return h;
+}
+function ackPolicy(id){ var r=policies.find(function(x){return x.id===id;}); if(!r)return; var acks=Object.assign({},r.acks||{}); acks[_polSafe(me.email)]={name:me.name,date:today()}; r.acks=acks; apiMerge('policies',id,{acks:acks}).then(synced); render(); }
+function editPolicy(id){ var r=id?policies.find(function(x){return x.id===id;}):{branch:defBranch(),date:today()}; openModal(id?'تعديل سياسة':'سياسة جديدة', fEl('العنوان','po_title',r.title)+fTa('النص','po_body',r.body)+selEl('الفرع','po_branch',branchOpts(),r.branch), function(){ var d={title:val('po_title'),body:val('po_body'),branch:val('po_branch')}; if(!d.title){alert('العنوان مطلوب');return false;} if(!id){d.by=me.name;d.date=today();d.created=new Date().toISOString();d.acks={};} saveDoc('policies',d,id); }); }
+/* --- hr20: Exit Interviews --- */
+function vExitIv(){
+  var mgr=isMgr()||me.dept==='HR'||me.dept==='Management'||isAdmin();
+  if(!mgr) return '<div class="card empty">الصفحة دي للإدارة و HR بس.</div>';
+  var rows=exits.filter(inBranch).slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});
+  var h='<div class="sect"><h2>🚪 مقابلات الخروج</h2><div class="sp"></div><button class="btn cy" onclick="editExit()">+ مقابلة خروج</button></div>';
+  if(!rows.length) return h+'<div class="card empty">مفيش مقابلات.</div>';
+  h+='<div style="overflow-x:auto"><table><thead><tr><th>التاريخ</th><th>الموظف</th><th>السبب</th><th>التقييم</th><th>ملاحظات</th><th></th></tr></thead><tbody>'+rows.map(function(r){ var st='★'.repeat(Math.max(0,Math.min(5,num(r.rating))))||'—'; return '<tr><td>'+esc(r.date||'')+'</td><td><b>'+esc(r.employee||'')+'</b></td><td>'+esc(r.reason||'')+'</td><td style="color:#e0a93b">'+st+'</td><td class="mini">'+esc(r.feedback||'')+'</td><td style="white-space:nowrap"><button class="btn gh sm" onclick="editExit(\''+r.id+'\')">Edit</button> <button class="btn dn sm" onclick="delDoc(\'exits\',\''+r.id+'\')">🗑</button></td></tr>'; }).join('')+'</tbody></table></div>';
+  return h;
+}
+function editExit(id){ var r=id?exits.find(function(x){return x.id===id;}):{branch:defBranch(),date:today(),rating:3}; openModal(id?'تعديل':'مقابلة خروج', '<div class="fld"><label>الموظف</label><input id="ex_emp" list="emp_dl" value="'+esc(r.employee||'')+'">'+empDatalist()+'</div>'+'<div class="row2">'+selEl('سبب الخروج','ex_reason',['راتب أعلى','فرصة أفضل','مشاكل إدارية','ظروف شخصية','انتقال','إنهاء من الشركة','أخرى'],r.reason||'فرصة أفضل')+fEl('التاريخ','ex_date',r.date,'date')+'</div>'+'<div class="row2">'+selEl('تقييم التجربة (1-5)','ex_rating',['1','2','3','4','5'],String(r.rating||3))+selEl('الفرع','ex_branch',branchOpts(),r.branch)+'</div>'+fTa('ملاحظات / اقتراحات','ex_feedback',r.feedback), function(){ var d={employee:val('ex_emp'),reason:val('ex_reason'),rating:num(val('ex_rating')),date:val('ex_date'),branch:val('ex_branch'),feedback:val('ex_feedback')}; if(!d.employee){alert('اسم الموظف مطلوب');return false;} if(!id){d.by=me.name;d.created=new Date().toISOString();} saveDoc('exits',d,id); }); }
 /* ===================== MANAGER-PARITY: TAX CODES · TRANSFERS · CAPITAL · CREDIT/DEBIT NOTES ===================== */
 function acctSel(idAttr,label,sel,filterType){ const list=accounts.slice().filter(a=>!filterType||a.type===filterType).sort((a,b)=>(a.code||'').localeCompare(b.code||'')); return `<div class="fld"><label>${label}</label><select id="${idAttr}"><option value="">— account —</option>${list.map(a=>`<option value="${esc(a.code)}" ${a.code===sel?'selected':''}>${esc(a.code)} ${esc(a.name)}</option>`).join('')}</select></div>`; }
 function cashAccts(){ return accounts.filter(a=>a.type==='Asset'&&(a.code==='1000'||a.code==='1010'||/cash|bank/i.test(a.name||''))); }
