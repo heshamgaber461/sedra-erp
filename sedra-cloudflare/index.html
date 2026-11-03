@@ -841,7 +841,7 @@ function inBranch(item){ const a=allowedBranches(); const b=item&&item.branch; i
 var LOCK_PERSONAL=['hub','dashboard','profile','myhr','todo','calendar','sitecheck','attendance','announcements','leavecal','birthdays','suggestions','chat','training'];
 var DEPT_HOME={Sales:'sales',Marketing:'marketing',Operations:'projects',Technical:'projects',Accounting:'accounting',Inventory:'inventory',HR:'hr',Management:'dashboard'};
 var SENSITIVE_MODS=['hr','accounting','finance','payroll','payslips','loans'];
-function canSee(m){ if(!me)return false; if(m&&m.id!=='admin'&&settings&&settings.hiddenModules&&settings.hiddenModules[m.id])return false; if(me.role==='Super Admin')return true; if(m.adminOnly)return false; if(me.role==='Viewer'){ return SENSITIVE_MODS.indexOf(m.id)<0; } if(SENSITIVE_MODS.indexOf(m.id)>=0){ if((me.accessModules||[]).indexOf(m.id)>=0)return true; var essS=(typeof ROLE_ESSENTIALS!=='undefined'&&(ROLE_ESSENTIALS[me.dept]||ROLE_ESSENTIALS._default))||[]; return essS.indexOf(m.id)>=0; } if(LOCK_PERSONAL.indexOf(m.id)>=0)return true; if((me.accessModules||[]).indexOf(m.id)>=0)return true; var ess=(typeof ROLE_ESSENTIALS!=='undefined'&&(ROLE_ESSENTIALS[me.dept]||ROLE_ESSENTIALS._default))||[]; return ess.indexOf(m.id)>=0; }
+function canSee(m){ if(!me)return false; if(m&&m.id!=='admin'&&settings&&settings.hiddenModules&&settings.hiddenModules[m.id])return false; if(me.role==='Super Admin')return true; if(roleRank(me.role)>=ROLE_RANK['CEO']) return !m.adminOnly; /* CEO / CO Founder: see every module except Admin-only system screens (no system/settings/mass-delete) */ if(m.adminOnly)return false; if(me.role==='Viewer'){ return SENSITIVE_MODS.indexOf(m.id)<0; } if(SENSITIVE_MODS.indexOf(m.id)>=0){ if((me.accessModules||[]).indexOf(m.id)>=0)return true; var essS=(typeof ROLE_ESSENTIALS!=='undefined'&&(ROLE_ESSENTIALS[me.dept]||ROLE_ESSENTIALS._default))||[]; return essS.indexOf(m.id)>=0; } if(LOCK_PERSONAL.indexOf(m.id)>=0)return true; if((me.accessModules||[]).indexOf(m.id)>=0)return true; if(me.role==='Member'&&(me.dept==='Operations'||me.dept==='Technical')){ return m.id==='projects'; } /* field staff: personal screens (check-in/out) + their assigned projects + material requests only — no ops/workorders/dsr/snags */ var ess=(typeof ROLE_ESSENTIALS!=='undefined'&&(ROLE_ESSENTIALS[me.dept]||ROLE_ESSENTIALS._default))||[]; return ess.indexOf(m.id)>=0; }
 function canEdit(){ if(me&&me.role==='Viewer')return false; return me && me.role!=='Member' ? true : (me&&me.role==='Member'); }
 function isViewer(){ return !!(me&&me.role==='Viewer'); }
 function canWrite(){ return !(me&&me.role==='Viewer'); }
@@ -3809,7 +3809,7 @@ function editProject(id){
     `<div class="row2">${selEl('Status','p_status',PSTAT,r.status||'Planning')}${fEl('Progress %','p_progress',r.progress,'number')}</div>`+
     `<div class="row2">${fEl('Start date','p_start',r.start,'date')}${fEl('End date','p_end',r.end,'date')}</div>`+
     `<div class="row2">${fEl('Owner','p_owner',r.owner)}${fEl('Value','p_value',r.value,'number')}</div>`+
-    `<div class="row2"><div class="fld"><label>${lang==='ar'?'موقع المشروع على الخريطة (GPS)':'GPS location (lat,lng or link)'}</label>`+(_gpsLocked?`<input id="p_gps" value="${esc(r.gps||'')}" readonly style="background:#eef2f6;color:#5A6B7B"><div class="mini" style="margin-top:6px">🔒 ${lang==='ar'?'الموقع متسجّل ومتقفل — أي تغيير لازم موافقة الإدارة':'Location set & locked — any change needs management approval'}</div><button type="button" class="btn gh sm" style="margin-top:6px" onclick="reqLocChange('${id}')">📍 ${lang==='ar'?'اطلب تغيير الموقع':'Request location change'}</button>`:`<input id="p_gps" value="${esc(r.gps||'')}" placeholder="${lang==='ar'?'مثال: 30.0512, 31.2405 أو إحداثيات DMS':'e.g. 30.0512, 31.2405'}"><button type="button" class="btn gh sm" style="margin-top:6px" onclick="fillMyGps()">📍 ${lang==='ar'?'استخدم موقعي الحالي':'Use my current location'}</button>`)+`</div>${selEl('Drawings approved?','p_draw',['No','Yes'],r.drawingApproved?'Yes':'No')}</div>`+
+    `<div class="row2"><div class="fld"><label>${lang==='ar'?'موقع المشروع على الخريطة (GPS)':'GPS location (lat,lng or link)'}</label>`+(_gpsLocked?`<input id="p_gps" value="${esc(r.gps||'')}" readonly style="background:#eef2f6;color:#5A6B7B"><div class="mini" style="margin-top:6px">🔒 ${lang==='ar'?'الموقع متسجّل ومتقفل — أي تغيير لازم موافقة الإدارة':'Location set & locked — any change needs management approval'}</div><button type="button" class="btn gh sm" style="margin-top:6px" onclick="reqLocChange('${id}')">📍 ${lang==='ar'?'اطلب تغيير الموقع':'Request location change'}</button>`:`<input id="p_gps" value="${esc(r.gps||'')}" placeholder="${lang==='ar'?'مثال: 30.0512, 31.2405 أو إحداثيات DMS':'e.g. 30.0512, 31.2405'}"><button type="button" class="btn gh sm" style="margin-top:6px" onclick="fillMyGps()">📍 ${lang==='ar'?'استخدم موقعي الحالي':'Use my current location'}</button> <button type="button" class="btn gh sm" style="margin-top:6px" onclick="pickGpsMap()">🗺️ ${lang==='ar'?'اختر على الخريطة':'Pick on map'}</button>`)+`</div>${selEl('Drawings approved?','p_draw',['No','Yes'],r.drawingApproved?'Yes':'No')}</div>`+
     fEl('Site address (text)','p_address',r.address)+
     `<div class="row2">${fEl('Collected so far','p_collected',r.collected,'number')}${fEl('Assigned technicians (emails, comma-separated)','p_assigned',(r.assignedTo||[]).join(', '))}</div>`+
     fEl('Estimated / actual cost','p_cost',r.cost,'number')+
@@ -3830,6 +3830,44 @@ function fillMyGps(){
     el.disabled=false; el.value=p.coords.latitude.toFixed(6)+','+p.coords.longitude.toFixed(6);
     var acc=Math.round(p.coords.accuracy||0); if(acc>80){ alert(ar?('تنبيه: دقّة الموقع ضعيفة (±'+acc+' متر). يفضّل تكون في الموقع نفسه وتحت السما المكشوفة.'):('Note: low accuracy (±'+acc+'m). Best taken on-site, outdoors.')); }
   }, function(){ el.disabled=false; el.value=old; alert(ar?'مش قادر أحدد موقعك. فعّل الـ GPS واسمح للمتصفح بالوصول للموقع، وحاول تاني.':'Could not get your location. Enable GPS and allow access, then retry.'); }, {timeout:12000,enableHighAccuracy:true,maximumAge:0});
+}
+/* Optional map picker for the project GPS field — click (or search) a point and it fills #p_gps.
+   Coordinates text entry stays the primary method; this is an easier alternative from the office.
+   Uses free Leaflet + OpenStreetMap (lazy-loaded; online only). Opens as its own overlay ABOVE the
+   project modal so the form underneath is preserved; #p_gps is still in the DOM when we set it. */
+function pickGpsMap(){
+  var ar=(lang==='ar');
+  function ensureLeaflet(cb){
+    if(window.L){ cb(); return; }
+    if(!document.getElementById('leafletCss')){ var lk=document.createElement('link'); lk.id='leafletCss'; lk.rel='stylesheet'; lk.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(lk); }
+    var ex=document.getElementById('leafletJs');
+    if(!ex){ var s=document.createElement('script'); s.id='leafletJs'; s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.onload=function(){cb();}; s.onerror=function(){ alert(ar?'مش قادر أحمّل الخريطة — اتأكد من النت واستخدم الإحداثيات.':'Could not load the map — check your connection and use coordinates instead.'); }; document.head.appendChild(s); }
+    else { var t=setInterval(function(){ if(window.L){ clearInterval(t); cb(); } },200); setTimeout(function(){clearInterval(t);},8000); }
+  }
+  ensureLeaflet(function(){
+    if(!window.L) return;
+    var ov=document.createElement('div'); ov.id='gpsMapOv'; ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:14px';
+    ov.innerHTML='<div style="background:#fff;border-radius:12px;width:min(780px,96vw);max-height:92vh;display:flex;flex-direction:column;overflow:hidden" onclick="event.stopPropagation()">'
+      +'<div style="padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #e3eaf1"><b style="color:#143F63">🗺️ '+(ar?'اختر موقع المشروع':'Pick the project location')+'</b><div style="flex:1"></div><button id="gpsMapX" style="border:0;background:#eef2f6;border-radius:8px;padding:6px 10px;cursor:pointer">✕</button></div>'
+      +'<div style="padding:8px 14px;display:flex;gap:6px"><input id="gpsSearch" placeholder="'+(ar?'ابحث عن مكان أو عنوان…':'Search a place or address…')+'" style="flex:1;padding:9px;border:1px solid #d7dfe8;border-radius:8px"><button id="gpsSearchBtn" class="btn gh sm">'+(ar?'بحث':'Search')+'</button></div>'
+      +'<div id="gpsMap" style="flex:1;min-height:380px"></div>'
+      +'<div style="padding:10px 14px;display:flex;align-items:center;gap:10px;border-top:1px solid #e3eaf1;flex-wrap:wrap"><div class="mini" id="gpsPick" style="flex:1;min-width:160px">'+(ar?'دوس على مكان المشروع على الخريطة':'Tap the project location on the map')+'</div><button id="gpsUse" class="btn cy" disabled>'+(ar?'✓ استخدم ده':'✓ Use this')+'</button></div></div>';
+    document.body.appendChild(ov);
+    var startLL=[30.0444,31.2357], z=11;
+    var cur=(typeof scLatLng==='function')?scLatLng(g('p_gps')?g('p_gps').value:''):null; if(cur){ startLL=[cur.lat,cur.lng]; z=16; }
+    var map=L.map('gpsMap').setView(startLL, z);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+    var marker=cur?L.marker(startLL).addTo(map):null, chosen=cur?{lat:cur.lat,lng:cur.lng}:null;
+    function setPick(la,ln,pan){ chosen={lat:la,lng:ln}; if(marker)marker.setLatLng([la,ln]); else marker=L.marker([la,ln]).addTo(map); if(pan)map.setView([la,ln],16); var u=g('gpsUse'); if(u)u.disabled=false; var p=g('gpsPick'); if(p)p.textContent=la.toFixed(6)+', '+ln.toFixed(6); }
+    if(cur) setPick(cur.lat,cur.lng,false);
+    map.on('click',function(e){ setPick(e.latlng.lat,e.latlng.lng,false); });
+    function closeOv(){ try{map.remove();}catch(e){} try{ov.remove();}catch(e){} }
+    g('gpsMapX').onclick=closeOv; ov.addEventListener('click',closeOv);
+    g('gpsUse').onclick=function(){ if(!chosen)return; var el=g('p_gps'); if(el) el.value=chosen.lat.toFixed(6)+','+chosen.lng.toFixed(6); closeOv(); };
+    function doSearch(){ var q=(g('gpsSearch').value||'').trim(); if(!q)return; g('gpsPick').textContent=(ar?'بحث…':'Searching…'); fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q)).then(function(r){return r.json();}).then(function(j){ if(j&&j[0]){ setPick(parseFloat(j[0].lat),parseFloat(j[0].lon),true); } else { g('gpsPick').textContent=(ar?'مفيش نتيجة':'No result'); } }).catch(function(){ g('gpsPick').textContent=(ar?'البحث مش متاح':'Search unavailable'); }); }
+    g('gpsSearchBtn').onclick=doSearch; g('gpsSearch').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); doSearch(); } });
+    setTimeout(function(){ try{map.invalidateSize();}catch(e){} },250);
+  });
 }
 /* Request a change to a LOCKED project location → recorded + Super Admin notified; only the admin edits it. */
 function reqLocChange(pid){
