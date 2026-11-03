@@ -641,6 +641,7 @@ const MODULES = [
   {id:'approvals',  label:'Approvals', icon:'✅', access:'all'},
   {id:'maintenance',label:'Maintenance', icon:'🛠️', depts:['Operations','Technical']},
   {id:'devroadmap',label:'Development Roadmap', icon:'🛣️', depts:['Management']},
+  {id:'datahealth',label:'Data Health', icon:'🩺', depts:['Management']},
   {id:'automation',label:'Automation', icon:'⚡', adminOnly:true},
   {id:'admin',     label:'Admin', icon:'⚙️', adminOnly:true},
   {id:'claims',    label:'Expense Claims', icon:'🧾', access:'all'},
@@ -1984,7 +1985,7 @@ function signOut(){ localStorage.removeItem('sedra_branch'); if(auth)auth.signOu
 function toggleSide(){ var a=g('app'); if(a)a.classList.toggle('navopen'); }
 function closeSide(){ var a=g('app'); if(a)a.classList.remove('navopen'); }
 const NAV_GROUPS=[
-  {k:'overview',t:'Overview',ic:'🏠',ids:['workqueue','dashboard','execdash','alerts','kpiscore','performance','reports']},
+  {k:'overview',t:'Overview',ic:'🏠',ids:['workqueue','dashboard','execdash','alerts','datahealth','kpiscore','performance','reports']},
   {k:'sales',t:'Sales & CRM',ic:'💼',ids:['sales','blueprint','customers','servicereqs','contacts','cust360','funnel','leadsource','commission','tenders','salesorders','quicksale','quotes','variations','bookings','bot']},
   {k:'marketing',t:'Marketing',ic:'📣',ids:['marketing','adspend','revops','mktplan','mktprod','contentcal','growth','mktlib','surveys','feedback']},
   {k:'projects',t:'Projects & Field',ic:'🏗️',ids:['projects','sitecheck','operations','gantt','workorders','issues','scheduling','manpower','dsr','costctrl','ipc','snags','quality','tandc','ncr','calibration','handover','methods','siteinstr','subipc','asbuilt','scurve','ncranalysis','submittals','rfi','doccontrol','risks','permits','maintenance','warranty','support','subcontractors','equipment']},
@@ -2574,7 +2575,7 @@ function render(keepScroll){
   if(!canSee(m)){ curView='hub'; m=MODULES.find(function(x){return x.id==='hub';})||MODULES[0]; }
   g('viewTitle').textContent=m.label;
   markNav();
-  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,clientreqs:vClientReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,devroadmap:vDevRoadmap,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,trash:vTrash,findreplace:vFindReplace,quoterequests:vQuoteRequests,admin:vAdmin,profile:vProfile}[curView];
+  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,clientreqs:vClientReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,devroadmap:vDevRoadmap,datahealth:vDataHealth,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,trash:vTrash,findreplace:vFindReplace,quoterequests:vQuoteRequests,admin:vAdmin,profile:vProfile}[curView];
   g('view').innerHTML = fn?fn():'';
   if(curView==='sales' && window._afterSales)window._afterSales();
   if(curView==='chat' && window._afterChat)window._afterChat();
@@ -11807,6 +11808,62 @@ function vDevRoadmap(){
     out+='</div>';
     return out;
   }).join('');
+  return h;
+}
+/* ===================== DATA HEALTH DASHBOARD (صحة البيانات) — roadmap item mg15 =====================
+   Live data-quality checks over existing collections. Read-only; each issue links to the record to fix. */
+function _dhNormPhone(p){ var d=String(p||'').replace(/\D/g,''); if(d.length>9) d=d.slice(-9); return d; }
+function _dhDups(arr,keyFn){ var map={},out=[]; arr.forEach(function(r){ var k=keyFn(r); if(!k)return; (map[k]=map[k]||[]).push(r); }); for(var k in map){ if(map[k].length>1) out.push({key:k,rows:map[k]}); } return out; }
+function _dhCard(icon,title,hint,rows,rowRender,sev){
+  if(!rows.length) return '<div class="card" style="margin-bottom:8px;border-left:4px solid #1a7a4f"><b>✅ '+icon+' '+title+'</b> <span class="mini">تمام — مفيش مشاكل</span></div>';
+  var col=sev==='high'?'#c0392b':(sev==='med'?'#e0a93b':'#1aa3c4');
+  var shown=rows.slice(0,100);
+  var body=shown.map(rowRender).join('');
+  var more=rows.length>100?'<div class="mini" style="margin-top:6px">و '+(rows.length-100)+' غيرهم…</div>':'';
+  return '<details class="card" style="margin-bottom:8px;border-left:4px solid '+col+'"><summary style="cursor:pointer;list-style:none"><b>'+icon+' '+title+'</b> <span class="tag" style="background:'+col+'22;color:'+col+'">'+rows.length+'</span>'+(hint?'<div class="mini" style="margin-top:3px">'+hint+'</div>':'')+'</summary><div style="margin-top:8px">'+body+more+'</div></details>';
+}
+function _dhRow(label,id,openFn,sub){
+  return '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--mist)"><span>'+esc(label||id)+(sub?' <span class="mini">'+esc(sub)+'</span>':'')+'</span><button class="btn gh sm" onclick="'+openFn+'(\''+id+'\')">فتح</button></div>';
+}
+function _dhDupRow(g,openFn){
+  return '<div style="padding:6px 0;border-bottom:1px solid var(--mist)"><div class="mini" style="margin-bottom:3px">🔁 '+esc(g.key)+' — '+g.rows.length+' تكرار</div>'+g.rows.map(function(r){ return '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:2px 0"><span>'+esc(r.name||r.id)+(r.branch?' <span class="mini">'+esc(r.branch)+'</span>':'')+'</span><button class="btn gh sm" onclick="'+openFn+'(\''+r.id+'\')">فتح</button></div>'; }).join('')+'</div>';
+}
+function vDataHealth(){
+  if(!me) return '';
+  var L=(typeof leads!=='undefined')?leads:[], P=(typeof projects!=='undefined')?projects:[], C=(typeof customers!=='undefined')?customers:[], Q=(typeof quotes!=='undefined')?quotes:[];
+  var projNoGps=P.filter(function(p){ if(!p.gps) return true; try{ return !scLatLng(p.gps); }catch(e){ return !p.gps; } });
+  var projNoVal=P.filter(function(p){ return !num(p.value); });
+  var projNoOwner=P.filter(function(p){ return !(p.owner||p.ownerEmail); });
+  var leadNoOwner=L.filter(function(l){ return !(l.owner||l.ownerEmail); });
+  var leadNoSource=L.filter(function(l){ return !(l.source||l.pool); });
+  var leadDups=_dhDups(L.filter(function(l){return _dhNormPhone(l.phone);}),function(l){return _dhNormPhone(l.phone);});
+  var custDupPhone=_dhDups(C.filter(function(c){return _dhNormPhone(c.phone);}),function(c){return _dhNormPhone(c.phone);});
+  var custDupEmail=_dhDups(C.filter(function(c){return (c.email||'').trim();}),function(c){return (c.email||'').trim().toLowerCase();});
+  var custNoContact=C.filter(function(c){ return !((c.phone||'').trim()||(c.email||'').trim()||(c.contact||'').trim()); });
+  var quoteNoItems=Q.filter(function(q){ try{ var n=0;(quoteSections(q)||[]).forEach(function(s){n+=(s.items||[]).length;}); return n===0; }catch(e){ return false; } });
+  var totalIssues=projNoGps.length+projNoVal.length+projNoOwner.length+leadNoOwner.length+leadDups.length+custDupPhone.length+custDupEmail.length+custNoContact.length+quoteNoItems.length;
+  var h='<div class="sect"><h2>🩺 صحة البيانات</h2><div class="sp"></div><button class="btn gh sm" onclick="render()">🔄 تحديث</button></div>';
+  h+='<div class="card mini" style="margin-bottom:10px">فحص حي على بياناتكم. كل مشكلة تحتها قايمة بالسجلات — دوس «فتح» تصلّحها على طول. (المصدر: '+L.length+' ليد · '+P.length+' مشروع · '+C.length+' عميل'+(Q.length?(' · '+Q.length+' كوتيشن'):'')+')</div>';
+  h+='<div class="grid kpis"><div class="card kpi"><div class="n" style="color:'+(totalIssues?'#c0392b':'#1a7a4f')+'">'+totalIssues+'</div><div class="l">إجمالي الملاحظات</div></div>'+
+     '<div class="card kpi"><div class="n" style="color:#c0392b">'+projNoGps.length+'</div><div class="l">مشاريع بدون GPS</div></div>'+
+     '<div class="card kpi"><div class="n" style="color:#e0a93b">'+projNoVal.length+'</div><div class="l">مشاريع بدون قيمة</div></div>'+
+     '<div class="card kpi"><div class="n" style="color:#e0a93b">'+leadNoOwner.length+'</div><div class="l">ليدز بدون مسؤول</div></div>'+
+     '<div class="card kpi"><div class="n" style="color:#1aa3c4">'+(leadDups.length+custDupPhone.length)+'</div><div class="l">مجموعات تكرار</div></div></div>';
+  h+='<h3 style="margin:14px 0 6px">المشاريع</h3>';
+  h+=_dhCard('📍','مشاريع من غير موقع GPS صحيح','دي اللي الموظفين مش هيقدروا يعملوا check-in عليها لحد ما تحدّد موقعها.',projNoGps,function(p){return _dhRow(p.name,p.id,'editProject',p.projNo?('#'+p.projNo):'');},'high');
+  h+=_dhCard('💰','مشاريع من غير قيمة',' ',projNoVal,function(p){return _dhRow(p.name,p.id,'editProject','');},'med');
+  h+=_dhCard('👤','مشاريع من غير مسؤول',' ',projNoOwner,function(p){return _dhRow(p.name,p.id,'editProject','');},'med');
+  h+='<h3 style="margin:14px 0 6px">الليدز</h3>';
+  h+=_dhCard('👤','ليدز من غير مسؤول','محتاجة تتوزّع على مندوب.',leadNoOwner,function(l){return _dhRow(l.name||l.phone,l.id,'editLead',l.phone||'');},'med');
+  h+=_dhCard('🎯','ليدز من غير مصدر','بيأثّر على تقارير مصدر الليد والـROI.',leadNoSource,function(l){return _dhRow(l.name||l.phone,l.id,'editLead',l.phone||'');},'low');
+  h+=_dhCard('🔁','ليدز مكررة (نفس التليفون)',' ',leadDups,function(g){return _dhDupRow(g,'editLead');},'low');
+  h+='<h3 style="margin:14px 0 6px">العملاء</h3>';
+  h+=_dhCard('🔁','عملاء مكررين (نفس التليفون)',' ',custDupPhone,function(g){return _dhDupRow(g,'editCustomer');},'med');
+  h+=_dhCard('📧','عملاء مكررين (نفس الإيميل)',' ',custDupEmail,function(g){return _dhDupRow(g,'editCustomer');},'low');
+  h+=_dhCard('📵','عملاء من غير وسيلة تواصل','لا تليفون ولا إيميل ولا جهة اتصال.',custNoContact,function(c){return _dhRow(c.name,c.id,'editCustomer','');},'med');
+  h+='<h3 style="margin:14px 0 6px">الكوتيشن</h3>';
+  if(!Q.length){ h+='<div class="card mini">الكوتيشن بيتحمّل في الخلفية — افتح صفحة الكوتيشن مرة واحدة الأول وبعدين ارجع هنا عشان يتفحص.</div>'; }
+  else { h+=_dhCard('📄','كوتيشن من غير بنود',' ',quoteNoItems,function(q){return _dhRow(q.number||q.client||q.id,q.id,'recOpen','');},'med'); }
   return h;
 }
 /* ===================== MANAGER-PARITY: TAX CODES · TRANSFERS · CAPITAL · CREDIT/DEBIT NOTES ===================== */
