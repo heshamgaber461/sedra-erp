@@ -11170,7 +11170,10 @@ var SITE_MAX_SHIFT_H=10; /* cap a single session's counted hours — forgotten-c
 function siteMaxShiftH(){ var m=num(settings&&settings.maxShiftH); return m>0?m:SITE_MAX_SHIFT_H; }
 /* Hours for one site visit, CAPPED at the shift limit so a forgotten checkout (open session, or a
    checkout logged the next day) never inflates the totals. Raw open time is bounded to siteMaxShiftH(). */
-function scHours(v){ if(!v.inTs)return 0; var end=v.outTs||Date.now(); var h=Math.max(0,(end-num(v.inTs))/3600000); return Math.min(h, siteMaxShiftH()); }
+/* A session with NO real checkout counts ZERO hours (Hesham 4 Nov — option أ). Hours are credited
+   only once a genuine checkout exists (manual, or the 300m auto-checkout). A closed session is still
+   capped at the shift limit to bound a late/next-day checkout. */
+function scHours(v){ if(!v.inTs||!v.outTs) return 0; if(v.autoClosed==='no-checkout') return 0; var h=Math.max(0,(num(v.outTs)-num(v.inTs))/3600000); return Math.min(h, siteMaxShiftH()); }
 function hhmm(ts){ if(!ts)return '—'; var d=new Date(num(ts)); return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); }
 function fmtHrs(h){ var m=Math.round(h*60); return Math.floor(m/60)+'h '+(m%60)+'m'; }
 var SITE_RADIUS_M=300; /* meters allowed from the project's GPS to check in */
@@ -11295,7 +11298,7 @@ function closeStaleSessions(){
   try{
     if(typeof me==='undefined'||!me) return;
     var cap=siteMaxShiftH(); var myE=((me.email||'')).toLowerCase();
-    (sitevisits||[]).forEach(function(v){ if(v.inTs&&!v.outTs&&((v.empEmail||'').toLowerCase()===myE)){ var ageH=(Date.now()-num(v.inTs))/3600000; if(ageH>cap){ var outTs=num(v.inTs)+cap*3600000; apiMerge('sitevisits',v.id,{outTs:outTs,autoClosed:'stale',note:((v.note?v.note+' · ':'')+(lang==='ar'?('إقفال تلقائي — نسي الانصراف (سقف '+cap+' ساعة)'):('Auto-closed — forgotten checkout (cap '+cap+'h)')))}).catch(function(){}); } } });
+    (sitevisits||[]).forEach(function(v){ if(v.inTs&&!v.outTs&&((v.empEmail||'').toLowerCase()===myE)){ var ageH=(Date.now()-num(v.inTs))/3600000; if(ageH>cap){ apiMerge('sitevisits',v.id,{outTs:num(v.inTs),autoClosed:'no-checkout',note:((v.note?v.note+' · ':'')+(lang==='ar'?'إقفال تلقائي بدون ساعات — نسي الانصراف':'Auto-closed, 0 hours — forgotten checkout'))}).catch(function(){}); } } });
   }catch(e){}
 }
 function scPhoto(id,which){ var ar=(lang==='ar'); apiCall('GET','/sitephotos/'+id+'.json').then(function(rec){ var d=rec&&rec[which]; if(!d){ alert(ar?'الصورة مش موجودة':'No photo'); return; } _openDataUrl(d,(which==='in'?'checkin':'checkout')+'-'+id+'.jpg'); }).catch(function(e){ alert('Error: '+(e&&e.message||e)); }); }
@@ -12410,7 +12413,7 @@ function _shFmt(h){ var H=Math.floor(h); var M=Math.round((h-H)*60); if(M===60){
 function _shDate(v){ return v.date||((v.inTs)?new Date(num(v.inTs)).toISOString().slice(0,10):''); }
 function _shInRange(v){ var d=_shDate(v); if(_shFrom && d<_shFrom) return false; if(_shTo && d>_shTo) return false; return true; }
 function _shTime(ts){ if(!ts) return '—'; try{ if(typeof hhmm==='function') return hhmm(ts); }catch(e){} try{ var d=new Date(num(ts)); return (('0'+d.getHours()).slice(-2))+':'+(('0'+d.getMinutes()).slice(-2)); }catch(e){ return '—'; } }
-function _shVisRows(list, who){ return list.slice().sort(function(a,b){return num(b.inTs)-num(a.inTs);}).map(function(v){ var open=!v.outTs; var auto=v.autoClosed?(' <span class="mini" title="إقفال/انصراف تلقائي">⏱️</span>'):''; return '<tr><td>'+esc(_shDate(v))+'</td><td>'+esc(who==='site'?(v.project||''):(v.emp||''))+'</td><td>'+_shTime(v.inTs)+'</td><td>'+(open?'<span style="color:#e0a93b">مفتوحة</span>':(_shTime(v.outTs)+auto))+'</td><td style="text-align:right">'+_shFmt(scHours(v))+'</td></tr>'; }).join(''); }
+function _shVisRows(list, who){ return list.slice().sort(function(a,b){return num(b.inTs)-num(a.inTs);}).map(function(v){ var open=!v.outTs; var noco=(v.autoClosed==='no-checkout'); var auto=(v.autoClosed==='geo')?(' <span class="mini" title="انصراف تلقائي — بعد عن الموقع">⏱️</span>'):''; var outCell=open?'<span style="color:#e0a93b">مفتوحة</span>':(noco?'<span style="color:#c0392b">بدون انصراف</span>':(_shTime(v.outTs)+auto)); return '<tr><td>'+esc(_shDate(v))+'</td><td>'+esc(who==='site'?(v.project||''):(v.emp||''))+'</td><td>'+_shTime(v.inTs)+'</td><td>'+outCell+'</td><td style="text-align:right">'+_shFmt(scHours(v))+'</td></tr>'; }).join(''); }
 function vSiteHours(){
   var vs=(sitevisits||[]).filter(inBranch).filter(_shInRange);
   var byEmp={}, bySite={}, visEmp={}, visSite={}, openCnt=0;
