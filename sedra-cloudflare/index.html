@@ -3995,6 +3995,28 @@ function decideMatReq(reqId,approve){
     apiMerge('matreqs',reqId,{status:'Rejected',decidedBy:(me&&me.name)||'',decidedAt:new Date().toISOString()}).then(function(){ synced(); }).catch(function(e){ r.status='Pending'; alert('Error: '+(e.message||e)); });
   }
 }
+/* Technician returns unused material back to the PROJECT STORE.
+   Effect: reduces the checklist item's qtyUsed (so Remaining goes back up), logs an IN stock move,
+   and records returnedQty on the request. Allowed for the requester or a manager / team leader. */
+function returnMat(reqId){
+  var ar=(lang==='ar');
+  var r=(typeof matreqs!=='undefined'?matreqs:[]).find(function(x){return x.id===reqId;}); if(!r)return;
+  var p=projects.find(function(x){return x.id===r.projectId;}); if(!p){ alert(ar?'المشروع مش موجود':'Project not found'); return; }
+  var isReq=((r.byEmail||'')===((me&&me.email||'').toLowerCase()));
+  if(!isReq && !canApproveMat(p)){ alert(ar?'المرتجع للفني صاحب الطلب أو المدير / Team Leader فقط.':'Only the requester or a manager can return.'); return; }
+  if(r.status!=='Approved'){ alert(ar?'المرتجع للطلبات المعتمدة فقط.':'Returns are only for approved requests.'); return; }
+  var already=num(r.returnedQty); var maxRet=num(r.qty)-already; if(maxRet<=0){ alert(ar?'الطلب ده اترجّع بالكامل.':'Already fully returned.'); return; }
+  openModal((ar?'↩ مرتجع من الفني — ':'↩ Return material — ')+esc(r.item),
+    '<div class="card mini" style="margin-bottom:8px">'+(ar?'المأخوذ':'Taken')+': <b>'+num(r.qty)+'</b>'+(already?(' · '+(ar?'مرتجع سابقًا':'returned before')+': '+already):'')+' · '+(ar?'أقصى كمية مرتجعة':'max return')+': <b>'+maxRet+'</b></div>'+
+    fEl(ar?'الكمية المرتجعة لمخزن المشروع':'Quantity returned to project store','mrt_qty',maxRet,'number')+fTa(ar?'ملاحظة (اختياري)':'Note (optional)','mrt_note',''),
+    function(){ var q=num(val('mrt_qty')); if(q<=0){alert(ar?'اكتب كمية':'Enter quantity');return false;} if(q>maxRet){alert((ar?'أكبر من المسموح ':'Exceeds max ')+'('+maxRet+')');return false;}
+      var cl=(p.checklist||[]).map(function(x){return Object.assign({},x);});
+      var it=cl[r.itemIdx];
+      if(it){ it.qtyUsed=Math.max(0,num(it.qtyUsed)-q); apiMerge('projects',r.projectId,{checklist:cl}).catch(function(){}); }
+      try{ apiAdd('stockMoves',{item:r.item,project:p.name,projectId:r.projectId,branch:p.branch,type:'in',qty:q,by:(me&&me.name)||'',note:(ar?'مرتجع من الفني لمخزن المشروع':'Return to project store')+' (طلب '+((r.by)||'')+')'+(val('mrt_note')?(' — '+val('mrt_note')):''),date:new Date().toISOString().slice(0,16).replace('T',' ')}); }catch(e){}
+      apiMerge('matreqs',reqId,{returnedQty:already+q,returnedAt:new Date().toISOString(),returnedBy:(me&&me.name)||''}).then(function(){ try{logAudit('return','matreqs',reqId,p.name+' +'+q+' '+r.item);}catch(e){} try{ notifyLeaders(p,(ar?'↩ مرتجع خامات — ':'↩ Material returned — ')+p.name,((me&&me.name)||'')+(ar?' رجّع ':' returned ')+q+' × '+r.item+(ar?' لمخزن المشروع':' to the project store')); }catch(_n){} synced(); alert(ar?('✔ اترجّع '+q+' لمخزن المشروع'):('✔ '+q+' returned to project store')); }).catch(function(e){alert('Error: '+(e.message||e));});
+    });
+}
 function setCollected(pid){ var p=projects.find(function(x){return x.id===pid;}); if(!p)return;
   openModal(lang==='ar'?'تحديث المبلغ المحصّل':'Update collected amount',
     fEl(lang==='ar'?'إجمالي المحصّل':'Total collected','pc_col',num(p.collected!=null&&p.collected!==''?p.collected:projCollected(p)),'number'),
@@ -4022,9 +4044,10 @@ function projExtraDetail(p){
   else { h+='<div style="overflow-x:auto"><table><thead><tr><th>'+(ar?'الصنف':'Item')+'</th><th>'+(ar?'كمية':'Qty')+'</th><th>'+(ar?'الطالب':'By')+'</th><th>'+(ar?'الحالة':'Status')+'</th><th></th></tr></thead><tbody>';
     reqs.slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');}).forEach(function(r){
       var col=r.status==='Approved'?'var(--ok)':(r.status==='Rejected'?'var(--bad)':'#e0a93b');
-      h+='<tr><td><b>'+esc(r.item)+'</b>'+(r.note?'<div class="mini">'+esc(r.note)+'</div>':'')+'</td><td>'+num(r.qty)+'</td><td>'+esc(r.by||'')+'<div class="mini">'+esc((r.date||'').slice(0,10))+'</div></td>'
-        +'<td><span class="tag" style="background:'+col+'22;color:'+col+'">'+esc(r.status||'')+'</span>'+(r.decidedBy?'<div class="mini">'+esc(r.decidedBy)+'</div>':'')+'</td>'
-        +'<td style="white-space:nowrap">'+((canAp&&r.status==='Pending')?'<button class="btn cy sm" onclick="decideMatReq(\''+r.id+'\',true)">'+(ar?'موافقة':'Approve')+'</button> <button class="btn dn sm" onclick="decideMatReq(\''+r.id+'\',false)">'+(ar?'رفض':'Reject')+'</button>':'')+'</td></tr>';
+      var ret=num(r.returnedQty); var net=num(r.qty)-ret; var isReq=((r.byEmail||'')===((me&&me.email||'').toLowerCase())); var canRet=(r.status==='Approved'&&ret<num(r.qty)&&(isReq||canAp));
+      h+='<tr><td><b>'+esc(r.item)+'</b>'+(r.note?'<div class="mini">'+esc(r.note)+'</div>':'')+'</td><td>'+num(r.qty)+(ret?'<div class="mini" style="color:var(--ok)">↩ '+(ar?'مرتجع ':'returned ')+ret+' · '+(ar?'صافي ':'net ')+net+'</div>':'')+'</td><td>'+esc(r.by||'')+'<div class="mini">'+esc((r.date||'').slice(0,10))+'</div></td>'
+        +'<td><span class="tag" style="background:'+col+'22;color:'+col+'">'+esc(r.status||'')+'</span>'+(r.decidedBy?'<div class="mini">'+esc(r.decidedBy)+'</div>':'')+(ret>=num(r.qty)?'<div class="mini" style="color:var(--ok)">'+(ar?'↩ اترجّع بالكامل':'fully returned')+'</div>':'')+'</td>'
+        +'<td style="white-space:nowrap">'+((canAp&&r.status==='Pending')?'<button class="btn cy sm" onclick="decideMatReq(\''+r.id+'\',true)">'+(ar?'موافقة':'Approve')+'</button> <button class="btn dn sm" onclick="decideMatReq(\''+r.id+'\',false)">'+(ar?'رفض':'Reject')+'</button> ':'')+(canRet?'<button class="btn gh sm" onclick="returnMat(\''+r.id+'\')" title="'+(ar?'مرتجع من الفني لمخزن المشروع':'Return to project store')+'">↩ '+(ar?'مرتجع':'Return')+'</button>':'')+'</td></tr>';
     });
     h+='</tbody></table></div>';
   }
