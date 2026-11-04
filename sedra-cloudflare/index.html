@@ -6920,9 +6920,11 @@ function vAttendance(){
   // admin/manager: see team attendance
   if(isMgr()){
     const bl=allowedBranches();
-    const rows=attendance.filter(a=>(curBranch==='All'||a.branch===curBranch)&&bl.includes(a.branch)).slice(0,100);
-    h+=`<div class="sect"><h2>Team attendance log</h2></div>`;
-    h+= rows.length?`<table><thead><tr><th>Date</th><th>Employee</th><th>Branch</th><th>In</th><th>Out</th><th>Distance</th></tr></thead><tbody>`+rows.map(a=>`<tr><td>${esc(a.date)}</td><td>${esc(a.name||a.email)}</td><td>${FLAG[a.branch]||''} ${esc(a.branch||'')}</td><td>${esc(a.inTime||'—')}</td><td>${esc(a.outTime||'—')}</td><td>${a.inDist!=null?Math.round(a.inDist)+'m':'—'}</td></tr>`).join('')+`</tbody></table>`:`<div class="card empty">No attendance records.</div>`;
+    let rows=attendance.filter(a=>(curBranch==='All'||a.branch===curBranch)&&bl.includes(a.branch)&&rptInRange('att',(a.date||'').slice(0,10)));
+    rows=rows.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,500);
+    h+=`<div class="sect"><h2>Team attendance log</h2><div class="sp"></div><button class="btn gh sm" onclick="attExport()">⬇ CSV</button></div>`;
+    h+=rptDateBar('att');
+    h+= rows.length?`<table><thead><tr><th>Date</th><th>Employee</th><th>Branch</th><th>In</th><th>Out</th><th>Distance</th></tr></thead><tbody>`+rows.map(a=>`<tr><td>${esc(a.date)}</td><td>${esc(a.name||a.email)}</td><td>${FLAG[a.branch]||''} ${esc(a.branch||'')}</td><td>${esc(a.inTime||'—')}</td><td>${esc(a.outTime||'—')}</td><td>${a.inDist!=null?Math.round(a.inDist)+'m':'—'}</td></tr>`).join('')+`</tbody></table>`:`<div class="card empty">مفيش سجلات حضور في الفترة دي.</div>`;
   }
   return h;
 }
@@ -11619,11 +11621,13 @@ function editSuggestion(id){
 function vOvertime(){
   const mgr=isMgr()||me.dept==='HR'||me.dept==='Management';
   let rows=overtimes.filter(inBranch); if(!mgr) rows=rows.filter(r=>(r.email||'')===(me.email||'').toLowerCase());
+  rows=rows.filter(r=>rptInRange('ot',(r.date||'').slice(0,10)));
   rows=rows.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const totH=rows.reduce((s,r)=>s+num(r.hours),0);
-  let h=`<div class="sect"><h2>⏱️ Overtime Log</h2><div class="sp"></div><button class="btn cy" onclick="editOvertime()">+ Log overtime</button></div>`;
+  let h=`<div class="sect"><h2>⏱️ Overtime Log</h2><div class="sp"></div><button class="btn gh sm" onclick="otExport()">⬇ CSV</button> <button class="btn cy" onclick="editOvertime()">+ Log overtime</button></div>`;
+  h+=rptDateBar('ot');
   h+=`<div class="grid kpis"><div class="card kpi"><div class="n">${totH}</div><div class="l">Total OT hours</div></div><div class="card kpi"><div class="n" style="color:var(--warn)">${rows.filter(r=>(r.status||'Pending')==='Pending').length}</div><div class="l">Pending approval</div></div></div>`;
-  if(!rows.length) return h+`<div class="card empty">No overtime logged.</div>`;
+  if(!rows.length) return h+`<div class="card empty">مفيش أوفر تايم في الفترة دي.</div>`;
   h+=`<div style="overflow-x:auto"><table><thead><tr><th>Date</th><th>Employee</th><th class="r">Hours</th><th>Project / reason</th><th>Status</th><th></th></tr></thead><tbody>`+rows.map(r=>{const stc={Pending:'#e0a93b',Approved:'#1a7a4f',Rejected:'#c0392b'}[r.status]||'#5A6B7B';return `<tr><td>${esc(r.date||'')}</td><td><b>${esc(r.employee||'')}</b></td><td style="text-align:right">${num(r.hours)}</td><td>${esc(r.reason||'')}</td><td><span class="tag" style="background:${stc}22;color:${stc}">${esc(r.status||'Pending')}</span></td>
     <td style="white-space:nowrap">${(mgr&&(r.status||'Pending')==='Pending')?`<button class="btn cy sm" onclick="setOT('${r.id}','Approved')">✔</button> <button class="btn dn sm" onclick="setOT('${r.id}','Rejected')">✕</button> `:''}<button class="btn gh sm" title="Open record" onclick="recOpen('${r.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${r.id}')">📎</button> <button class="btn gh sm" onclick="editOvertime('${r.id}')">Edit</button> ${mgr?`<button class="btn dn sm" onclick="delDoc('overtimes','${r.id}')">🗑</button>`:''}</td></tr>`}).join('')+`</tbody></table></div>`;
   return h;
@@ -12394,6 +12398,12 @@ function vDiscountReqs(){
 }
 function setDiscReq(id,st){ apiMerge('discountreqs',id,{status:st,decidedBy:me.name,decidedTs:Date.now()}).then(function(){ try{logAudit('update','discountreqs',id,st);}catch(e){} synced(); }); }
 function editDiscReq(id){ var r=id?discountreqs.find(function(x){return x.id===id;}):{branch:defBranch()}; openModal(id?'تعديل طلب':'طلب خصم', '<div class="fld"><label>العميل / الكوتيشن</label><input id="dq_ref" list="dq_leads" value="'+esc(r.ref||'')+'"><datalist id="dq_leads">'+leads.filter(inBranch).slice(0,250).map(function(l){return '<option value="'+esc(l.name||'')+'">';}).join('')+'</datalist></div>'+'<div class="row2">'+fEl('قيمة الخصم','dq_amt',r.amount,'number')+selEl('نوع','dq_pct',['مبلغ','نسبة %'],r.isPct?'نسبة %':'مبلغ')+'</div>'+fTa('السبب','dq_reason',r.reason)+selEl('الفرع','dq_branch',branchOpts(),r.branch), function(){ var d={ref:val('dq_ref'),amount:val('dq_amt'),isPct:(val('dq_pct')==='نسبة %'),reason:val('dq_reason'),branch:val('dq_branch')}; if(!d.ref){alert('العميل/الكوتيشن مطلوب');return false;} if(!id){d.by=me.name;d.byEmail=(me.email||'').toLowerCase();d.status='Pending';d.created=new Date().toISOString();} saveDoc('discountreqs',d,id); }); }
+/* ===================== REUSABLE DATE-RANGE FILTER for reports ===================== */
+var _rptRange={};
+function rptDateBar(key){ var f=_rptRange[key+'F']||'', t=_rptRange[key+'T']||''; return '<div class="card" style="margin-bottom:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center"><span class="mini">من تاريخ:</span><input type="date" value="'+esc(f)+'" onchange="_rptRange[\''+key+'F\']=this.value;render()" style="padding:5px 7px;border:1px solid var(--mist);border-radius:6px"><span class="mini">لتاريخ:</span><input type="date" value="'+esc(t)+'" onchange="_rptRange[\''+key+'T\']=this.value;render()" style="padding:5px 7px;border:1px solid var(--mist);border-radius:6px">'+((f||t)?'<button class="btn gh sm" onclick="delete _rptRange[\''+key+'F\'];delete _rptRange[\''+key+'T\'];render()">كل الفترات</button>':'')+'</div>'; }
+function rptInRange(key,dateStr){ var f=_rptRange[key+'F']||'', t=_rptRange[key+'T']||''; var d=dateStr||''; if(f&&d<f) return false; if(t&&d>t) return false; return true; }
+function attExport(){ try{ var bl=allowedBranches(); var rows=attendance.filter(function(a){return (curBranch==='All'||a.branch===curBranch)&&bl.includes(a.branch)&&rptInRange('att',(a.date||'').slice(0,10));}).slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');}); var out=rows.map(function(a){return [a.date||'',a.name||a.email||'',a.branch||'',a.inTime||'',a.outTime||'',a.inDist!=null?Math.round(a.inDist):'']; }); exportCSV('attendance',['التاريخ','الموظف','الفرع','حضور','انصراف','مسافة م'],out); }catch(e){alert('Error: '+(e.message||e));} }
+function otExport(){ try{ var mgr=isMgr()||me.dept==='HR'||me.dept==='Management'; var rows=overtimes.filter(inBranch); if(!mgr) rows=rows.filter(function(r){return (r.email||'')===(me.email||'').toLowerCase();}); rows=rows.filter(function(r){return rptInRange('ot',(r.date||'').slice(0,10));}).slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');}); var out=rows.map(function(r){return [r.date||'',r.employee||'',num(r.hours),r.reason||'',r.status||'Pending']; }); exportCSV('overtime',['التاريخ','الموظف','ساعات','السبب','الحالة'],out); }catch(e){alert('Error: '+(e.message||e));} }
 /* ===================== SITE HOURS REPORT (ساعات المواقع — بالموظف / بالموقع) ===================== */
 var _shTab='emp', _shFrom='', _shTo='';
 function _shFmt(h){ var H=Math.floor(h); var M=Math.round((h-H)*60); if(M===60){H++;M=0;} return H+'h '+(M<10?'0':'')+M+'m'; }
