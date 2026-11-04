@@ -3766,7 +3766,8 @@ function vProjects(){
   const rows=projects.filter(inBranch).filter(p=>{
     var base=me.role==='Super Admin'||me.dept==='Management'||!p.dept||p.dept===me.dept||(me.accessModules||[]).includes('projects');
     if(!base) return false;
-    if(!isMgr() && !isAdmin() && (me.dept==='Operations'||me.dept==='Technical')) return projIsAssigned(p);
+    /* Team Leader & up (like managers) see ALL their dept's projects; only regular Members/Viewers are limited to assigned ones (Hesham 4 Nov: managers + team leaders get full project access). */
+    if(!isMgr() && !isAdmin() && roleRank(me.role)<ROLE_RANK['Team Leader'] && (me.dept==='Operations'||me.dept==='Technical')) return projIsAssigned(p);
     return true;
   });
   let h=`<div class="tabs"><button class="${projTab==='list'?'active':''}" onclick="projTab='list';render()">🏗️ ${lang==='ar'?'المشاريع':'Projects'}</button><button class="${projTab==='profit'?'active':''}" onclick="projTab='profit';render()">💹 ${lang==='ar'?'الربحية':'Profitability'}</button></div>`;
@@ -3945,7 +3946,7 @@ function projCollected(p){ if(p.collected!=null&&p.collected!=='') return num(p.
 function projOutstanding(p){ return Math.max(0, num(p.value)-projCollected(p)); }
 function projSiteHours(p){ var vs=(typeof sitevisits!=='undefined'?sitevisits:[]).filter(function(v){ return v.project===p.name || nameEq(v.project,p.name); }); return vs.reduce(function(a,v){return a+(typeof scHours==='function'?scHours(v):0);},0); }
 function projIsAssigned(p){ var e=((me&&me.email)||'').toLowerCase(); return (p.assignedTo||[]).map(function(x){return String(x).toLowerCase();}).indexOf(e)>=0 || nameEq(p.owner,me&&me.name); }
-function canUseMaterials(p){ return isMgr()||isAdmin()||(me&&me.dept==='Management')||projIsAssigned(p); }
+function canUseMaterials(p){ return isMgr()||isAdmin()||(me&&me.dept==='Management')||(me&&(me.dept==='Operations'||me.dept==='Technical')&&roleRank(me.role)>=ROLE_RANK['Team Leader'])||projIsAssigned(p); }
 function quoteChecklist(q){ var cl=[]; (quoteSections(q)||[]).forEach(function(s){ (s.items||[]).forEach(function(i){ if(!i.item && !i.desc) return; cl.push({item:i.item||i.desc||'',code:i.code||'',qtyPlanned:num(i.qty),unitPrice:num(i.price),qtyUsed:0}); }); }); return cl; }
 function recordUsage(pid,idx){
   var p=projects.find(function(x){return x.id===pid;}); if(!p)return;
