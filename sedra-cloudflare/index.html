@@ -3933,7 +3933,7 @@ function reqLocChange(pid){
   if(!nl || !scLatLng(nl)){ alert(ar?'لازم تدخل إحداثيات مقروءة.':'Readable coordinates required.'); return; }
   var why=prompt(ar?'سبب التغيير:':'Reason for the change:',''); if(why===null)return;
   apiAdd('locchangereqs',{projectId:pid,project:p.name,oldGps:p.gps||'',newGps:nl,reason:why||'',by:(me&&me.name)||'',byEmail:((me&&me.email)||'').toLowerCase(),branch:p.branch||'',status:'Pending',date:new Date().toISOString()}).then(function(){
-    try{ if(typeof sendEmailAuto==='function' && typeof SUPER_ADMIN_EMAIL!=='undefined') sendEmailAuto(SUPER_ADMIN_EMAIL,(ar?'📍 طلب تغيير موقع مشروع — ':'📍 Project location-change request — ')+p.name,((me&&me.name)||'')+(ar?' طلب تغيير موقع المشروع ':' requested changing the location of ')+p.name+' → '+nl+(why?('\n'+(ar?'السبب: ':'Reason: ')+why):'')); }catch(_){}
+    /* location-change-request email disabled — in-system only (Hesham 5 Nov). The request record (locchangereqs) is still created and visible in the system. */
     try{ logAudit('locchange-request','projects',pid,p.name); }catch(_){}
     try{ closeModal(); }catch(_){}
     alert(ar?'اتبعت طلب تغيير الموقع للإدارة ✔ — هيتغيّر بعد الموافقة.':'Location-change request sent to management ✔ — it will change after approval.');
@@ -3967,7 +3967,11 @@ function recordUsage(pid,idx){
 }
 function canApproveMat(p){ if(isAdmin()||(me&&me.dept==='Management'))return true; if(me&&(me.dept==='Operations'||me.dept==='Technical')&&roleRank(me.role)>=ROLE_RANK['Team Leader'])return true; return false; }
 function projLeaders(p){ var br=(p&&p.branch)||''; return (typeof employees!=='undefined'?employees:[]).filter(function(e){ if(!e||!e.email)return false; var okRole=roleRank(e.role)>=ROLE_RANK['Team Leader']; var okDept=(e.dept==='Operations'||e.dept==='Technical'||e.dept==='Management'); var okBranch=!br||!e.branch||e.branch===br||e.dept==='Management'; return okRole&&okDept&&okBranch; }); }
-function notifyLeaders(p,subject,body){ try{ var ls=projLeaders(p); if(!ls.length)return; var emails=ls.map(function(e){return (e.email||'').toLowerCase();}).filter(Boolean); emails.forEach(function(em){ try{ if(typeof sendEmailAuto==='function') sendEmailAuto(em,subject,body); }catch(_){} }); try{ if(typeof sendPushToStaff==='function') sendPushToStaff(emails,subject,body,'/'); }catch(_){} }catch(e){} }
+/* In-system only (Hesham 5 Nov): activity alerts (material requests, check-ins, approvals, etc.) show
+   in the 🔔 notifications bell, which is computed live from the data in getNotifications(). We no longer
+   send emails or phone push on every action — it was too noisy for everyone. Kept as a no-op so all
+   existing callers keep working. */
+function notifyLeaders(p,subject,body){ return; }
 function projMatReqs(p){ return (typeof matreqs!=='undefined'?matreqs:[]).filter(function(r){return r.projectId===p.id;}); }
 function requestMaterial(pid,idx){
   var p=projects.find(function(x){return x.id===pid;}); if(!p)return;
@@ -4912,8 +4916,8 @@ function deliverRFQ(id){
     if(to){
       var subj=(ar?'كوتيشنك جاهز — ':'Your quotation is ready — ')+(q.number||q.client||'');
       var body=(ar?'الكوتيشن اللي طلبته من المكتب الفني خلص وجاهز:':'The quotation you requested from the Technical Office is ready:')+NL2+NL2+(ar?'العميل: ':'Client: ')+(q.client||'-')+NL2+(ar?'رقم الكوتيشن: ':'Quote No.: ')+(q.number||'-')+NL2+(ar?'جهّزه: ':'Prepared by: ')+(q.completedBy||q.assignedTo||'-')+NL2+NL2+(ar?'ادخل النظام لعرض الكوتيشن والمرفقات.':'Open the system to view the quotation and attachments.');
-      sendEmailAuto(to,subj,body); try{sendPushToStaff([to],(ar?'✅ كوتيشنك جاهز':'✅ Your quotation is ready'),(q.client||'')+(q.number?(' · '+q.number):''),'/');}catch(_p){}
-      alert(ar?'✔ اتسلّم للسيلز — واتبعتله إيميل تلقائي إن الكوتيشن جاهز، وكمان إشعار جوّه النظام.':'✔ Delivered — an automatic “quotation ready” email was sent to the requester, plus an in-app notification.');
+      /* email/push disabled — in-system bell only (Hesham 5 Nov); the requester sees "كوتيشنك جاهز" in 🔔 */
+      alert(ar?'✔ اتسلّم للسيلز — هيوصله إشعار جوّه النظام إن الكوتيشن جاهز.':'✔ Delivered — the requester gets an in-app notification that the quotation is ready.');
     } else {
       alert(ar?'✔ اتسلّم للسيلز — هيوصله إشعار جوّه النظام (مفيش إيميل متسجّل ليه).':'✔ Delivered — the requester gets an in-app notification (no email on file).');
     }
