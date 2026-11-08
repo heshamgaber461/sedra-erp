@@ -12027,13 +12027,17 @@ function vAttExcept(){
   var att=attendance.filter(function(a){return a.date===d && inBranch(a);});
   var byEmail={}; att.forEach(function(a){ byEmail[(a.email||'').toLowerCase()]=a; });
   var absent=active.filter(function(e){ return !byEmail[(e.email||'').toLowerCase()]; });
-  var noOut=att.filter(function(a){ return a.inTime && !a.outTime; });
+  var _w=workSched(); var _endM=_ohMin(_w.end); var _nowM=_ohMin(nowT()); var _pastEnd=(_endM!=null && _nowM!=null && _nowM>_endM+120); /* عدّى ميعاد الانصراف بساعتين */
+  var openNow=att.filter(function(a){ return a.inTime && !a.outTime; });
+  var working=_pastEnd?[]:openNow;   /* لسه في الدوام = شغّالين، مش نسيان */
+  var noOut=_pastEnd?openNow:[];     /* عدّى الميعاد بكتير ولسه مفتوح = نسي الانصراف */
   var far=att.filter(function(a){ return num(a.inDist)>300; });
   var h='<div class="sect"><h2>⚠️ استثناءات الحضور — '+esc(d)+'</h2><div class="sp"></div><button class="btn gh sm" onclick="render()">🔄 تحديث</button></div>';
-  h+='<div class="grid kpis"><div class="card kpi"><div class="n" style="color:#c0392b">'+absent.length+'</div><div class="l">غياب النهاردة</div></div><div class="card kpi"><div class="n" style="color:#e0a93b">'+noOut.length+'</div><div class="l">نسوا الانصراف</div></div><div class="card kpi"><div class="n" style="color:#e0a93b">'+far.length+'</div><div class="l">سجّلوا بعيد</div></div><div class="card kpi"><div class="n" style="color:#1a7a4f">'+att.length+'</div><div class="l">سجّلوا حضور</div></div></div>';
+  h+='<div class="grid kpis"><div class="card kpi"><div class="n" style="color:#c0392b">'+absent.length+'</div><div class="l">غياب النهاردة</div></div><div class="card kpi"><div class="n" style="color:#1aa3c4">'+working.length+'</div><div class="l">شغّالين دلوقتي</div></div><div class="card kpi"><div class="n" style="color:#e0a93b">'+noOut.length+'</div><div class="l">نسوا الانصراف</div></div><div class="card kpi"><div class="n" style="color:#e0a93b">'+far.length+'</div><div class="l">سجّلوا بعيد</div></div><div class="card kpi"><div class="n" style="color:#1a7a4f">'+att.length+'</div><div class="l">سجّلوا حضور</div></div></div>';
   function sec(title,icon,rows,render){ if(!rows.length) return '<div class="card" style="margin-bottom:8px;border-left:4px solid #1a7a4f"><b>✅ '+icon+' '+title+'</b> <span class="mini">تمام</span></div>'; return '<details class="card" style="margin-bottom:8px;border-left:4px solid #c0392b"><summary style="cursor:pointer"><b>'+icon+' '+title+'</b> <span class="tag" style="background:#c0392b22;color:#c0392b">'+rows.length+'</span></summary><div style="margin-top:8px">'+rows.map(render).join('')+'</div></details>'; }
   h+=sec('غياب النهاردة','🚫',absent,function(e){ return '<div style="padding:4px 0;border-bottom:1px solid var(--mist)">'+esc(e.name||'')+' <span class="mini">'+esc(e.dept||'')+'</span></div>'; });
-  h+=sec('نسوا يسجّلوا انصراف','🚪',noOut,function(a){ return '<div style="padding:4px 0;border-bottom:1px solid var(--mist)">'+esc(a.name||'')+' <span class="mini">دخول '+esc(a.inTime||'')+'</span></div>'; });
+  if(working.length){ h+='<details class="card" style="margin-bottom:8px;border-left:4px solid #1aa3c4"><summary style="cursor:pointer"><b>🟢 شغّالين دلوقتي (مسجّلين حضور ولسه الدوام شغّال)</b> <span class="tag" style="background:#1aa3c422;color:#1aa3c4">'+working.length+'</span></summary><div style="margin-top:8px">'+working.map(function(a){ return '<div style="padding:4px 0;border-bottom:1px solid var(--mist)">'+esc(a.name||'')+' <span class="mini">دخول '+esc(a.inTime||'')+' — عادي، لسه ماعملش انصراف</span></div>'; }).join('')+'</div></details>'; }
+  h+=sec('نسوا يسجّلوا انصراف (عدّى ميعاد الانصراف بكتير)','🚪',noOut,function(a){ return '<div style="padding:4px 0;border-bottom:1px solid var(--mist)">'+esc(a.name||'')+' <span class="mini">دخول '+esc(a.inTime||'')+'</span></div>'; });
   h+=sec('سجّلوا حضور بعيد عن الموقع','📍',far,function(a){ return '<div style="padding:4px 0;border-bottom:1px solid var(--mist)">'+esc(a.name||'')+' <span class="mini">'+Math.round(num(a.inDist))+'م</span></div>'; });
   return h;
 }
@@ -12449,15 +12453,19 @@ function siteHoursExport(){ var vs=(sitevisits||[]).filter(inBranch).filter(_shI
    بدون انصراف = 0 ساعة، وبسقف siteMaxShiftH() للجلسة الواحدة. */
 var _ohTab='emp', _ohFrom='', _ohTo='';
 function _ohMin(t){ if(!t||typeof t!=='string') return null; var m=t.match(/^(\d{1,2}):(\d{2})/); if(!m) return null; var v=(+m[1])*60+(+m[2]); return (v>=0&&v<1440)?v:null; }
-function attHours(a){ if(!a) return 0; var i=_ohMin(a.inTime), o=_ohMin(a.outTime); if(i==null||o==null) return 0; var h=(o-i)/60; if(h<0) h+=24; /* عبر منتصف الليل */ if(h<0||h>24) return 0; return Math.min(h, siteMaxShiftH()); }
+function attHours(a){ if(!a) return 0; var i=_ohMin(a.inTime); if(i==null) return 0; var o=_ohMin(a.outTime);
+  if(o==null){ /* مفيش انصراف */
+    if((a.date||'')>=today()){ /* جلسة مفتوحة النهاردة — احسب لحد دلوقتي (مؤقّت) */ var nowm=_ohMin(nowT()); if(nowm==null) return 0; var hv=(nowm-i)/60; if(hv<0) return 0; return Math.min(hv, siteMaxShiftH()); }
+    return 0; /* يوم فات من غير انصراف = نسي الانصراف = 0 */ }
+  var h=(o-i)/60; if(h<0) h+=24; /* عبر منتصف الليل */ if(h<0||h>24) return 0; return Math.min(h, siteMaxShiftH()); }
 function _ohDate(a){ return (a.date||'').slice(0,10); }
 function _ohInRange(a){ var d=_ohDate(a); if(_ohFrom && d<_ohFrom) return false; if(_ohTo && d>_ohTo) return false; return true; }
-function _ohRows(list, who){ return list.slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');}).map(function(a){ var noco=(a.inTime && !a.outTime); var outCell=noco?'<span style="color:#c0392b">بدون انصراف</span>':(esc(a.outTime||'—')); var lbl=(who==='branch')?(esc(a.name||a.email||'')):((FLAG[a.branch]||'')+' '+esc(a.branch||'')); return '<tr><td>'+esc(_ohDate(a))+'</td><td>'+lbl+'</td><td>'+esc(a.inTime||'—')+'</td><td>'+outCell+'</td><td style="text-align:right">'+_shFmt(attHours(a))+'</td></tr>'; }).join(''); }
+function _ohRows(list, who){ return list.slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');}).map(function(a){ var open=(a.inTime && !a.outTime); var todayOpen=open && (a.date||'')>=today(); var outCell=!open?(esc(a.outTime||'—')):(todayOpen?'<span style="color:#e0a93b">مفتوحة (شغّال)</span>':'<span style="color:#c0392b">بدون انصراف</span>'); var lbl=(who==='branch')?(esc(a.name||a.email||'')):((FLAG[a.branch]||'')+' '+esc(a.branch||'')); return '<tr><td>'+esc(_ohDate(a))+'</td><td>'+lbl+'</td><td>'+esc(a.inTime||'—')+'</td><td>'+outCell+'</td><td style="text-align:right">'+_shFmt(attHours(a))+'</td></tr>'; }).join(''); }
 function vOffHours(){
   var bl=(typeof allowedBranches==='function')?allowedBranches():BRANCHES;
   var rows=(attendance||[]).filter(function(a){ return (curBranch==='All'||a.branch===curBranch) && bl.includes(a.branch) && _ohInRange(a); });
   var byEmp={}, byBr={}, recEmp={}, recBr={}, noco=0;
-  rows.forEach(function(a){ var hh=attHours(a); var e=a.name||a.email||'—'; var b=a.branch||'—'; if(a.inTime&&!a.outTime)noco++; byEmp[e]=(byEmp[e]||0)+hh; byBr[b]=(byBr[b]||0)+hh; (recEmp[e]=recEmp[e]||[]).push(a); (recBr[b]=recBr[b]||[]).push(a); });
+  rows.forEach(function(a){ var hh=attHours(a); var e=a.name||a.email||'—'; var b=a.branch||'—'; if(a.inTime&&!a.outTime&&(a.date||'')<today())noco++; byEmp[e]=(byEmp[e]||0)+hh; byBr[b]=(byBr[b]||0)+hh; (recEmp[e]=recEmp[e]||[]).push(a); (recBr[b]=recBr[b]||[]).push(a); });
   var h='<div class="sect"><h2>🏢 تقرير ساعات المكتب (حضور المقر)</h2><div class="sp"></div><button class="btn gh sm" onclick="offHoursExport()">⬇ CSV</button></div>';
   h+='<div class="tabs"><button class="'+(_ohTab==='emp'?'active':'')+'" onclick="_ohTab=\'emp\';render()">👤 بالموظف</button><button class="'+(_ohTab==='branch'?'active':'')+'" onclick="_ohTab=\'branch\';render()">🏢 بالفرع</button></div>';
   h+='<div class="card" style="margin-bottom:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center"><span class="mini">من تاريخ:</span><input type="date" value="'+esc(_ohFrom)+'" onchange="_ohFrom=this.value;render()" style="padding:5px 7px;border:1px solid var(--mist);border-radius:6px"><span class="mini">لتاريخ:</span><input type="date" value="'+esc(_ohTo)+'" onchange="_ohTo=this.value;render()" style="padding:5px 7px;border:1px solid var(--mist);border-radius:6px">'+((_ohFrom||_ohTo)?'<button class="btn gh sm" onclick="_ohFrom=\'\';_ohTo=\'\';render()">كل الفترات</button>':'')+'</div>';
