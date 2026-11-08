@@ -11439,7 +11439,9 @@ function scSuspReasons(target,coords,ip){
   return reasons;
 }
 function scCamBody(ar){
+  var isOut=(_scCtx&&_scCtx.mode==='out');
   return '<div class="card mini" style="margin-bottom:8px">'+(ar?'📍 هيتم تسجيل موقعك (GPS) وعنوان الإنترنت للتأكد إنك في المشروع.':'📍 Your location (GPS) and IP will be recorded to confirm you are on site.')+'</div>'
+   +(isOut?'<div class="card mini" style="background:#e9f7ef;border-color:#bfe3cd;color:#15663f;margin-bottom:8px">✅ '+(ar?'تقدر تدوس «سجّل انصراف» على طول — الموقع مش شرط في الانصراف ومش هيعطّلك لو الـ GPS بطيء.':'You can tap “Check out” right away — location is optional for check-out and won’t block you if GPS is slow.')+'</div>':'')
    +'<div id="scStatus" class="mini" style="margin-top:8px">'+(ar?'⏳ بحدّد موقعك…':'⏳ Locating…')+'</div>';
 }
 function scSnap(){
