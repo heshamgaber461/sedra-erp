@@ -12424,7 +12424,7 @@ function otExport(){ try{ var mgr=isMgr()||me.dept==='HR'||me.dept==='Management
 var _shTab='emp', _shFrom='', _shTo='';
 function _shFmt(h){ var H=Math.floor(h); var M=Math.round((h-H)*60); if(M===60){H++;M=0;} return H+'h '+(M<10?'0':'')+M+'m'; }
 function _shDate(v){ return v.date||((v.inTs)?new Date(num(v.inTs)).toISOString().slice(0,10):''); }
-function _shInRange(v){ var d=_shDate(v); if(_shFrom && d<_shFrom) return false; if(_shTo && d>_shTo) return false; return true; }
+function _shInRange(v){ var d=_shDate(v); if(d<attStart()) return false; if(_shFrom && d<_shFrom) return false; if(_shTo && d>_shTo) return false; return true; }
 function _shTime(ts){ if(!ts) return '—'; try{ if(typeof hhmm==='function') return hhmm(ts); }catch(e){} try{ var d=new Date(num(ts)); return (('0'+d.getHours()).slice(-2))+':'+(('0'+d.getMinutes()).slice(-2)); }catch(e){ return '—'; } }
 function _shVisRows(list, who){ return list.slice().sort(function(a,b){return num(b.inTs)-num(a.inTs);}).map(function(v){ var open=!v.outTs; var noco=(v.autoClosed==='no-checkout'); var auto=(v.autoClosed==='geo')?(' <span class="mini" title="انصراف تلقائي — بعد عن الموقع">⏱️</span>'):''; var outCell=open?'<span style="color:#e0a93b">مفتوحة</span>':(noco?'<span style="color:#c0392b">بدون انصراف</span>':(_shTime(v.outTs)+auto)); return '<tr><td>'+esc(_shDate(v))+'</td><td>'+esc(who==='site'?(v.project||''):(v.emp||''))+'</td><td>'+_shTime(v.inTs)+'</td><td>'+outCell+'</td><td style="text-align:right">'+_shFmt(scHours(v))+'</td></tr>'; }).join(''); }
 function vSiteHours(){
@@ -12459,7 +12459,7 @@ function attHours(a){ if(!a) return 0; var i=_ohMin(a.inTime); if(i==null) retur
     return 0; /* يوم فات من غير انصراف = نسي الانصراف = 0 */ }
   var h=(o-i)/60; if(h<0) h+=24; /* عبر منتصف الليل */ if(h<0||h>24) return 0; return Math.min(h, siteMaxShiftH()); }
 function _ohDate(a){ return (a.date||'').slice(0,10); }
-function _ohInRange(a){ var d=_ohDate(a); if(_ohFrom && d<_ohFrom) return false; if(_ohTo && d>_ohTo) return false; return true; }
+function _ohInRange(a){ var d=_ohDate(a); if(d<attStart()) return false; if(_ohFrom && d<_ohFrom) return false; if(_ohTo && d>_ohTo) return false; return true; }
 function _ohRows(list, who){ return list.slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');}).map(function(a){ var open=(a.inTime && !a.outTime); var todayOpen=open && (a.date||'')>=today(); var outCell=!open?(esc(a.outTime||'—')):(todayOpen?'<span style="color:#e0a93b">مفتوحة (شغّال)</span>':'<span style="color:#c0392b">بدون انصراف</span>'); var lbl=(who==='branch')?(esc(a.name||a.email||'')):((FLAG[a.branch]||'')+' '+esc(a.branch||'')); return '<tr><td>'+esc(_ohDate(a))+'</td><td>'+lbl+'</td><td>'+esc(a.inTime||'—')+'</td><td>'+outCell+'</td><td style="text-align:right">'+_shFmt(attHours(a))+'</td></tr>'; }).join(''); }
 function vOffHours(){
   var bl=(typeof allowedBranches==='function')?allowedBranches():BRANCHES;
@@ -12488,15 +12488,21 @@ function offHoursExport(){ var bl=(typeof allowedBranches==='function')?allowedB
    افتراضي: 09:00–17:00، سماح 15 دقيقة للحضور و15 للانصراف، عطلة الجمعة والسبت. قابلة للتعديل من زر «مواعيد العمل».
    الغياب = يوم عمل (مش عطلة، مش إجازة معتمدة) مفيش فيه تسجيل حضور، لحد تاريخ النهاردة، وبعد تاريخ التعيين. */
 var DOW_AR=['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+/* تاريخ بداية احتساب الحضور/الغياب (go-live) — كل تقارير الحضور والمشاريع مبتحسبش قبله. افتراضي: 2026-11-08. */
+var ATT_EPOCH_DEFAULT='2026-11-08';
+function attStart(){ var s=(settings&&settings.attStartDate)||''; return (s&&/^\d{4}-\d{2}-\d{2}$/.test(s))?s:ATT_EPOCH_DEFAULT; }
 function workSched(){ var s=(settings&&settings.workSched)||{}; return { start:s.start||'09:00', end:s.end||'17:00', graceIn:(s.graceIn!=null?num(s.graceIn):15), graceOut:(s.graceOut!=null?num(s.graceOut):15), weekend:(s.weekend&&s.weekend.length?s.weekend:[5,6]) }; }
 function editWorkSched(){ var w=workSched(); openModal('⚙ مواعيد العمل الرسمية',
   '<div class="card mini" style="margin-bottom:8px">المواعيد دي اللي التقارير بتحسب عليها التأخير والانصراف المبكر والأوفر تايم والغياب.</div>'+
   '<div class="row2">'+fEl('بداية الدوام','ws_start',w.start,'time')+fEl('نهاية الدوام','ws_end',w.end,'time')+'</div>'+
   '<div class="row2">'+fEl('سماح التأخير (دقيقة)','ws_gin',w.graceIn,'number')+fEl('سماح الانصراف المبكر (دقيقة)','ws_gout',w.graceOut,'number')+'</div>'+
-  '<div class="fld"><label>أيام العطلة الأسبوعية</label><div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:4px">'+DOW_AR.map(function(d,i){return '<label style="display:flex;gap:4px;align-items:center;font-size:13px"><input type="checkbox" id="ws_d'+i+'" '+(w.weekend.indexOf(i)>=0?'checked':'')+'> '+d+'</label>';}).join('')+'</div></div>',
-  function(){ var wk=[]; for(var i=0;i<7;i++){ if(g('ws_d'+i)&&g('ws_d'+i).checked) wk.push(i); } saveSetting('workSched',{start:val('ws_start')||'09:00',end:val('ws_end')||'17:00',graceIn:num(val('ws_gin')),graceOut:num(val('ws_gout')),weekend:wk}); }); }
+  '<div class="fld"><label>أيام العطلة الأسبوعية</label><div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:4px">'+DOW_AR.map(function(d,i){return '<label style="display:flex;gap:4px;align-items:center;font-size:13px"><input type="checkbox" id="ws_d'+i+'" '+(w.weekend.indexOf(i)>=0?'checked':'')+'> '+d+'</label>';}).join('')+'</div></div>'+
+  '<hr style="border:none;border-top:1px solid var(--mist);margin:12px 0">'+
+  fEl('بداية احتساب الحضور (من تاريخ)','ws_attstart',attStart(),'date')+
+  '<div class="card mini">كل تقارير الحضور والغياب (الشركة والمشاريع) مبتحسبش أي حاجة قبل التاريخ ده — عشان البيانات القديمة قبل التشغيل متدخلش في الغياب والساعات.</div>',
+  function(){ var wk=[]; for(var i=0;i<7;i++){ if(g('ws_d'+i)&&g('ws_d'+i).checked) wk.push(i); } saveSetting('workSched',{start:val('ws_start')||'09:00',end:val('ws_end')||'17:00',graceIn:num(val('ws_gin')),graceOut:num(val('ws_gout')),weekend:wk}); var asd=val('ws_attstart'); if(asd&&/^\d{4}-\d{2}-\d{2}$/.test(asd)) saveSetting('attStartDate',asd); }); }
 var _arTab='present', _arFrom='', _arTo='';
-function _arRangeDef(){ var f=_arFrom, t=_arTo; var now=new Date(); if(!f){ f=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-01'; } if(!t){ t=today(); } return {f:f,t:t}; }
+function _arRangeDef(){ var f=_arFrom, t=_arTo; var as=attStart(); if(!f){ f=as; } if(f<as){ f=as; } /* ماينفعش نحسب قبل بداية التشغيل */ if(!t){ t=today(); } return {f:f,t:t}; }
 function _arDays(f,t){ var out=[]; var d=new Date(f+'T00:00:00'); var e=new Date(t+'T00:00:00'); var guard=0; while(d<=e && guard<800){ out.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); guard++; } return out; }
 function _minTxt(m){ m=Math.round(m); if(m<=0) return '0د'; var H=Math.floor(m/60),M=m%60; return (H?H+'س ':'')+(M||!H?M+'د':''); }
 function _arRows(){
@@ -12534,7 +12540,7 @@ function vAttReport(){
   var D=_arRows(); var w=D.w; var R=D.range; var rows=D.rows;
   var TAB=[['present','✅ الحضور'],['absence','🚫 الغياب'],['late','⏰ التأخير'],['early','🚪 الانصراف المبكر'],['ot','⏱️ الأوفر تايم']];
   var h='<div class="sect"><h2>📊 تقارير الحضور والانضباط</h2><div class="sp"></div>'+(D.mgr?'<button class="btn gh sm" onclick="editWorkSched()">⚙ مواعيد العمل</button> ':'')+'<button class="btn gh sm" onclick="attRepExport()">⬇ CSV</button></div>';
-  h+='<div class="card mini" style="margin-bottom:8px">الدوام الرسمي: <b>'+esc(w.start)+'–'+esc(w.end)+'</b> · سماح حضور '+w.graceIn+'د / انصراف '+w.graceOut+'د · العطلة: '+(w.weekend.map(function(i){return DOW_AR[i];}).join(' و ')||'—')+'. '+(D.mgr?'عدّلها من زر «مواعيد العمل».':'')+'</div>';
+  h+='<div class="card mini" style="margin-bottom:8px">الدوام الرسمي: <b>'+esc(w.start)+'–'+esc(w.end)+'</b> · سماح حضور '+w.graceIn+'د / انصراف '+w.graceOut+'د · العطلة: '+(w.weekend.map(function(i){return DOW_AR[i];}).join(' و ')||'—')+' · الاحتساب من: <b>'+esc(attStart())+'</b>. '+(D.mgr?'عدّلها من زر «مواعيد العمل».':'')+'</div>';
   h+='<div class="tabs">'+TAB.map(function(t){return '<button class="'+(_arTab===t[0]?'active':'')+'" onclick="_arTab=\''+t[0]+'\';render()">'+t[1]+'</button>';}).join('')+'</div>';
   h+='<div class="card" style="margin-bottom:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center"><span class="mini">من تاريخ:</span><input type="date" value="'+esc(R.f)+'" onchange="_arFrom=this.value;render()" style="padding:5px 7px;border:1px solid var(--mist);border-radius:6px"><span class="mini">لتاريخ:</span><input type="date" value="'+esc(R.t)+'" onchange="_arTo=this.value;render()" style="padding:5px 7px;border:1px solid var(--mist);border-radius:6px">'+((_arFrom||_arTo)?'<button class="btn gh sm" onclick="_arFrom=\'\';_arTo=\'\';render()">الشهر الحالي</button>':'')+'</div>';
   if(!rows.length) return h+'<div class="card empty">مفيش موظفين في النطاق ده.</div>';
