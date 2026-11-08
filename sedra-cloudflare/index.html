@@ -4056,6 +4056,12 @@ function notifyLeaders(p,subject,body,opts){
       title:(subject||'').toString().slice(0,90), sub:(body||'').toString().slice(0,140),
       type:opts.type||'', projectId:(p&&p.id)||'',
       actor:(me&&me.name)||'', actorEmail:((me&&me.email)||'').toLowerCase() });
+    // also push to the managers'/team leaders' phones (even when the app is closed)
+    try{
+      var _me=((me&&me.email)||'').toLowerCase();
+      var _tos=deptLeaderEmails(dept,branch).filter(function(x){ return x && x!==_me; });
+      if(_tos.length) sendPushToStaff(_tos, (opts.ico? opts.ico+' ':'')+(subject||'Sedra Electric'), (body||''), '/');
+    }catch(_p){}
   }catch(e){}
 }
 /* Remove notifications older than 4 days so the collection stays small (admin runs it once per session). */
@@ -7050,12 +7056,19 @@ function checkInAuto(){
   });
 }
 function checkOut(id,branch){
-  const loc=settings.loc&&settings.loc[branch];
-  geo((lat,lng)=>{ const d=loc?dist(lat,lng,num(loc.lat),num(loc.lng)):null;
-    apiMerge('attendance',id,{outTime:nowT(),outLat:lat,outLng:lng,outDist:d}).then(synced);
-    try{ notifyLeaders(null,(lang==='ar'?'🏁 انصراف — ':'🏁 Check-out — ')+(me.name||''),(me.name||'')+(lang==='ar'?' سجّل انصراف ':' checked out ')+(branch||'')+' · '+nowT(),{ico:'🏁',type:'checkout',branch:branch}); }catch(_co){}
-    g('attMsg').innerHTML=`<span style="color:var(--ok)">Checked out.</span>`;
-  });
+  // Record the check-out IMMEDIATELY — never block on GPS. Leaving doesn't need a location fix,
+  // and a denied/slow GPS used to abandon the check-out silently (fix: Hesham 8 Nov).
+  apiMerge('attendance',id,{outTime:nowT()}).then(synced);
+  try{ notifyLeaders(null,(lang==='ar'?'🏁 انصراف — ':'🏁 Check-out — ')+(me.name||''),(me.name||'')+(lang==='ar'?' سجّل انصراف ':' checked out ')+(branch||'')+' · '+nowT(),{ico:'🏁',type:'checkout',branch:branch}); }catch(_co){}
+  g('attMsg').innerHTML=`<span style="color:var(--ok)">${lang==='ar'?'تم تسجيل الانصراف':'Checked out'} — ${nowT()}.</span>`;
+  // Best-effort: attach GPS if it comes back, but the check-out is already saved regardless.
+  try{
+    const loc=settings.loc&&settings.loc[branch];
+    if(navigator.geolocation){ navigator.geolocation.getCurrentPosition(function(p){
+      const d=loc?dist(p.coords.latitude,p.coords.longitude,num(loc.lat),num(loc.lng)):null;
+      apiMerge('attendance',id,{outLat:p.coords.latitude,outLng:p.coords.longitude,outDist:d}).catch(function(){});
+    },function(){},{enableHighAccuracy:true,timeout:8000}); }
+  }catch(_g){}
 }
 
 /* ===================== TEAM CHAT ===================== */
@@ -7813,7 +7826,7 @@ function flashBell(){ try{ var b=document.querySelector('.bell'); if(b){ b.class
 function pingSound(){ pingNotify(); }
 function desktopNotify(m){ try{ if(!('Notification' in window)||Notification.permission!=='granted')return; const n=new Notification('Sedra · '+(m.sender||'New message'),{body:(m.text||'').slice(0,120)}); n.onclick=function(){ try{window.focus();}catch(e){} openChatChannel(m.channel); n.close(); }; }catch(e){} }
 /* ===== Web Push (offline notifications) — subscribe + send ===== */
-var VAPID_PUBLIC='BPDLnlT1-K1ZumUzDVpgDIymEaOEzRgv1umHp_yn75VfrDJEr19aWBTbWSk4azDShSZzzW0-FYx2ybchQVOFeT8';
+var VAPID_PUBLIC='BPPjzNxioMjk6ScT_ote6SD17bOVNF846e1kUpclaC_Fm-o3WKeQlHaW0KxVDzl5Js4S72_k2OWmSB7Iu8Ux_nk';
 function _urlB64ToU8(s){ var pad='='.repeat((4-s.length%4)%4); var b=(s+pad).replace(/-/g,'+').replace(/_/g,'/'); var raw=atob(b); var u=new Uint8Array(raw.length); for(var i=0;i<raw.length;i++)u[i]=raw.charCodeAt(i); return u; }
 function _pushSubId(ep){ var h=5381; for(var i=0;i<ep.length;i++){ h=((h<<5)+h+ep.charCodeAt(i))>>>0; } return 'sub_'+h.toString(36)+String(ep.length); }
 async function enablePush(silent){
@@ -7839,7 +7852,7 @@ function sendPushToStaff(emails, title, body, url){
     if(!emails.length) return;
     if(!(auth&&auth.currentUser)) return;
     auth.currentUser.getIdToken().then(function(tok){
-      try{ fetch('/push',{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({token:tok,targets:emails,title:title||'Sedra Electric',body:body||'',url:url||'/'}),keepalive:true}).catch(function(){}); }catch(e){}
+      try{ fetch('https://sedra-push.heshamgaber461.workers.dev/send',{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({token:tok,targets:emails,title:title||'Sedra Electric',body:body||'',url:url||'/'}),keepalive:true}).catch(function(){}); }catch(e){}
     }).catch(function(){});
   }catch(e){}
 }
