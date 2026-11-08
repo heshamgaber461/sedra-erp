@@ -426,6 +426,17 @@
   #gHub .cc-signin:hover{filter:brightness(1.06)}
   @media(max-width:900px){.ghub-grid{grid-template-columns:repeat(2,1fr)}}
   @media(max-width:520px){.ghub-grid{grid-template-columns:1fr}#gHub h2{font-size:24px}}
+  /* Mobile: a sticky one-tap Sign-in button so you never scroll past 8 cards to log in */
+  .cc-signin-fix{display:none}
+  @media(max-width:640px){
+    #gHub .cc-signin{display:none}
+    .cc-signin-fix{display:flex;align-items:center;justify-content:center;gap:6px;position:fixed;left:12px;right:12px;bottom:12px;z-index:30;font-size:16px;padding:15px;background:linear-gradient(90deg,#36C5E0,#1aa3c4);color:#062634;font-weight:800;border-radius:12px;border:0;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+    .gate.hubwide .gc{padding:18px 14px 86px}
+    #gHub .cc-mk{display:none}
+    #gHub h2{margin-top:2px}
+    .ghub-card{padding:12px}
+    .ghub-grid{gap:8px}
+  }
   /* ===== Dark theme -> Style 3 (navy + cyan) default (v101) ===== */
   body.dark{--bg:#0b1526;--mist:#1c3350;--muted:#8ba3bd}
   body.dark .card{background:#0f1e34;border-color:#1c3350;box-shadow:0 6px 20px rgba(0,0,0,.28)}
@@ -499,6 +510,7 @@
       <div class="ghub-card" onclick="showGate('gLogin')"><div class="gh-top"><div class="gh-ic">🛡️</div><div class="gh-h">Governance & Admin<span>الإدارة والصلاحيات</span></div><span class="gh-live">LIVE</span></div><p>السلامة، المستندات، الاعتمادات، المستخدمين والصلاحيات، سجل التدقيق.</p><div class="gh-open">افتح · Open →</div></div>
     </div>
     <button class="cc-signin" onclick="showGate('gLogin')">🔐 تسجيل الدخول · Sign in</button>
+    <button class="cc-signin-fix" onclick="showGate('gLogin')">🔐 تسجيل الدخول · Sign in</button>
   </div>
   <!-- login -->
   <div id="gLogin" class="hide">
@@ -715,6 +727,7 @@ const MODULES = [
   {id:'risks',     label:'Risk Register', icon:'⚠️', depts:['Management','Operations']},
   {id:'sitecheck', label:'Site Check-in', icon:'📍', access:'all'},
   {id:'sitehours', label:'Site Hours Report', icon:'🕒', depts:['Operations','Technical','Management','HR']},
+  {id:'livesites', label:'Live Sites', icon:'🛰️', depts:['Operations','Technical','Management','HR']},
   {id:'offhours',  label:'Office Hours Report', icon:'🏢', depts:['HR','Management','Operations','Technical']},
   {id:'attreport', label:'Attendance Reports', icon:'📊', depts:['HR','Management','Operations','Technical']},
   {id:'permits',   label:'Permits to Work', icon:'🦺', depts:['Operations','Management','Technical']},
@@ -830,6 +843,8 @@ let sheets=[], worddocs=[], decks=[];
 let positions=[], mktasks=[], mktlib=[], mktplans=[], growthexp=[];
 let sitevisits=[];
 let matreqs=[];
+let appNotifs=[]; /* live department-activity notifications (notifications collection) — managers & team leaders get a sound+popup on each team action */
+let recHistory=[]; /* per-record version snapshots (history collection) — owner can restore a previous version */
 let reccmts=[], wfappr=[];
 let rfis=[], dsrs=[], contacts=[];
 let announcements=[], suggestions=[], overtimes=[], devideas=[], calls=[], policies=[], exits=[], shifts=[];
@@ -1280,6 +1295,57 @@ function sendEmailAuto(to,subject,body,opts){
       .then(function(r){ return r.ok; }).catch(function(){ return false; });
   }catch(e){ return Promise.resolve(false); }
 }
+/* ===== End-of-day department report (emailed to the department's manager & team leader) ===== */
+function deptEmployees(dept){ return (employees||[]).filter(function(e){ return e.dept===dept && e.active!==false; }); }
+function deptLeaderEmails(dept,branch){
+  var out=[];
+  (employees||[]).forEach(function(e){
+    if(e.active===false) return; var r=e.role||'';
+    var leader=(r==='Manager'||r==='Team Leader'||r==='Director'||r==='CEO'||r==='CO Founder'||r==='Super Admin'||e.dept==='Management');
+    if(!leader) return;
+    if(e.dept!==dept && e.dept!=='Management' && r!=='Super Admin') return;
+    if(branch && branch!=='All' && r!=='Super Admin' && e.dept!=='Management'){ var bs=e.branches||[]; if(bs.indexOf(branch)<0 && bs.indexOf('All')<0) return; }
+    if(e.email) out.push((e.email||'').toLowerCase());
+  });
+  return Array.from(new Set(out));
+}
+function buildEodReport(dept,branch,T){
+  T=T||today(); var ar=(lang==='ar'); var L=[];
+  var eset={}; deptEmployees(dept).forEach(function(e){ eset[(e.email||'').toLowerCase()]=1; });
+  var inB=function(x){ return !branch||branch==='All'||x.branch===branch; };
+  var att=(attendance||[]).filter(function(a){ return a.date===T && inB(a) && (eset[(a.email||'').toLowerCase()]||dept==='Management'); });
+  L.push((ar?'الحضور (المقر): ':'Office attendance: ')+att.length);
+  att.forEach(function(a){ L.push('  • '+(a.name||a.email||'')+' — '+(ar?'حضور ':'in ')+(a.inTime||'—')+(a.outTime?(ar?' / انصراف ':' / out ')+a.outTime:(ar?' / لسه':' / still in'))); });
+  var sv=(sitevisits||[]).filter(function(v){ return v.date===T && inB(v); });
+  if(sv.length){ L.push(''); L.push((ar?'الموقع (Site): ':'Site visits: ')+sv.length); sv.forEach(function(v){ var hrs=v.outTs?((num(v.outTs)-num(v.inTs))/3600000):((Date.now()-num(v.inTs))/3600000); L.push('  • '+(v.emp||'')+' — '+(v.project||'')+' — '+fmtHrs(Math.max(0,hrs))+(v.outTs?'':(ar?' (لسه على الموقع)':' (still on site)'))); }); }
+  var mr=(matreqs||[]).filter(function(r){ return inB(r) && String(r.date||'').slice(0,10)===T; });
+  if(mr.length){ L.push(''); L.push((ar?'طلبات مواد: ':'Material requests: ')+mr.length); mr.forEach(function(r){ L.push('  • '+(r.by||'')+' — '+(r.qty||'')+' × '+(r.item||'')+' ('+(r.project||'')+') — '+(r.status||'Pending')); }); }
+  var nc=(customers||[]).filter(function(c){ return inB(c) && String(c.created||'').slice(0,10)===T; });
+  if(nc.length){ L.push(''); L.push((ar?'عملاء جدد: ':'New customers: ')+nc.length); nc.slice(0,40).forEach(function(c){ L.push('  • '+(c.name||'')); }); }
+  if(!att.length && !sv.length && !mr.length && !nc.length) L.push(ar?'مفيش نشاط مسجّل النهاردة.':'No activity recorded today.');
+  return (ar?('تقرير آخر اليوم — قسم '+dept+(branch&&branch!=='All'?(' · '+branch):'')+'\nالتاريخ: '+T+'\n\n'):('End-of-day report — '+dept+(branch&&branch!=='All'?(' · '+branch):'')+'\nDate: '+T+'\n\n'))+L.join('\n')+'\n\n— Sedra ERP';
+}
+function sendDeptEod(dept,branch,manual){
+  try{
+    var T=today(); var key='eod_'+dept+'_'+(branch||'All')+'_'+T;
+    settings.eodSent=settings.eodSent||{};
+    if(!manual && settings.eodSent[key]) return Promise.resolve(false);
+    var tos=deptLeaderEmails(dept,branch); if(!tos.length){ if(manual)alert(lang==='ar'?'مفيش إيميلات لمديري القسم.':'No manager/team-leader emails for this department.'); return Promise.resolve(false); }
+    settings.eodSent[key]=Date.now(); try{ apiMerge('meta','settings',{eodSent:settings.eodSent}); }catch(e){}
+    return sendEmailAuto(tos.join(','), (lang==='ar'?'📊 تقرير آخر اليوم — '+dept+(branch&&branch!=='All'?(' · '+branch):'')+' ('+T+')':'📊 End-of-day — '+dept+(branch&&branch!=='All'?(' · '+branch):'')+' ('+T+')'), buildEodReport(dept,branch,T))
+      .then(function(ok){ if(manual)alert(ok?((lang==='ar'?'اتبعت ✔ لـ: ':'Sent ✔ to: ')+tos.join(', ')):(lang==='ar'?'فشل الإرسال — جرّب تاني.':'Send failed — try again.')); return ok; });
+  }catch(e){ if(manual)alert('Error: '+(e.message||e)); return Promise.resolve(false); }
+}
+var _eodChecked=false;
+function maybeSendEod(){
+  try{
+    if(!me||!appReady||_eodChecked) return;
+    if(!(roleRank(me.role)>=ROLE_RANK['Team Leader'])) return;   /* only a manager / team leader triggers the send */
+    if(new Date().getHours()<18) return;                          /* only in the evening */
+    _eodChecked=true;
+    sendDeptEod(me.dept, (curBranch&&curBranch!=='All')?curBranch:'All', false);
+  }catch(e){}
+}
 
 /* ===== Offline mode: work with no internet; queue writes locally; auto-sync on reconnect =====
    - Reads: the last full snapshot is cached in IndexedDB, so the app opens & shows data offline.
@@ -1459,7 +1525,7 @@ var BULK_COLLS=['_backups','accounts','activities','adcampaigns','announcements'
    inline images, ~10 MB), so pulling them in the first load froze the browser and burned
    the free DB quota. applyAll only overwrites their globals when they ARE present, so a
    light refresh never blanks them. */
-var HEAVY_COLLS=['quotes','inventory','audit','trash'];
+var HEAVY_COLLS=['quotes','inventory','audit','trash','history'];
 /* Bulk DB read that EXCLUDES the large-file store ('blobs').
    Big attachments (up to 50MB) live under /blobs and are fetched on demand only,
    so they never bloat this whole-DB read, the poll, or the offline snapshot. */
@@ -1516,12 +1582,13 @@ async function loadHeavy(which){
       else if(k==='inventory') inventory=listToArr(v).sort((x,y)=>(x.name||'').localeCompare(y.name||''));
       else if(k==='audit') audit=listToArr(v).sort((x,y)=>num(y.ts)-num(x.ts));
       else if(k==='trash'){ trash=listToArr(v).sort((x,y)=>(y.at||'').localeCompare(x.at||'')); try{ purgeOldTrash(); }catch(_t){} }
+      else if(k==='history'){ recHistory=listToArr(v).sort((x,y)=>num(y.ts)-num(x.ts)); try{ purgeOldHistory(); }catch(_hh){} }
     });
     if(any){ try{ if(appReady && typeof render==='function' && !_modalOpen()) render(); }catch(_){} }
   }catch(e){ todo.forEach(function(k){ window.__heavyLoading[k]=false; }); }
 }
 /* Which heavy collections each view needs. */
-var VIEW_HEAVY={ quotes:['quotes','inventory'], variations:['quotes','inventory'], salesorders:['quotes','inventory'], quicksale:['quotes','inventory'], inventory:['inventory'], reorder:['inventory'], stockledger:['inventory'], stockcount:['inventory'], invvalue:['inventory'], grn:['inventory'], gatepass:['inventory'], requisitions:['inventory'], purchasereq:['inventory'], auditlog:['audit'], admin:['audit'], trash:['trash'] };
+var VIEW_HEAVY={ quotes:['quotes','inventory'], variations:['quotes','inventory'], salesorders:['quotes','inventory'], quicksale:['quotes','inventory'], inventory:['inventory'], reorder:['inventory'], stockledger:['inventory'], stockcount:['inventory'], invvalue:['inventory'], grn:['inventory'], gatepass:['inventory'], requisitions:['inventory'], purchasereq:['inventory'], auditlog:['audit','history'], admin:['audit','history'], trash:['trash'] };
 function ensureHeavyFor(v){ try{ var need=VIEW_HEAVY[v]; if(need){ need.forEach(function(k){ loadHeavy(k); }); } }catch(_){ } }
 async function refreshAll(quiet){
   if(polling)return; polling=true; lastRefresh=Date.now();
@@ -1557,6 +1624,8 @@ function applyAll(all){
     if(all.inventory!==undefined) inventory=listToArr(all.inventory).sort((x,y)=>(x.name||'').localeCompare(y.name||''));
     stockMoves=listToArr(all.stockMoves).sort((x,y)=>(y.date||'').localeCompare(x.date||''));
     attendance=listToArr(all.attendance).sort((x,y)=>(y.date||'').localeCompare(x.date||''));
+    appNotifs=listToArr(all.notifications).sort((x,y)=>num(y.ts)-num(x.ts));
+    if(all.history!==undefined) recHistory=listToArr(all.history).sort((x,y)=>num(y.ts)-num(x.ts));
     invoices=listToArr(all.invoices).sort((x,y)=>(y.date||'').localeCompare(x.date||''));
     payments=listToArr(all.payments).sort((x,y)=>(y.date||'').localeCompare(x.date||''));
     expenses=listToArr(all.expenses).sort((x,y)=>(y.date||'').localeCompare(x.date||''));
@@ -1692,7 +1761,7 @@ function ensureAdminDoc(u){
 function pickBranch(b){ curBranch=b; localStorage.setItem('sedra_branch',b); enterApp(); }
 function enterApp(){ appReady=true; lastSig=''; hideLoad(); hideGate(); g('app').classList.remove('hide'); buildNav();
   try{ var _dh=DEPT_HOME[me.dept]||'hub'; var _dm=MODULES.find(function(x){return x.id===_dh;}); curView=(_dm&&canSee(_dm))?_dh:'hub'; var _sv=null; try{_sv=localStorage.getItem('orbit_view');}catch(e2){} if(_sv){ var _svm=MODULES.find(function(x){return x.id===_sv;}); if(_svm&&canSee(_svm)) curView=_sv; } }catch(e){ curView='hub'; } try{ openProjectId=(curView==='projects')?(localStorage.getItem('sedra_openproj')||null):null; }catch(e3){}
-  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); _setupUpdateCheck(); try{ purgeOldTrash(); }catch(e){} try{ dedupOnce(); }catch(e){} try{ dedupLeadsOnce(); }catch(e){} }
+  g('whoName').textContent=me.name||me.email; g('whoRole').textContent=me.dept+' · '+me.role; buildBranchSel(); setupNotif(); render(); updateBadges(); maybeTasksPopup(); _setupUpdateCheck(); try{ purgeOldTrash(); }catch(e){} try{ setTimeout(purgeOldNotifs,8000); }catch(e){} try{ dedupOnce(); }catch(e){} try{ dedupLeadsOnce(); }catch(e){} }
 
 /* ONE-TIME de-duplication (2026-10-25). The migration/import duplicated records many times (same
    Zoho record imported repeatedly → identical copies with different push-IDs). Records reference each
@@ -2025,7 +2094,7 @@ const NAV_GROUPS=[
   {k:'overview',t:'Overview',ic:'🏠',ids:['workqueue','dashboard','execdash','alerts','datahealth','kpiscore','performance','reports']},
   {k:'sales',t:'Sales & CRM',ic:'💼',ids:['sales','blueprint','customers','servicereqs','contacts','calllog','clientportal','discountreqs','cust360','funnel','leadsource','commission','tenders','salesorders','quicksale','quotes','variations','bookings','bot']},
   {k:'marketing',t:'Marketing',ic:'📣',ids:['marketing','adspend','revops','mktplan','mktprod','contentcal','growth','mktlib','casestudy','audiences','partners','seoranks','eventlead','competitorads','brandcheck','surveys','feedback']},
-  {k:'projects',t:'Projects & Field',ic:'🏗️',ids:['projects','sitecheck','sitehours','operations','gantt','workorders','issues','scheduling','manpower','dsr','costctrl','ipc','snags','quality','tandc','ncr','calibration','handover','methods','siteinstr','subipc','asbuilt','scurve','ncranalysis','submittals','rfi','doccontrol','risks','permits','maintenance','warranty','support','subcontractors','equipment']},
+  {k:'projects',t:'Projects & Field',ic:'🏗️',ids:['projects','sitecheck','sitehours','livesites','operations','gantt','workorders','issues','scheduling','manpower','dsr','costctrl','ipc','snags','quality','tandc','ncr','calibration','handover','methods','siteinstr','subipc','asbuilt','scurve','ncranalysis','submittals','rfi','doccontrol','risks','permits','maintenance','warranty','support','subcontractors','equipment']},
   {k:'tech',t:'Technical Office',ic:'📐',ids:['quotes','quoterequests','variations','catalog','boqtpl','scopelib','termslib','designlib','engtime','marginrep','bomrecon','lessons','submittals','doccontrol','rfi']},
   {k:'inventory',t:'Inventory & Purchasing',ic:'📦',ids:['inventory','reorder','grn','gatepass','stockcount','stockledger','invvalue','requisitions','purchasereq','rfq','prequal','suppscore']},
   {k:'finance',t:'Finance & Accounting',ic:'💰',ids:['accounting','ledger','glreport','bonds','retention','finance','cashpos','openbal','taxcodes','taxsummary','fxrates','transfers','capital','creditnotes','debitnotes','subscriptions','billabletime','claims','pettycash','deprec','intangibles','investments','araging','apaging','expanalysis','branchcompare','orderbook']},
@@ -2058,12 +2127,12 @@ function buildMobileBar(){
 var ROLE_ESSENTIALS={
  Sales:['dashboard','sales','customers','quotes','cust360','servicereqs','salesorders','todo','calendar'],
  Marketing:['dashboard','adspend','marketing','contentcal','mktplan','mktprod','surveys','todo','calendar'],
- Operations:['dashboard','projects','sitecheck','operations','workorders','dsr','snags','todo','calendar'],
- Technical:['dashboard','quotes','projects','submittals','rfi','ncr','sitecheck','todo'],
+ Operations:['dashboard','projects','livesites','sitecheck','operations','workorders','dsr','snags','todo','calendar'],
+ Technical:['dashboard','quotes','projects','livesites','submittals','rfi','ncr','sitecheck','todo'],
  Accounting:['dashboard','accounting','ledger','finance','claims','customers','todo'],
  Inventory:['dashboard','inventory','reorder','grn','stockcount','suppscore','todo'],
- HR:['dashboard','hr','attendance','recruit','applicants','myhr','todo'],
- Management:['dashboard','execdash','reports','projects','accounting','sales','hr','alerts'],
+ HR:['dashboard','hr','attendance','livesites','recruit','applicants','myhr','todo'],
+ Management:['dashboard','execdash','reports','projects','livesites','accounting','sales','hr','alerts'],
  _default:['dashboard','todo','calendar','sitecheck','myhr','chat']
 };
 function menuMode(){ if(!isAdmin())return 'simple'; try{ var v=localStorage.getItem('sedra_menumode'); if(v==='simple'||v==='all') return v; }catch(e){} return 'all'; }
@@ -2614,7 +2683,7 @@ function render(keepScroll){
   try{ localStorage.setItem('orbit_view', curView); }catch(_ov){} /* persist current view every render so a page refresh always returns here (not the hub), whatever navigated us */
   g('viewTitle').textContent=m.label;
   markNav();
-  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,clientreqs:vClientReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,devroadmap:vDevRoadmap,datahealth:vDataHealth,orgchart:vOrgChart,attexcept:vAttExcept,onboard:vOnboard,policies:vPolicies,exitiv:vExitIv,calllog:vCallLog,docexp:vDocExp,probation:vProbation,roster:vRoster,headcount:vHeadcount,clientportal:vClientPortal,catalog:vCatalog,boqtpl:vBoqTpl,termslib:vTermsLib,scopelib:vScopeLib,designlib:vDesignLib,engtime:vEngTime,marginrep:vMarginRep,bomrecon:vBomRecon,lessons:vLessons,competitorads:vCompetitorAds,casestudy:vCaseStudy,audiences:vAudiences,partners:vPartners,seoranks:vSeoRanks,eventlead:vEventLead,brandcheck:vBrandCheck,discountreqs:vDiscountReqs,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,sitehours:vSiteHours,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,trash:vTrash,findreplace:vFindReplace,quoterequests:vQuoteRequests,offhours:vOffHours,attreport:vAttReport,admin:vAdmin,profile:vProfile}[curView];
+  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,clientreqs:vClientReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,devroadmap:vDevRoadmap,datahealth:vDataHealth,orgchart:vOrgChart,attexcept:vAttExcept,onboard:vOnboard,policies:vPolicies,exitiv:vExitIv,calllog:vCallLog,docexp:vDocExp,probation:vProbation,roster:vRoster,headcount:vHeadcount,clientportal:vClientPortal,catalog:vCatalog,boqtpl:vBoqTpl,termslib:vTermsLib,scopelib:vScopeLib,designlib:vDesignLib,engtime:vEngTime,marginrep:vMarginRep,bomrecon:vBomRecon,lessons:vLessons,competitorads:vCompetitorAds,casestudy:vCaseStudy,audiences:vAudiences,partners:vPartners,seoranks:vSeoRanks,eventlead:vEventLead,brandcheck:vBrandCheck,discountreqs:vDiscountReqs,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,sitehours:vSiteHours,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,trash:vTrash,findreplace:vFindReplace,quoterequests:vQuoteRequests,offhours:vOffHours,attreport:vAttReport,livesites:vLiveSites,admin:vAdmin,profile:vProfile}[curView];
   g('view').innerHTML = fn?fn():'';
   if(curView==='sales' && window._afterSales)window._afterSales();
   if(curView==='chat' && window._afterChat)window._afterChat();
@@ -3392,7 +3461,7 @@ function leadWonToCustomer(l){
   var exists=(customers||[]).some(function(c){ return (ph&&_pk(c.phone)===ph)||(nm&&_nk(c.name)===nm)||(co&&c.company&&_nk(c.company)===co); });
   if(exists)return;
   var cust={name:(l.company||l.name||'Customer'), company:l.company||'', ctype:(l.ctype||'Company'), branch:l.branch||defBranch(), contact:l.name||l.villaOwner||'', phone:l.phone||'', email:l.email||'', city:l.area||'', address:l.address||'', villaOwner:l.villaOwner||'', notes:'Converted from Won lead'+(l.villaOwner?(' · '+(lang==='ar'?'مالك الفيلا: ':'Villa owner: ')+l.villaOwner):''), source:'Won lead', leadId:l.id, owner:l.owner||'', ownerEmail:l.ownerEmail||'', created:new Date().toISOString()};
-  apiAdd('customers',cust).then(function(cid){ try{logAudit('create','customers',cid||'',cust.name);}catch(_){} });
+  apiAdd('customers',cust).then(function(cid){ try{logAudit('create','customers',cid||'',cust.name);}catch(_){} try{ notifyLeaders(null,(lang==='ar'?'🧑‍💼 عميل جديد — ':'🧑‍💼 New customer — ')+(cust.name||''),((me&&me.name)||'')+(lang==='ar'?' أضاف عميل':' added a customer')+(cust.phone?(' · '+cust.phone):''),{ico:'🧑‍💼',type:'customer',branch:cust.branch}); }catch(_nc){} });
 }
 function leadToQuote(id){
   const l=leads.find(x=>x.id===id); if(!l)return;
@@ -3974,7 +4043,23 @@ function projLeaders(p){ var br=(p&&p.branch)||''; return (typeof employees!=='u
    in the 🔔 notifications bell, which is computed live from the data in getNotifications(). We no longer
    send emails or phone push on every action — it was too noisy for everyone. Kept as a no-op so all
    existing callers keep working. */
-function notifyLeaders(p,subject,body){ return; }
+/* Writes an in-app notification targeted at the responsible department's managers & team leaders.
+   They see it in the bell with a sound + popup (getNotifications surfaces it; checkNotifSound pings).
+   opts: {dept, branch, ico, type}. No emails/phone push (that was the old noisy behaviour). */
+function notifyLeaders(p,subject,body,opts){
+  try{
+    opts=opts||{};
+    var dept=opts.dept||(p&&p.dept)||(me&&me.dept)||'';
+    var branch=opts.branch||(p&&p.branch)||((me&&curBranch)||'');
+    if(branch==='All')branch='';
+    apiAdd('notifications',{ ts:Date.now(), dept:dept, branch:branch, ico:opts.ico||'🔔',
+      title:(subject||'').toString().slice(0,90), sub:(body||'').toString().slice(0,140),
+      type:opts.type||'', projectId:(p&&p.id)||'',
+      actor:(me&&me.name)||'', actorEmail:((me&&me.email)||'').toLowerCase() });
+  }catch(e){}
+}
+/* Remove notifications older than 4 days so the collection stays small (admin runs it once per session). */
+function purgeOldNotifs(){ try{ if(!isAdmin())return; var cut=Date.now()-4*86400000; (appNotifs||[]).forEach(function(n){ if(num(n.ts)&&num(n.ts)<cut&&n.id){ try{apiDelete('notifications',n.id);}catch(_){} } }); }catch(e){} }
 function projMatReqs(p){ return (typeof matreqs!=='undefined'?matreqs:[]).filter(function(r){return r.projectId===p.id;}); }
 function requestMaterial(pid,idx){
   var p=projects.find(function(x){return x.id===pid;}); if(!p)return;
@@ -3985,7 +4070,7 @@ function requestMaterial(pid,idx){
     fEl(ar?'الكمية المطلوبة':'Quantity requested','rm_qty',1,'number')+fTa(ar?'ملاحظة (اختياري)':'Note (optional)','rm_note',''),
     function(){ var q=num(val('rm_qty')); if(q<=0){alert('Enter quantity');return false;}
       apiAdd('matreqs',{project:p.name,projectId:pid,item:it.item,itemIdx:idx,qty:q,by:(me&&me.name)||'',byEmail:((me&&me.email)||'').toLowerCase(),branch:p.branch,status:'Pending',note:val('rm_note'),date:new Date().toISOString()})
-        .then(function(){ try{logAudit('create','matreqs','',p.name);}catch(e){} try{ notifyLeaders(p,(ar?'🧰 طلب مواد — ':'🧰 Material request — ')+p.name,((me&&me.name)||'')+(ar?' طلب ':' requested ')+q+' × '+it.item+(ar?' — محتاج موافقتك':' — needs your approval')); }catch(_n){} synced(); alert(ar?'اتبعت الطلب ✔ — مستني موافقة مدير Operations أو Team Leader':'Request sent ✔ — awaiting Operations Manager / Team Leader approval'); })
+        .then(function(){ try{logAudit('create','matreqs','',p.name);}catch(e){} try{ notifyLeaders(p,(ar?'🧰 طلب مواد — ':'🧰 Material request — ')+p.name,((me&&me.name)||'')+(ar?' طلب ':' requested ')+q+' × '+it.item+(ar?' — محتاج موافقتك':' — needs your approval'),{ico:'🧰',type:'material'}); }catch(_n){} synced(); alert(ar?'اتبعت الطلب ✔ — مستني موافقة مدير Operations أو Team Leader':'Request sent ✔ — awaiting Operations Manager / Team Leader approval'); })
         .catch(function(e){alert('Error: '+(e.message||e));});
     });
 }
@@ -6956,8 +7041,10 @@ function checkInAuto(){
       const _ex2=(attendance||[]).find(function(a){return a.id===id;});
       if(_ex2 && _ex2.inTime){ g('attMsg').innerHTML=`<span style="color:var(--muted)">${lang==='ar'?('مسجّل حضور بالفعل النهاردة ('+_ex2.inTime+')'):('Already checked in today ('+_ex2.inTime+')')}</span>`; return; }
       apiMerge('attendance',id,{email:(me.email||'').toLowerCase(),name:me.name,branch:o.branch,date:today(),inTime:nowT(),inLat:lat,inLng:lng,inDist:best.d}).then(synced);
+      try{ notifyLeaders(null,(lang==='ar'?'✅ حضور — ':'✅ Check-in — ')+(me.name||''),(me.name||'')+(lang==='ar'?' سجّل حضور ':' checked in ')+(o.branch||'')+' ('+Math.round(best.d)+'m) · '+nowT(),{ico:'✅',type:'checkin',branch:o.branch}); }catch(_ci){}
       g('attMsg').innerHTML=`<span style="color:var(--ok)">${lang==='ar'?'تم تسجيل الحضور':'Checked in'} — ${(FLAG[o.branch]||'')} ${o.branch} (${Math.round(best.d)}m).</span>`;
     } else if(best){
+      try{ notifyLeaders(null,(lang==='ar'?'⚠️ فشل تسجيل حضور — ':'⚠️ Check-in failed — ')+(me.name||''),(me.name||'')+(lang==='ar'?' حاول يسجّل حضور وهو على بُعد ':' tried to check in ')+Math.round(best.d)+'m '+(lang==='ar'?'من':'from')+' '+(best.o.branch||'')+(lang==='ar'?' (لازم خلال ':' (must be within ')+best.o.radius+'m)',{ico:'⚠️',type:'checkin_fail',branch:best.o.branch}); }catch(_cf){}
       g('attMsg').innerHTML=`<span style="color:var(--bad)">${lang==='ar'?'إنت على بُعد':'You are'} ${Math.round(best.d)}m ${lang==='ar'?'من أقرب مقر':'from the nearest office'} (${(FLAG[best.o.branch]||'')} ${best.o.branch}) — ${lang==='ar'?'لازم تكون في حدود':'must be within'} ${best.o.radius}m.</span>`;
     }
   });
@@ -6966,6 +7053,7 @@ function checkOut(id,branch){
   const loc=settings.loc&&settings.loc[branch];
   geo((lat,lng)=>{ const d=loc?dist(lat,lng,num(loc.lat),num(loc.lng)):null;
     apiMerge('attendance',id,{outTime:nowT(),outLat:lat,outLng:lng,outDist:d}).then(synced);
+    try{ notifyLeaders(null,(lang==='ar'?'🏁 انصراف — ':'🏁 Check-out — ')+(me.name||''),(me.name||'')+(lang==='ar'?' سجّل انصراف ':' checked out ')+(branch||'')+' · '+nowT(),{ico:'🏁',type:'checkout',branch:branch}); }catch(_co){}
     g('attMsg').innerHTML=`<span style="color:var(--ok)">Checked out.</span>`;
   });
 }
@@ -7524,7 +7612,32 @@ function fTa(label,id,v){ return `<div class="fld"><label>${label}</label><texta
 function selEl(label,id,opts,sel){ return `<div class="fld"><label>${label}</label><select id="${id}">`+opts.map(o=>`<option ${o===sel?'selected':''}>${o}</option>`).join('')+`</select></div>`; }
 function branchChips(sel){ return `<div class="fld"><label>Branches access</label><div class="chips">`+BRANCHES.map(b=>`<label><input type="checkbox" class="bchip" value="${b}" ${sel.includes(b)?'checked':''}> ${FLAG[b]} ${b}</label>`).join('')+`</div></div>`; }
 function readChips(){ return [...document.querySelectorAll('.bchip:checked')].map(c=>c.value); }
-function deptChips(sel){ sel=sel||[]; return `<div class="fld"><label>Extra section access (optional)</label><div class="chips">`+MODULES.filter(m=>m.depts).map(m=>`<label><input type="checkbox" class="dchip" value="${m.id}" ${sel.includes(m.id)?'checked':''}> ${m.icon} ${m.label}</label>`).join('')+`</div><div class="mini">يشوف شاشات زيادة غير قسمه الأساسي (مثلاً مندوب Sales تديله Quotations + Marketing).</div></div>`; }
+/* Grouped permission tree: each main department shows an "All" master toggle that ticks every
+   sub-section under it in one click — far easier than the old flat list of checkboxes. */
+function deptChips(sel){ sel=sel||[]; var ar=(lang==='ar');
+  var grantable={}; MODULES.forEach(function(m){ if(m.depts) grantable[m.id]=m; });
+  var used={};
+  var groupBlock=function(key,ic,title,mods){
+    if(!mods.length) return '';
+    var allOn=mods.every(function(m){return sel.indexOf(m.id)>=0;});
+    var items=mods.map(function(m){ used[m.id]=1; return `<label style="display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid var(--mist);border-radius:7px;padding:5px 9px;font-size:12.5px;cursor:pointer"><input type="checkbox" class="dchip" data-grp="${key}" value="${m.id}" ${sel.indexOf(m.id)>=0?'checked':''} onchange="_permSyncMaster('${key}')"> ${m.icon} ${esc(m.label)}</label>`; }).join('');
+    return `<div style="border:1px solid var(--mist);border-radius:10px;padding:9px 11px;margin-bottom:8px;background:#f6f9fc">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px">
+        <b style="font-size:13.5px;color:var(--navy)">${ic} ${esc(title)}</b>
+        <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:#157f96;cursor:pointer"><input type="checkbox" class="dgrpall" data-grp="${key}" ${allOn?'checked':''} onclick="_permGrpToggle('${key}',this.checked)"> ${ar?'الكل':'Select all'}</label>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${items}</div>
+    </div>`;
+  };
+  var blocks=NAV_GROUPS.map(function(G){ var mods=(G.ids||[]).map(function(id){return grantable[id];}).filter(Boolean); return groupBlock(G.k,G.ic,G.t,mods); }).join('');
+  var leftover=Object.keys(grantable).filter(function(id){return !used[id];}).map(function(id){return grantable[id];});
+  blocks+=groupBlock('other','🔧',ar?'أخرى':'Other',leftover);
+  return `<div class="fld"><label>${ar?'صلاحيات الأقسام (علّم على "الكل" للقسم = كل اللي تحته)':'Section access (tick "Select all" on a department to grant everything under it)'}</label>
+    <div style="max-height:46vh;overflow-y:auto;padding:4px;border:1px solid var(--mist);border-radius:10px;background:#fff">${blocks}</div>
+    <div class="mini">${ar?'الموظف بيشوف قسمه الأساسي تلقائيًا. هنا بتديله شاشات زيادة بس.':'The employee sees their own department automatically; grant extra screens here.'}</div></div>`;
+}
+function _permGrpToggle(gk,on){ try{ document.querySelectorAll('.dchip[data-grp="'+gk+'"]').forEach(function(c){ c.checked=!!on; }); }catch(e){} }
+function _permSyncMaster(gk){ try{ var ch=[].slice.call(document.querySelectorAll('.dchip[data-grp="'+gk+'"]')); var all=ch.length&&ch.every(function(c){return c.checked;}); var m=document.querySelector('.dgrpall[data-grp="'+gk+'"]'); if(m)m.checked=all; }catch(e){} }
 function readDChips(){ return [...document.querySelectorAll('.dchip:checked')].map(c=>c.value); }
 function val(id){ const e=g(id); return e?e.value:''; }
 
@@ -7540,9 +7653,25 @@ function guardedClose(){ if(_modalGuard){ if(!confirm(lang==='ar'?'\u062A\u0642\
 g('mSave').onclick=_mSaveClick;
 function logAudit(action,coll,id,label){ if(coll==='audit')return; try{ apiAdd('audit',{ts:Date.now(),user:(me&&me.name)||'',email:(me&&me.email||'').toLowerCase(),action:action,coll:coll,docId:id||'',label:(label||'').toString().slice(0,80)}); }catch(e){} }
 function saveDoc(coll,d,id){
+  var _before=null;
+  if(id){ try{ var arr=COLL_REG()[coll]; if(arr){ var cur=arr.find(function(x){return x.id===id;}); if(cur) _before=JSON.parse(JSON.stringify(cur)); } }catch(e){} }
   var p = id ? apiMerge(coll,id,d) : apiAdd(coll,d);
-  p.then(function(r){ logAudit(id?'update':'create',coll,id||(r||''),(d&&(d.name||d.title||d.number||d.client||d.customer))||''); synced(); }).catch(function(e){ alert('Save error ['+coll+']: '+(e.message||e)); });
+  p.then(function(r){ logAudit(id?'update':'create',coll,id||(r||''),(d&&(d.name||d.title||d.number||d.client||d.customer))||'');
+    if(id && _before){ try{ apiAdd('history',{ts:Date.now(),coll:coll,docId:id,by:(me&&me.name)||'',byEmail:((me&&me.email)||'').toLowerCase(),label:(_before.name||_before.title||_before.number||_before.client||_before.customer||coll).toString().slice(0,60),before:_before}); }catch(_h){} }
+    synced(); }).catch(function(e){ alert('Save error ['+coll+']: '+(e.message||e)); });
 }
+/* Owner-only: restore the previous saved version of a record (from the 'history' snapshots). The
+   current values are themselves snapshotted first, so a restore is also undoable. */
+function revertHist(histId){
+  if(!isAdmin()){ alert(lang==='ar'?'🚫 استرجاع النسخ للأونر (Super Admin) فقط.':'🚫 Version restore is owner-only.'); return; }
+  var hrec=(recHistory||[]).find(function(x){return x.id===histId;}); if(!hrec||!hrec.before){ alert(lang==='ar'?'النسخة مش موجودة.':'Version not found.'); return; }
+  var coll=hrec.coll, docId=hrec.docId, b=hrec.before;
+  if(!confirm((lang==='ar'?'ترجّع نسخة ':'Restore version from ')+fmtNotifTime(hrec.ts)+(lang==='ar'?'؟ ده هيستبدل القيم الحالية (وتقدر ترجع تاني).':'? This overwrites current values (and is itself undoable).')))return;
+  try{ var cur=(COLL_REG()[coll]||[]).find(function(x){return x.id===docId;}); if(cur) apiAdd('history',{ts:Date.now(),coll:coll,docId:docId,by:(me&&me.name)||'',byEmail:((me&&me.email)||'').toLowerCase(),label:(lang==='ar'?'قبل الاسترجاع':'(before restore)'),before:JSON.parse(JSON.stringify(cur))}); }catch(e){}
+  var patch={}; Object.keys(b).forEach(function(k){ if(k!=='id') patch[k]=b[k]; });
+  apiMerge(coll,docId,patch).then(function(){ try{logAudit('revert',coll,docId,hrec.label||'');}catch(e){} synced(); alert(lang==='ar'?'تم استرجاع النسخة ✔':'Version restored ✔'); if(curView==='auditlog')render(); }).catch(function(e){ alert('Error: '+(e.message||e)); });
+}
+function purgeOldHistory(){ try{ if(!isAdmin())return; var cut=Date.now()-30*86400000; (recHistory||[]).forEach(function(x){ if(num(x.ts)&&num(x.ts)<cut&&x.id){ try{apiDelete('history',x.id);}catch(_){} } }); }catch(e){} }
 /* ===== Recycle Bin: soft-delete → 'trash' (auto-purged after 30 days) ===== */
 var TRASH_DAYS=30;
 function trashName(rec,id){ return String((rec&&(rec.name||rec.number||rec.title||rec.client||rec.company||rec.subject||rec.ref||rec.projectName))||id); }
@@ -7722,7 +7851,7 @@ function setupNotif(){
 }
 var _nbCount=-1;
 function checkNotifSound(){ try{ var n=getNotifications().filter(function(x){return x.ico!=='💬';}).reduce(function(s,x){return s+(x.count||1);},0); if(_nbCount>=0 && n>_nbCount){ pingNotify(); try{flashBell();}catch(_f){} try{ if(_wantDesktop && 'Notification' in window && Notification.permission==='granted'){ new Notification('Sedra Electric', {body:'You have a new notification', icon:'icon-192.png'}); } }catch(_){} } _nbCount=n; }catch(e){} }
-function updateBadges(){ try{ updateChatNavBadge(); updateBellBadge(); checkNotifSound(); updateReqNavBadge(); }catch(e){} }
+function updateBadges(){ try{ updateChatNavBadge(); updateBellBadge(); checkNotifSound(); updateReqNavBadge(); try{maybeSendEod();}catch(_e){} }catch(e){} }
 function updateReqNavBadge(){ const nav=g('nav'); if(!nav)return; const btn=nav.querySelector('button[data-v="quoterequests"]'); if(!btn)return; let b=btn.querySelector('.navbadge'); const n=(typeof rfqPending==='function')?rfqPending().length:0; if(n>0){ if(!b){ b=document.createElement('span'); b.className='navbadge'; btn.appendChild(b);} b.textContent=n>99?'99+':n; } else if(b){ b.remove(); } }
 function chatUnreadTotal(){ const myEmail=(me&&me.email||'').toLowerCase(); if(!myEmail)return 0; let n=0; messages.forEach(m=>{ if(msgForMe(m,myEmail)&&(m.email||'').toLowerCase()!==myEmail&&num(m.ts)>chReadFor(m.channel))n++; }); return n; }
 function updateChatNavBadge(){ const nav=g('nav'); if(!nav)return; const btn=nav.querySelector('button[data-v="chat"]'); if(!btn)return; let b=btn.querySelector('.navbadge'); const n=chatUnreadTotal(); if(n>0){ if(!b){ b=document.createElement('span'); b.className='navbadge'; btn.appendChild(b);} b.textContent=n>99?'99+':n; } else if(b){ b.remove(); } }
@@ -7775,6 +7904,25 @@ function getNotifications(){
   try{
     (quotes||[]).forEach(function(q){ if(q.isRFQ && q.rfqDone && num(q.completedTs)>_seen && (((typeof nameEq==='function'&&nameEq(q.requestedBy,myName))||(q.requestedBy||'')===myName)||(q.requestedByEmail||'').toLowerCase()===myEmail))
       list.unshift({ico:'✅',key:'rfqdone:'+q.id,title:(lang==='ar'?'كوتيشنك جاهز':'Your quotation is ready'),sub:(q.client||'')+' · '+(q.number||''),count:1,ts:num(q.completedTs),act:function(){curView='sales';salesTab='quotes';markNotifSeen();closeBell();recOpen(q.id);}}); });
+  }catch(e){}
+  // ---- Department activity feed: managers & team leaders get a live sound+popup on each team action ----
+  try{
+    if(me && roleRank(me.role)>=ROLE_RANK['Team Leader']){
+      var _seeAll = isAdmin() || me.dept==='Management' || roleRank(me.role)>=ROLE_RANK['Director'];
+      var _bl2 = allowedBranches();
+      var _floor = Math.max(_seen, Date.now()-3*86400000); /* recent + unseen only — avoids a huge backlog the first time */
+      var _added=0;
+      (appNotifs||[]).forEach(function(n){
+        if(_added>=25) return;
+        if(num(n.ts)<=_floor) return;
+        if((n.actorEmail||'')===myEmail) return;              /* never alert me about my own action */
+        if(!_seeAll && (n.dept||'')!==me.dept) return;         /* team leader / manager: own department only */
+        if(n.branch){ if(curBranch!=='All' && n.branch!==curBranch) return; if(!_seeAll && _bl2.indexOf(n.branch)<0) return; }
+        _added++;
+        var _t=n.type||'';
+        list.unshift({ico:n.ico||'🔔',key:'act:'+(n.id||n.ts),title:n.title||'',sub:(n.sub||''),count:1,ts:num(n.ts),act:function(){ markNotifSeen(); closeBell(); if(_t==='checkin'||_t==='checkout'||_t==='checkin_fail'){curView='attreport';} else if(_t==='material'){curView='projects';openProjectId=null;} else if(_t==='customer'){curView='customers';} else if(_t==='quoterequest'){curView='quoterequests';} render(); }});
+      });
+    }
   }catch(e){}
   return list;
 }
@@ -9157,6 +9305,17 @@ function vAuditLog(){
   if(auditFilter) rows=rows.filter(a=>[a.user,a.action,a.coll,a.label].join(' ').toLowerCase().includes(auditFilter.toLowerCase()));
   let h=`<div class="sect"><h2>🕵️ Audit Log</h2><div class="sp"></div><input class="gsearch" placeholder="🔎 Filter…" value="${esc(auditFilter)}" oninput="auditFilter=this.value;render()" style="max-width:220px"></div>`;
   h+=`<div class="card mini" style="margin-bottom:8px">سجل كامل لكل الإجراءات في النظام — مين عمل إيه وإمتى. آخر ${Math.min(rows.length,400)} إجراء.</div>`;
+  // ---- Owner version-restore panel ----
+  var _hist=(recHistory||[]).slice(0,120);
+  if(_hist.length){
+    h+=`<div class="card" style="margin-bottom:12px;border:1px solid #e0a93b"><div class="ch-t">↩ ${lang==='ar'?'استرجاع نسخة سابقة من أي سجل (للأونر)':'Restore a previous version of any record (owner)'}</div>`
+      +`<div class="mini" style="margin-bottom:6px">${lang==='ar'?'كل تعديل على سجل بيتحفظ هنا تلقائيًا. لو حد باظ حاجة، ارجّع النسخة اللي قبلها بضغطة — والاسترجاع نفسه بيتسجّل فتقدر ترجع تاني.':'Every record edit is snapshotted here. If someone broke something, roll it back in one click — the restore is itself logged so it is reversible.'}</div>`
+      +`<div style="overflow-x:auto;max-height:40vh;overflow-y:auto"><table><thead><tr><th>${lang==='ar'?'الوقت':'When'}</th><th>${lang==='ar'?'السجل':'Record'}</th><th>${lang==='ar'?'عدّله':'Edited by'}</th><th></th></tr></thead><tbody>`
+      + _hist.map(function(x){ return `<tr><td style="white-space:nowrap">${esc(fmtNotifTime(x.ts))}</td><td><b>${esc(x.label||x.coll)}</b> <span class="mini">· ${esc(x.coll)}</span></td><td>${esc(x.by||'')}</td><td style="text-align:right"><button class="btn gh sm" onclick="revertHist('${x.id}')">↩ ${lang==='ar'?'استرجاع':'Restore'}</button></td></tr>`; }).join('')
+      + `</tbody></table></div></div>`;
+  } else {
+    h+=`<div class="card mini" style="margin-bottom:12px;background:#fff8ec;border-color:#e0a93b;color:#8a5a00">↩ ${lang==='ar'?'لسه مفيش نسخ محفوظة للاسترجاع — هتبدأ تتسجّل مع أول تعديل على أي سجل بعد التحديث ده.':'No restore-able version snapshots yet — they start recording from the next record edit after this update.'}</div>`;
+  }
   if(!rows.length) return h+`<div class="card empty">No audit records.</div>`;
   const ico={create:'➕',update:'✏️',delete:'🗑️'};
   h+=`<div style="overflow-x:auto"><table><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Module</th><th>Item</th></tr></thead><tbody>`+rows.slice(0,400).map(a=>{let t='';try{t=new Date(num(a.ts)).toLocaleString();}catch(e){}return `<tr><td class="mini">${esc(t)}</td><td>${esc(a.user||'')}</td><td>${ico[a.action]||''} ${esc(a.action||'')}</td><td>${esc(a.coll||'')}</td><td>${esc(a.label||'')}</td></tr>`}).join('')+`</tbody></table></div>`;
@@ -11339,6 +11498,32 @@ function siteCheckOut(id){
   scGather();
 }
 function scNote(id){ var v=(sitevisits||[]).find(x=>x.id===id); if(!v)return; var n=prompt(lang==='ar'?'ملاحظة عن الزيارة:':'Visit note:',v.note||''); if(n===null)return; apiMerge('sitevisits',id,{note:n}).then(()=>synced()); }
+/* Live Sites — managers & team leaders see, in real time, which sites have people on them right now
+   (open site check-in sessions), who they are and how long they've been there. Updates on each data poll. */
+function vLiveSites(){
+  var ar=(lang==='ar'); var now=Date.now();
+  var open=(sitevisits||[]).filter(inBranch).filter(function(v){ return v.inTs && !v.outTs; });
+  var byProj={}; open.forEach(function(v){ var k=v.project||(ar?'بدون مشروع':'No project'); (byProj[k]=byProj[k]||[]).push(v); });
+  var keys=Object.keys(byProj).sort(function(a,b){ return byProj[b].length-byProj[a].length; });
+  var cap=(typeof siteMaxShiftH==='function'?siteMaxShiftH():12);
+  var liveH=function(v){ return Math.min(Math.max(0,(now-num(v.inTs))/3600000), cap); };
+  var h='<div class="sect"><h2>🛰️ '+(ar?'المواقع الشغّالة دلوقتي':'Live sites — right now')+'</h2><div class="sp"></div><button class="btn cy sm" onclick="sendDeptEod(me.dept,(curBranch&&curBranch!==\'All\')?curBranch:\'All\',true)" title="'+(ar?'ابعت تقرير اليوم لمدير وتيم ليدر القسم':'Email today\'s report to the department manager & team leader')+'">📧 '+(ar?'تقرير اليوم':"Email today's report")+'</button> <button class="btn gh sm" onclick="render()">🔄 '+(ar?'تحديث':'Refresh')+'</button></div>';
+  h+='<div class="grid kpis"><div class="card kpi"><div class="n">'+keys.length+'</div><div class="l">'+(ar?'مواقع فيها ناس':'Sites with crew')+'</div></div><div class="card kpi"><div class="n">'+open.length+'</div><div class="l">'+(ar?'فنيين على المواقع':'People on site')+'</div></div></div>';
+  if(!keys.length){ h+='<div class="card empty" style="margin-top:12px">'+(ar?'مفيش حد مسجّل حضور على أي موقع دلوقتي.':'No one is currently checked in on any site.')+'</div>'; }
+  else keys.forEach(function(k){
+    var rows=byProj[k].sort(function(a,b){ return num(a.inTs)-num(b.inTs); });
+    var proj=(projects||[]).find(function(p){ return p.name===k; });
+    var gps=(proj&&proj.gps)?' · <a href="https://maps.google.com/?q='+encodeURIComponent(proj.gps)+'" target="_blank">🗺️</a>':'';
+    h+='<div class="card" style="margin-top:12px"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><div><b style="font-size:15px">📍 '+esc(k)+'</b>'+((proj&&proj.client)?' <span class="mini">· '+esc(proj.client)+'</span>':'')+gps+'</div><span class="tag" style="background:#1a7a4f22;color:#1a7a4f;font-weight:700"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#1a7a4f;margin-inline-end:5px"></span>'+rows.length+' '+(ar?'على الموقع':'on site')+'</span></div>';
+    h+='<div style="overflow-x:auto;margin-top:8px"><table><thead><tr><th>'+(ar?'الفني':'Person')+'</th><th>'+(ar?'حضور':'In')+'</th><th>'+(ar?'مدة':'Elapsed')+'</th><th>'+(ar?'موقع':'GPS')+'</th></tr></thead><tbody>';
+    rows.forEach(function(v){ h+='<tr><td><b>'+esc(v.emp||v.empEmail||'')+'</b>'+(v.site?'<div class="mini">📍 '+esc(v.site)+'</div>':'')+'</td><td>'+hhmm(v.inTs)+'</td><td><b>'+fmtHrs(liveH(v))+'</b></td><td>'+(v.gpsIn?'<a href="https://maps.google.com/?q='+esc(v.gpsIn)+'" target="_blank">📍</a>':'—')+'</td></tr>'; });
+    h+='</tbody></table></div></div>';
+  });
+  var activeProjs=(projects||[]).filter(inBranch).filter(function(p){ var s=(p.status||'').toLowerCase(); return s==='active'||s==='in progress'||s==='in-progress'||s==='execution'||s==='ongoing'; });
+  var idle=activeProjs.filter(function(p){ return keys.indexOf(p.name)<0; });
+  if(idle.length){ h+='<div class="sect" style="margin:18px 0 8px"><h2 style="font-size:15px">'+(ar?'مشاريع نشطة مفيش عليها حد دلوقتي':'Active projects — nobody on site now')+'</h2></div><div class="card" style="display:flex;flex-wrap:wrap;gap:6px">'+idle.slice(0,40).map(function(p){ return '<span class="tag" style="background:#14406312;color:var(--navy);cursor:pointer" onclick="openProjectId=\''+p.id+'\';curView=\'projects\';render()">'+esc(p.name)+(p.gps?'':' 📍')+'</span>'; }).join('')+'</div>'; }
+  return h;
+}
 function vSiteCheck(){
   const mgr=isMgr()||me.dept==='Management'||me.dept==='HR'||me.dept==='Operations';
   const T=today();
