@@ -843,6 +843,7 @@ let sheets=[], worddocs=[], decks=[];
 let positions=[], mktasks=[], mktlib=[], mktplans=[], growthexp=[];
 let sitevisits=[];
 let matreqs=[];
+let overtime=[]; /* overtime requests — each extends that employee's end-of-day auto-checkout window */
 let appNotifs=[]; /* live department-activity notifications (notifications collection) — managers & team leaders get a sound+popup on each team action */
 let recHistory=[]; /* per-record version snapshots (history collection) — owner can restore a previous version */
 let reccmts=[], wfappr=[];
@@ -1668,7 +1669,7 @@ function applyAll(all){
     subcontractors=listToArr(all.subcontractors); equipment=listToArr(all.equipment); licenses=listToArr(all.licenses);
     warranties=listToArr(all.warranties);
     tenders=listToArr(all.tenders); drawings=listToArr(all.drawings); toolbox=listToArr(all.toolbox);
-    submittals=listToArr(all.submittals); ipcs=listToArr(all.ipcs); risks=listToArr(all.risks); permits=listToArr(all.permits); requisitions=listToArr(all.requisitions); tandc=listToArr(all.tandc); ncrs=listToArr(all.ncrs); gatepasses=listToArr(all.gatepasses); bonds=listToArr(all.bonds); calibrations=listToArr(all.calibrations); handovers=listToArr(all.handovers); retentions=listToArr(all.retentions); insurances=listToArr(all.insurances); methods=listToArr(all.methods); siteinstr=listToArr(all.siteinstr); subipcs=listToArr(all.subipcs); asbuilts=listToArr(all.asbuilts); wastelogs=listToArr(all.wastelogs); prequals=listToArr(all.prequals); drills=listToArr(all.drills); sheets=listToArr(all.sheets); worddocs=listToArr(all.worddocs); decks=listToArr(all.decks); positions=listToArr(all.positions); mktasks=listToArr(all.mktasks); mktlib=listToArr(all.mktlib); mktplans=listToArr(all.mktplans); growthexp=listToArr(all.growthexp); sitevisits=listToArr(all.sitevisits); matreqs=listToArr(all.matreqs); reccmts=listToArr(all.comments); wfappr=listToArr(all.wfappr);
+    submittals=listToArr(all.submittals); ipcs=listToArr(all.ipcs); risks=listToArr(all.risks); permits=listToArr(all.permits); requisitions=listToArr(all.requisitions); tandc=listToArr(all.tandc); ncrs=listToArr(all.ncrs); gatepasses=listToArr(all.gatepasses); bonds=listToArr(all.bonds); calibrations=listToArr(all.calibrations); handovers=listToArr(all.handovers); retentions=listToArr(all.retentions); insurances=listToArr(all.insurances); methods=listToArr(all.methods); siteinstr=listToArr(all.siteinstr); subipcs=listToArr(all.subipcs); asbuilts=listToArr(all.asbuilts); wastelogs=listToArr(all.wastelogs); prequals=listToArr(all.prequals); drills=listToArr(all.drills); sheets=listToArr(all.sheets); worddocs=listToArr(all.worddocs); decks=listToArr(all.decks); positions=listToArr(all.positions); mktasks=listToArr(all.mktasks); mktlib=listToArr(all.mktlib); mktplans=listToArr(all.mktplans); growthexp=listToArr(all.growthexp); sitevisits=listToArr(all.sitevisits); matreqs=listToArr(all.matreqs); overtime=listToArr(all.overtime); reccmts=listToArr(all.comments); wfappr=listToArr(all.wfappr);
     rfis=listToArr(all.rfis); dsrs=listToArr(all.dsrs); contacts=listToArr(all.contacts);
     announcements=listToArr(all.announcements); suggestions=listToArr(all.suggestions); overtimes=listToArr(all.overtimes); devideas=listToArr(all.devideas); calls=listToArr(all.calls); policies=listToArr(all.policies); exits=listToArr(all.exits); shifts=listToArr(all.shifts);
     products=listToArr(all.products); boqtemplates=listToArr(all.boqtemplates); termsets=listToArr(all.termsets); scopeblocks=listToArr(all.scopeblocks); designlib=listToArr(all.designlib); engtime=listToArr(all.engtime); lessons=listToArr(all.lessons);
@@ -7014,8 +7015,11 @@ function vAttendance(){
   h+=`<div id="attMsg" class="gerr" style="color:var(--muted)"></div>`;
   if(!rec){ if(offices.length) h+=`<button class="btn cy" onclick="checkInAuto()">📍 ${lang==='ar'?'تسجيل حضور':'Check In'}</button>`; }
   else { h+=`<div style="margin:6px 0">✅ ${lang==='ar'?'حضور':'Checked in at'} <b>${esc(rec.inTime)}</b> ${rec.branch?'— '+(FLAG[rec.branch]||'')+' '+esc(rec.branch):''} ${rec.inDist!=null?`(${Math.round(rec.inDist)}m)`:''}</div>`;
-    if(!rec.outTime) h+=`<button class="btn" onclick="checkOut('${rec.id}','${esc(rec.branch||'')}')">🚪 ${lang==='ar'?'تسجيل انصراف':'Check Out'}</button>`;
-    else h+=`<div>🏁 ${lang==='ar'?'انصراف':'Checked out at'} <b>${esc(rec.outTime)}</b></div>`; }
+    if(!rec.outTime){ h+=`<button class="btn" onclick="checkOut('${rec.id}','${esc(rec.branch||'')}')">🚪 ${lang==='ar'?'تسجيل انصراف':'Check Out'}</button> <button class="btn gh" onclick="requestOvertime()">🕗 ${lang==='ar'?'طلب أوفر تايم':'Request overtime'}</button>`;
+      var _ot=otHoursToday(me.email); if(_ot>0) h+=`<div class="mini" style="color:var(--ok);margin-top:6px">🕗 ${lang==='ar'?('أوفر تايم مسجّل النهاردة: '+_ot+' ساعة — الانصراف التلقائي اتمدّ لـ '):('Overtime today: '+_ot+'h — auto-checkout extended to ')}<b>${addHoursToHHMM(workdayEndStr(),_ot)}</b></div>`;
+      else h+=`<div class="mini" style="color:var(--muted);margin-top:6px">${lang==='ar'?('لو نسيت الانصراف، النظام هيسجّله تلقائيًا الساعة '+workdayEndStr()):('If you forget, auto check-out at '+workdayEndStr())}</div>`;
+    }
+    else h+=`<div>🏁 ${lang==='ar'?'انصراف':'Checked out at'} <b>${esc(rec.outTime)}</b>${rec.autoOut?` <span class="mini">(${lang==='ar'?'تلقائي':'auto'})</span>`:''}</div>`; }
   h+=`<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="curView='hr';hrTab='leave';render();setTimeout(editLeave,60)">🌴 ${lang==='ar'?'طلب إجازة سنوية':'Request annual leave'}</button><button class="btn gh" onclick="setupNotif()">🔔 ${lang==='ar'?'تفعيل التنبيهات':'Enable notifications'}</button></div>`;
   h+=`</div>`;
   // admin/manager: see team attendance
@@ -7025,7 +7029,17 @@ function vAttendance(){
     rows=rows.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,500);
     h+=`<div class="sect"><h2>Team attendance log</h2><div class="sp"></div><button class="btn gh sm" onclick="attExport()">⬇ CSV</button></div>`;
     h+=rptDateBar('att');
-    h+= rows.length?`<table><thead><tr><th>Date</th><th>Employee</th><th>Branch</th><th>In</th><th>Out</th><th>Distance</th></tr></thead><tbody>`+rows.map(a=>`<tr><td>${esc(a.date)}</td><td>${esc(a.name||a.email)}</td><td>${FLAG[a.branch]||''} ${esc(a.branch||'')}</td><td>${esc(a.inTime||'—')}</td><td>${esc(a.outTime||'—')}</td><td>${a.inDist!=null?Math.round(a.inDist)+'m':'—'}</td></tr>`).join('')+`</tbody></table>`:`<div class="card empty">مفيش سجلات حضور في الفترة دي.</div>`;
+    h+= rows.length?`<table><thead><tr><th>Date</th><th>Employee</th><th>Branch</th><th>In</th><th>Out</th><th>Distance</th></tr></thead><tbody>`+rows.map(a=>`<tr><td>${esc(a.date)}</td><td>${esc(a.name||a.email)}</td><td>${FLAG[a.branch]||''} ${esc(a.branch||'')}</td><td>${esc(a.inTime||'—')}</td><td>${esc(a.outTime||'—')}${a.autoOut?' <span class="mini">(auto)</span>':''}</td><td>${a.inDist!=null?Math.round(a.inDist)+'m':'—'}</td></tr>`).join('')+`</tbody></table>`:`<div class="card empty">مفيش سجلات حضور في الفترة دي.</div>`;
+    // Overtime requests today — managers & team leaders can reject
+    var _ar2=(lang==='ar');
+    var _ot=(overtime||[]).filter(function(o){ return o.date===today() && bl.includes(o.branch) && (curBranch==='All'||o.branch===curBranch); }).sort(function(a,b){return num(b.ts)-num(a.ts);});
+    if(_ot.length){
+      h+=`<div class="sect"><h2>🕗 ${_ar2?'طلبات أوفر تايم النهاردة':'Overtime requests today'}</h2></div>`;
+      h+=`<table><thead><tr><th>${_ar2?'الموظف':'Employee'}</th><th>${_ar2?'الفرع':'Branch'}</th><th>${_ar2?'ساعات':'Hours'}</th><th>${_ar2?'لحد':'Until'}</th><th>${_ar2?'السبب':'Reason'}</th><th>${_ar2?'الحالة':'Status'}</th><th></th></tr></thead><tbody>`+_ot.map(function(o){
+        var st=(o.status||'Approved'); var badge=st==='Rejected'?`<span style="color:var(--bad)">${_ar2?'مرفوض':'Rejected'}</span>`:`<span style="color:var(--ok)">${_ar2?'مفعّل':'Active'}</span>`;
+        return `<tr><td>${esc(o.name||o.email)}</td><td>${FLAG[o.branch]||''} ${esc(o.branch||'')}</td><td>${esc(String(o.hours))}h</td><td>${esc(addHoursToHHMM(workdayEndStr(),o.hours))}</td><td>${esc(o.reason||'—')}</td><td>${badge}</td><td style="white-space:nowrap">${st!=='Rejected'?`<button class="btn dn sm" onclick="setOvertimeStatus('${o.id}','Rejected')">${_ar2?'رفض':'Reject'}</button>`:`<button class="btn gh sm" onclick="setOvertimeStatus('${o.id}','Approved')">${_ar2?'ارجاع':'Restore'}</button>`}</td></tr>`;
+      }).join('')+`</tbody></table>`;
+    }
   }
   return h;
 }
@@ -7070,6 +7084,30 @@ function checkOut(id,branch){
     },function(){},{enableHighAccuracy:true,timeout:8000}); }
   }catch(_g){}
 }
+
+/* ===================== OVERTIME & AUTO-CHECKOUT ===================== */
+// End-of-day time (editable in Admin ← Office locations). After this + 30 min, a forgotten
+// check-out is auto-closed by the server (sedra auto-checkout cron). An overtime request
+// extends that deadline by its hours.
+function workdayEndStr(){ var s=(settings&&settings.workdayEnd)||'17:00'; return /^\d{1,2}:\d{2}$/.test(s)?s:'17:00'; }
+function addHoursToHHMM(hhmm,hrs){ var p=(hhmm||'17:00').split(':'); var m=(num(p[0])*60+num(p[1]))+Math.round(num(hrs)*60); m=Math.max(0,Math.min(24*60-1,m)); return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
+function otHoursToday(email){ var e=(email||'').toLowerCase(), d=today();
+  return (overtime||[]).filter(function(o){ return (o.email||'').toLowerCase()===e && o.date===d && (o.status||'Approved')!=='Rejected'; })
+    .reduce(function(s,o){ return s+Math.max(0,num(o.hours)); },0); }
+function requestOvertime(){
+  var ar=(lang==='ar'); var rec=myAttToday();
+  if(!rec||!rec.inTime){ alert(ar?'لازم تسجّل حضور الأول':'Check in first'); return; }
+  var hv=prompt(ar?'هتقعد كام ساعة أوفر تايم النهاردة؟ (مثلاً 2 أو 1.5)':'How many overtime hours today? (e.g. 2 or 1.5)',''); if(hv===null)return;
+  var hrs=Math.round(num(hv)*2)/2; if(!(hrs>0)){ alert(ar?'اكتب عدد ساعات صحيح':'Enter valid hours'); return; }
+  if(hrs>8){ alert(ar?'أقصى حد ٨ ساعات في الطلب الواحد':'Max 8 hours per request'); return; }
+  var why=prompt(ar?'السبب (اختياري):':'Reason (optional):','')||'';
+  var o={ email:(me.email||'').toLowerCase(), name:me.name||'', branch:rec.branch||defBranch(), date:today(), hours:hrs, reason:why, status:'Approved', ts:Date.now() };
+  apiAdd('overtime',o).then(function(){
+    try{ notifyLeaders(null,(ar?'🕗 طلب أوفر تايم — ':'🕗 Overtime — ')+(me.name||''),(me.name||'')+(ar?' طلب ':' requested ')+hrs+(ar?' ساعة أوفر تايم النهاردة':'h overtime today')+(why?(' · '+why):''),{ico:'🕗',type:'overtime',branch:o.branch}); }catch(_){}
+    synced(); alert(ar?('تم ✓ — الانصراف التلقائي اتمدّ '+hrs+' ساعة'):('Done ✓ — auto-checkout extended '+hrs+'h'));
+  }).catch(function(e){ alert('Error: '+(e&&e.message||e)); });
+}
+function setOvertimeStatus(id,st){ var ar=(lang==='ar'); if(st==='Rejected'&&!confirm(ar?'ترفض طلب الأوفر تايم ده؟ (الموظف هيترجع لمعاد الانصراف العادي)':'Reject this overtime request?'))return; apiMerge('overtime',id,{status:st,decidedBy:(me&&me.name)||'',decidedTs:Date.now()}).then(synced); }
 
 /* ===================== TEAM CHAT ===================== */
 let chatTab='company', chatPeer='', chatGroup='', chatDraft='';
@@ -7425,8 +7463,17 @@ function adminLoc(){
       <div class="mini" id="locst_${b}" style="margin-top:4px">${l.lat!=null?'Set: '+l.lat+', '+l.lng:'Not set'}</div></div>`;
   });
   h+=`<div style="margin-top:14px"><button class="btn" onclick="saveLoc()">Save locations</button></div></div>`;
+  // Work hours & auto check-out
+  var ar=(lang==='ar');
+  h+=`<div class="sect"><h2>🕗 ${ar?'مواعيد الدوام والانصراف التلقائي':'Work hours & auto check-out'}</h2></div><div class="card">
+    <div class="mini" style="margin-bottom:10px">${ar?'لو حد سجّل حضور ونسي الانصراف، النظام بيسجّل له انصراف تلقائي بعد نهاية الدوام بنص ساعة. طلب الأوفر تايم بيمدّ الموعد بعدد الساعات المطلوبة.':'If someone checks in and forgets to check out, the system auto checks them out 30 min after the workday ends. An overtime request extends that by the requested hours.'}</div>
+    <label class="mini" style="display:block;margin-bottom:4px">${ar?'نهاية الدوام الرسمية (24 ساعة، مثل 17:00)':'Workday end (24h, e.g. 17:00)'}</label>
+    <input id="set_wend" type="time" value="${esc(workdayEndStr())}" style="max-width:160px">
+    <div style="margin-top:12px"><button class="btn" onclick="saveWorkEnd()">${ar?'حفظ':'Save'}</button></div>
+  </div>`;
   return h;
 }
+function saveWorkEnd(){ var v=(g('set_wend')&&g('set_wend').value||'').trim(); if(!/^\d{1,2}:\d{2}$/.test(v)){ alert(lang==='ar'?'اكتب وقت صحيح مثل 17:00':'Enter a valid time like 17:00'); return; } saveSetting('workdayEnd',v); alert(lang==='ar'?('تم ✓ نهاية الدوام: '+v):('Saved ✓ workday end: '+v)); }
 function parseLatLng(s){ s=(s||'').trim(); if(!s)return null; let m;
   m=s.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/); if(m)return{lat:parseFloat(m[1]),lng:parseFloat(m[2])};
   m=s.match(/!1d(-?\d+\.\d+)!2d(-?\d+\.\d+)/); if(m)return{lat:parseFloat(m[2]),lng:parseFloat(m[1])};
