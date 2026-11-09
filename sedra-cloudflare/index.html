@@ -1339,13 +1339,10 @@ function sendDeptEod(dept,branch,manual){
 }
 var _eodChecked=false;
 function maybeSendEod(){
-  try{
-    if(!me||!appReady||_eodChecked) return;
-    if(!(roleRank(me.role)>=ROLE_RANK['Team Leader'])) return;   /* only a manager / team leader triggers the send */
-    if(new Date().getHours()<18) return;                          /* only in the evening */
-    _eodChecked=true;
-    sendDeptEod(me.dept, (curBranch&&curBranch!=='All')?curBranch:'All', false);
-  }catch(e){}
+  /* Auto end-of-day email is now sent ONCE by the server cron (Cloudflare) as a single
+     consolidated message per manager. The old per-browser trigger caused duplicate emails,
+     so it's disabled. Managers can still send manually from the attendance report if needed. */
+  return;
 }
 
 /* ===== Offline mode: work with no internet; queue writes locally; auto-sync on reconnect =====
@@ -7883,11 +7880,20 @@ async function enablePush(silent){
     if(perm==='default'){ perm=await Notification.requestPermission(); }
     if(perm!=='granted'){ if(!silent)alert(lang==='ar'?'لازم تسمح بالإشعارات من المتصفح الأول':'Please allow notifications in the browser first'); return false; }
     var reg=await navigator.serviceWorker.ready;
+    var curKey=_urlB64ToU8(VAPID_PUBLIC);
     var sub=await reg.pushManager.getSubscription();
-    if(!sub){ sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64ToU8(VAPID_PUBLIC)}); }
+    // If the existing subscription was made with a different VAPID key (e.g. key rotated), drop it and re-subscribe.
+    if(sub){ try{ var ek=sub.options&&sub.options.applicationServerKey?new Uint8Array(sub.options.applicationServerKey):null;
+      var same=ek&&ek.length===curKey.length&&ek.every(function(b,i){return b===curKey[i];});
+      if(!same){ try{ await sub.unsubscribe(); }catch(_u){} sub=null; } }catch(_k){} }
+    if(!sub){ sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:curKey}); }
     var j=sub.toJSON(); if(!j||!j.keys||!j.keys.p256dh){ return false; }
     var rec={endpoint:sub.endpoint, p256dh:j.keys.p256dh, auth:j.keys.auth, email:((me&&me.email)||'').toLowerCase(), name:(me&&me.name)||'', ua:(navigator.userAgent||'').slice(0,140), at:new Date().toISOString()};
-    await apiMerge('pushsubs', _pushSubId(sub.endpoint), rec);
+    var newId=_pushSubId(sub.endpoint);
+    // one record per device: if this device's endpoint changed, remove its previous record
+    try{ var prevId=localStorage.getItem('sedra_push_id'); if(prevId&&prevId!==newId){ apiDelete('pushsubs',prevId).catch(function(){}); } }catch(_p){}
+    try{ localStorage.setItem('sedra_push_id', newId); }catch(_s){}
+    await apiMerge('pushsubs', newId, rec);
     window.__pushOn=true;
     if(!silent){ try{ showToast({title:(lang==='ar'?'✓ تنبيهات الجهاز مفعّلة':'✓ Device alerts enabled'), body:(lang==='ar'?'هتوصلك الإشعارات بصوت حتى والنظام مقفول':'You will get sound alerts even when the app is closed')}); }catch(e){} }
     return true;
@@ -8007,6 +8013,7 @@ function _globalSearchRun(q){ const box=g('searchResults'); if(!box)return; q=(q
   if(cvAllowed('projects')) add('Projects', projects.filter(inBranch).filter(x=>hit(x.name)||hit(x.client)).map(x=>({html:`<b>${esc(x.name)}</b> <small>${esc(x.client||'')}</small>`,act:`openProjectId='${x.id}';curView='projects';closeSearch();render()`})));
   if(cvAllowed('accounting')) add('Invoices', invoices.filter(inBranch).filter(x=>hit(x.number)||hit(x.client)).map(x=>({html:`<b>${esc(x.number||'')}</b> <small>${esc(x.client||'')}</small>`,act:`curView='accounting';accTab='invoices';closeSearch();render()`})));
   if(cvAllowed('inventory')) add('Inventory', inventory.filter(inBranch).filter(x=>hit(x.name)||hit(x.sku)).map(x=>({html:`<b>${esc(x.name)}</b> <small>${esc(x.sku||'')} · qty ${num(x.qty)}</small>`,act:`curView='inventory';invTab='items';closeSearch();render()`})));
+  if(cvAllowed('hr')){ var _DEPTAR={Management:'الإدارة',Sales:'المبيعات',Marketing:'الماركتينج',Operations:'العمليات',Technical:'الفني / التركيبات',Accounting:'الحسابات',Inventory:'المخزن',HR:'الموارد البشرية'}; add('Departments', (typeof DEPTS!=='undefined'?DEPTS:[]).filter(d=>hit(d)||hit(_DEPTAR[d]||'')).map(d=>{ var n=employees.filter(e=>e.dept===d&&e.active!==false).length; return {html:`<b>🏢 ${esc(d)}</b> <small>${esc(_DEPTAR[d]||'')} · ${n} ${lang==='ar'?'موظف':'members'}</small>`,act:`curView='hr';hrTab='directory';closeSearch();render()`}; })); }
   if(cvAllowed('hr')) add('Employees', employees.filter(x=>hit(x.name)||hit(x.email)||hit(x.dept)).map(x=>({html:`<b>${esc(x.name)}</b> <small>${esc(x.dept||'')} · ${esc(x.role||'')}</small>`,act:`curView='hr';hrTab='directory';closeSearch();render()`})));
   if(cvAllowed('quotes')) add('Quotations', quotes.filter(inBranch).filter(x=>hit(x.number)||hit(x.client)).map(x=>({html:`<b>${esc(x.number||'')}</b> <small>${esc(x.client||'')}</small>`,act:`curView='quotes';closeSearch();render()`})));
   add('Sections', MODULES.filter(canSee).filter(m=>hit(m.label)||hit(m.id)).map(m=>({html:`<b>${m.icon} ${esc(m.label)}</b> <small>section</small>`,act:`go('${m.id}');closeSearch()`})));
