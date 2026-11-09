@@ -657,6 +657,7 @@ const MODULES = [
   {id:'orgchart',  label:'Org Chart', icon:'🗂️', depts:['HR','Management']},
   {id:'attexcept', label:'Attendance Exceptions', icon:'⚠️', depts:['HR','Management','Operations']},
   {id:'onboard',   label:'Onboarding / Offboarding', icon:'🧳', depts:['HR','Management']},
+  {id:'empfiles',  label:'Employee Documents', icon:'🗂️', depts:['HR','Management']},
   {id:'policies',  label:'Policies', icon:'📜', access:'all'},
   {id:'exitiv',    label:'Exit Interviews', icon:'🚪', depts:['HR','Management']},
   {id:'calllog',   label:'Call Log', icon:'📞', depts:['Sales','Management']},
@@ -1657,7 +1658,7 @@ function applyAll(all){
     documents=listToArr(all.documents); approvals=listToArr(all.approvals); maintenance=listToArr(all.maintenance); boms=listToArr(all.boms);
     activities=listToArr(all.activities);
     payslips=listToArr(all.payslips).sort((x,y)=>(y.month||'').localeCompare(x.month||'')); loans=listToArr(all.loans);
-    warnings=listToArr(all.warnings); certs=listToArr(all.certs); onboarding=listToArr(all.onboarding);
+    warnings=listToArr(all.warnings); certs=listToArr(all.certs); onboarding=listToArr(all.onboarding); empdocs=listToArr(all.empdocs);
     holidays=listToArr(all.holidays);
     incidents=listToArr(all.incidents); prs=listToArr(all.prs); pettycash=listToArr(all.pettycash);
     budgets=listToArr(all.budgets); recurring=listToArr(all.recurring);
@@ -2681,7 +2682,7 @@ function render(keepScroll){
   try{ localStorage.setItem('orbit_view', curView); }catch(_ov){} /* persist current view every render so a page refresh always returns here (not the hub), whatever navigated us */
   g('viewTitle').textContent=m.label;
   markNav();
-  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,clientreqs:vClientReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,devroadmap:vDevRoadmap,datahealth:vDataHealth,orgchart:vOrgChart,attexcept:vAttExcept,onboard:vOnboard,policies:vPolicies,exitiv:vExitIv,calllog:vCallLog,docexp:vDocExp,probation:vProbation,roster:vRoster,headcount:vHeadcount,clientportal:vClientPortal,catalog:vCatalog,boqtpl:vBoqTpl,termslib:vTermsLib,scopelib:vScopeLib,designlib:vDesignLib,engtime:vEngTime,marginrep:vMarginRep,bomrecon:vBomRecon,lessons:vLessons,competitorads:vCompetitorAds,casestudy:vCaseStudy,audiences:vAudiences,partners:vPartners,seoranks:vSeoRanks,eventlead:vEventLead,brandcheck:vBrandCheck,discountreqs:vDiscountReqs,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,sitehours:vSiteHours,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,trash:vTrash,findreplace:vFindReplace,quoterequests:vQuoteRequests,offhours:vOffHours,attreport:vAttReport,livesites:vLiveSites,admin:vAdmin,profile:vProfile}[curView];
+  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,clientreqs:vClientReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,devroadmap:vDevRoadmap,datahealth:vDataHealth,orgchart:vOrgChart,attexcept:vAttExcept,onboard:vOnboard,empfiles:vEmpFiles,policies:vPolicies,exitiv:vExitIv,calllog:vCallLog,docexp:vDocExp,probation:vProbation,roster:vRoster,headcount:vHeadcount,clientportal:vClientPortal,catalog:vCatalog,boqtpl:vBoqTpl,termslib:vTermsLib,scopelib:vScopeLib,designlib:vDesignLib,engtime:vEngTime,marginrep:vMarginRep,bomrecon:vBomRecon,lessons:vLessons,competitorads:vCompetitorAds,casestudy:vCaseStudy,audiences:vAudiences,partners:vPartners,seoranks:vSeoRanks,eventlead:vEventLead,brandcheck:vBrandCheck,discountreqs:vDiscountReqs,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,sitehours:vSiteHours,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,trash:vTrash,findreplace:vFindReplace,quoterequests:vQuoteRequests,offhours:vOffHours,attreport:vAttReport,livesites:vLiveSites,admin:vAdmin,profile:vProfile}[curView];
   g('view').innerHTML = fn?fn():'';
   if(curView==='sales' && window._afterSales)window._afterSales();
   if(curView==='chat' && window._afterChat)window._afterChat();
@@ -12317,6 +12318,111 @@ function editOnb(id){
     selEl('الفرع','on_branch',branchOpts(),r.branch),
     function(){ var type=val('on_type'); var d={employee:val('on_emp'),type:type,date:val('on_date'),branch:val('on_branch')}; if(!d.employee){alert('اسم الموظف مطلوب');return false;} if(!id){ d.items=(type==='إنهاء خدمة'?OFF_DEF:ONB_DEF).map(function(t){return {t:t,done:false};}); d.by=me.name; d.created=new Date().toISOString(); } saveDoc('onboarding',d,id); });
 }
+/* ===================== EMPLOYEE DOCUMENTS / DOSSIER (onboarding + offboarding, with files) =====================
+   Every employee carries a full onboarding + offboarding checklist. Each item has a status, a text note,
+   and any number of file/image attachments (reuses the existing 50MB attachments store). HR gets a
+   per-employee dashboard + a full printable/CSV report that flags any missing papers. */
+var empdocs=(typeof empdocs!=='undefined')?empdocs:[];
+var edEmp='', edTab='onboarding', edQ='';
+var EMP_CHECKLISTS={
+  onboarding:[
+    {g:'📄 استلام المستندات الرسمية', items:[
+      ['job_offer','عرض العمل (Job offer)'],['academic_cert','شهادة المؤهل الدراسي'],['military_cert','شهادة الموقف من التجنيد'],
+      ['national_id','بطاقة الرقم القومي'],['birth_cert','شهادة الميلاد'],['union_membership','كارنيه النقابة'],
+      ['work_stub','كعب العمل / شهادة خبرة سابقة'],['insurance_print','استمارة/طباعة التأمينات'],['criminal_sheet','الفيش الجنائي'],
+      ['photos6','6 صور شخصية'],['scan_docs','مسح ضوئي لكل المستندات'],['add_to_db','إضافة الموظف لقاعدة البيانات + تواريخ النهاية + الزيادة السنوية']
+    ]},
+    {g:'✍️ توقيع العقود والإقرارات', items:[
+      ['contract_2copies','نسختين من العقد'],['nda','اتفاقية السرية (NDA)'],['social_insurance_form','استمارة التأمينات الاجتماعية'],
+      ['job_description','الوصف الوظيفي'],['kpis','مؤشرات الأداء (KPIs)'],['joining_form','استمارة الالتحاق (Joining Form)'],
+      ['internal_policy','اللائحة الداخلية'],['assets_form','استمارة العهدة (Assets Form)']
+    ]},
+    {g:'🪑 تجهيز مكان العمل', items:[
+      ['office_reserve','حجز مكتب / محطة عمل'],['office_supplies','توفير مستلزمات المكتب'],['assets_receipt','استلام العهدة (لابتوب – تليفون – سماعة – ماوس – موبايل)']
+    ]},
+    {g:'🔑 الحسابات والصلاحيات', items:[
+      ['email','إيميل الشركة'],['fingerprint','بصمة الحضور'],['zoho_email','إيميل Zoho'],['door_fingerprint','بصمة الباب'],
+      ['whatsapp_groups','جروبات الواتساب'],['wifi','صلاحية الواي فاي'],['medical_card','إصدار كارت التأمين الطبي'],['id_card','إصدار كارت تعريف (ID)']
+    ]},
+    {g:'🤝 الاندماج مع الشركة', items:[
+      ['office_tour','جولة في مقر الشركة'],['welcome_post','رسالة ترحيب على جروب الشركة'],['ceo_meeting','اجتماع ترحيبي مع الـ CEO']
+    ]}
+  ],
+  offboarding:[
+    {g:'🚪 إخلاء الطرف والإجراءات', items:[
+      ['manager_approval','موافقة المدير المباشر على الاستقالة'],['sign_resignation','توقيع الاستقالة'],['final_salary','حساب مرتب الموظف النهائي'],
+      ['no_entitlements','التأكد إن مفيش مستحقات للشركة عند الموظف'],['petty_cash_back','سداد أي عُهد نقدية (Petty cash)'],['exit_interview','عمل مقابلة خروج (Exit interview)'],
+      ['insurance_form6','توقيع استمارة 6 التأمينات'],['sign_social_resignation','توقيع استقالة التأمينات الاجتماعية'],['receive_medical_card','استلام كارت التأمين الطبي'],
+      ['cancel_medical_card','إلغاء كارت التأمين الطبي'],['remove_medical_sheet','شطب الموظف من كشف التأمين الطبي'],['cancel_zenhr','إلغاء الحساب على ZenHR'],
+      ['cancel_door_fp','إلغاء بصمة الباب'],['receive_assets','استلام عهدة الموظف'],['cancel_email','إلغاء إيميل الموظف'],
+      ['sign_receivables_ack','توقيع إقرار استلام المستحقات'],['remove_whatsapp','إزالة الموظف من جروبات الواتساب'],['sign_docs_receipt_confirm','توقيع إقرار استلام مستندات التعيين'],
+      ['experience_cert','عمل شهادة خبرة للموظف'],['remove_from_db','شطب الموظف من قاعدة البيانات وكشف التأمينات']
+    ]}
+  ]
+};
+function _edKey(email,item){ return _polSafe(email)+'__'+item; }
+function edRec(email,item){ var k=_edKey(email,item); return (empdocs||[]).find(function(x){return x.id===k;}); }
+function edAttRec(email,item){ return 'empdoc:'+_polSafe(email)+':'+item; }
+function edItemsFlat(kind){ var out=[]; (EMP_CHECKLISTS[kind]||[]).forEach(function(G){ G.items.forEach(function(it){ out.push({key:it[0],label:it[1],group:G.g}); }); }); return out; }
+function edEff(email,item){ var r=edRec(email,item); if(r&&r.status==='na')return 'na'; if((r&&r.status==='done')||attCount(edAttRec(email,item))>0)return 'done'; return 'missing'; }
+function edStats(email,kind){ var items=edItemsFlat(kind); var done=0,na=0; items.forEach(function(it){ var ef=edEff(email,it.key); if(ef==='na')na++; else if(ef==='done')done++; }); var cnt=items.length-na; var pct=cnt>0?Math.round(done/cnt*100):100; return {total:items.length,done:done,na:na,missing:Math.max(0,cnt-done),pct:pct}; }
+function edOpen(email){ edEmp=email; edTab='onboarding'; render(); }
+function edBack(){ edEmp=''; render(); }
+function edSetTab(t){ edTab=t; render(); }
+function edSet(email,item,status){ var k=_edKey(email,item); var e=employees.find(function(x){return x.email===email;}); var ex=edRec(email,item); var at=new Date().toISOString(); var by=(me&&me.name)||'';
+  if(ex){ ex.status=status; ex.by=by; ex.at=at; apiMerge('empdocs',k,{status:status,by:by,at:at}); }
+  else { var d={emp:email,name:(e&&e.name)||'',item:item,kind:edTab,status:status,note:'',by:by,at:at}; empdocs.push(Object.assign({id:k},d)); apiMerge('empdocs',k,d); }
+  render(); }
+function edNote(email,item,note){ var k=_edKey(email,item); var e=employees.find(function(x){return x.email===email;}); var ex=edRec(email,item);
+  if(ex){ ex.note=note; apiMerge('empdocs',k,{note:note}); }
+  else { var d={emp:email,name:(e&&e.name)||'',item:item,kind:edTab,status:'',note:note,by:(me&&me.name)||'',at:new Date().toISOString()}; empdocs.push(Object.assign({id:k},d)); apiMerge('empdocs',k,d); } }
+function vEmpFiles(){
+  var mgr=isMgr()||me.dept==='HR'||me.dept==='Management'||isAdmin();
+  if(edEmp) return edDashboard(edEmp,mgr);
+  var emps=employees.filter(function(e){return e.active!==false && e.email;});
+  if(edQ){ var q=edQ.toLowerCase(); emps=emps.filter(function(e){return (e.name||'').toLowerCase().indexOf(q)>=0||(e.email||'').toLowerCase().indexOf(q)>=0||(e.dept||'').toLowerCase().indexOf(q)>=0;}); }
+  emps.sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+  var h='<div class="sect"><h2>🗂️ ملفات ومستندات الموظفين</h2></div>';
+  h+='<div class="card mini" style="margin-bottom:8px">لكل موظف تشيك-ليست كاملة للتعيين وإخلاء الطرف. سجّل لكل بند: الحالة + ملاحظة + ملفات/صور (لحد 50 ميجا للملف الواحد). اختار موظف عشان تفتح ملفه الكامل.</div>';
+  h+='<div class="card" style="margin-bottom:8px"><input type="search" placeholder="🔎 ابحث باسم الموظف / القسم..." value="'+esc(edQ)+'" oninput="edQ=this.value;render()" style="width:100%;padding:8px;border:1px solid var(--mist);border-radius:8px"></div>';
+  if(!emps.length) return h+'<div class="card empty">مفيش موظفين بإيميل. ضيف إيميلات الموظفين الأول.</div>';
+  h+=emps.map(function(e){ var on=edStats(e.email,'onboarding'); var off=edStats(e.email,'offboarding'); var oc=on.pct>=100?'#1a7a4f':(on.pct>=50?'#e0a93b':'#c0392b');
+    return '<div class="card" style="margin-bottom:8px;cursor:pointer" onclick="edOpen(\''+esc(e.email)+'\')"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><div><b>'+esc(e.name||e.email)+'</b> <span class="mini">'+esc(e.dept||'')+' · '+esc(e.role||'')+'</span></div><div style="white-space:nowrap"><span class="tag" style="background:'+oc+'22;color:'+oc+'">تعيين '+on.pct+'%</span> '+(off.done>0?'<span class="tag" style="background:#c0392b22;color:#c0392b">إخلاء طرف '+off.pct+'%</span> ':'')+'<button class="btn gh sm">فتح الملف ›</button></div></div><div style="height:7px;background:var(--mist);border-radius:6px;margin-top:6px;overflow:hidden"><div style="height:100%;width:'+on.pct+'%;background:'+oc+'"></div></div>'+(on.missing>0?'<div class="mini" style="color:#c0392b;margin-top:4px">ناقص '+on.missing+' بند في التعيين</div>':'<div class="mini" style="color:#1a7a4f;margin-top:4px">✔ ورق التعيين مكتمل</div>')+'</div>'; }).join('');
+  return h;
+}
+function edDashboard(email,mgr){
+  var e=employees.find(function(x){return x.email===email;})||{name:email,email:email};
+  var st=edStats(email,edTab); var tc=edTab==='offboarding'?'#c0392b':'#1a7a4f';
+  var h='<div class="sect"><button class="btn gh sm" onclick="edBack()">‹ رجوع</button><div class="sp"></div><button class="btn gh sm" onclick="edExport(\''+esc(email)+'\')">⬇ تقرير CSV</button> <button class="btn cy sm" onclick="edReport(\''+esc(email)+'\')">🖨 تقرير كامل</button></div>';
+  h+='<div class="card" style="border-left:4px solid '+tc+';margin-bottom:8px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><div><b style="font-size:16px">'+esc(e.name||email)+'</b><div class="mini">'+esc(e.dept||'')+' · '+esc(e.role||'')+' · '+esc((e.branches&&e.branches.join('، '))||e.branch||'')+'</div></div><div style="text-align:center;min-width:90px"><div style="font-size:22px;font-weight:800;color:'+tc+'">'+st.pct+'%</div><div class="mini">'+st.done+' من '+(st.total-st.na)+(st.missing?(' · ناقص '+st.missing):'')+'</div></div></div><div style="height:9px;background:var(--mist);border-radius:6px;margin-top:8px;overflow:hidden"><div style="height:100%;width:'+st.pct+'%;background:'+tc+'"></div></div></div>';
+  h+='<div class="tabs"><button class="'+(edTab==='onboarding'?'active':'')+'" onclick="edSetTab(\'onboarding\')">🧳 تعيين (Onboarding)</button><button class="'+(edTab==='offboarding'?'active':'')+'" onclick="edSetTab(\'offboarding\')">🚪 إخلاء طرف (Offboarding)</button></div>';
+  (EMP_CHECKLISTS[edTab]||[]).forEach(function(G){
+    h+='<div class="card" style="margin-bottom:8px"><div style="font-weight:800;color:var(--navy);margin-bottom:4px">'+G.g+'</div>';
+    G.items.forEach(function(it){ var key=it[0],label=it[1]; var r=edRec(email,key)||{}; var ef=edEff(email,key); var nf=attCount(edAttRec(email,key)); var scol=ef==='done'?'#1a7a4f':(ef==='na'?'#8a94a6':'#c0392b'); var ic=ef==='done'?'✅ ':(ef==='na'?'➖ ':'⬜ ');
+      h+='<div style="border-top:1px solid var(--mist);padding:8px 0"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><div style="flex:1;min-width:150px"><span style="color:'+scol+';font-weight:700">'+ic+'</span>'+esc(label)+'</div>';
+      if(mgr){ h+='<div style="white-space:nowrap">'
+        +'<button class="btn '+(r.status==='done'?'cy':'gh')+' sm" onclick="edSet(\''+esc(email)+'\',\''+key+'\',\'done\')">تم</button> '
+        +'<button class="btn '+(r.status==='na'?'cy':'gh')+' sm" onclick="edSet(\''+esc(email)+'\',\''+key+'\',\'na\')">لا ينطبق</button> '
+        +(r.status?'<button class="btn gh sm" title="إلغاء" onclick="edSet(\''+esc(email)+'\',\''+key+'\',\'\')">↺</button> ':'')
+        +'<button class="btn '+(nf?'cy':'gh')+' sm" onclick="attachOpen(\''+edAttRec(email,key)+'\',\''+esc(label).replace(/'/g,'')+'\')">📎 ملفات'+(nf?(' ('+nf+')'):'')+'</button></div>';
+      } else { h+='<div class="mini" style="color:'+scol+'">'+(ef==='done'?'تم':(ef==='na'?'لا ينطبق':'ناقص'))+(nf?(' · '+nf+' ملف'):'')+'</div>'; }
+      h+='</div>';
+      if(mgr){ h+='<input type="text" placeholder="ملاحظة (اختياري)..." value="'+esc(r.note||'')+'" onchange="edNote(\''+esc(email)+'\',\''+key+'\',this.value)" style="width:100%;margin-top:6px;padding:6px;border:1px solid var(--mist);border-radius:6px;font-size:12px">'; }
+      else if(r.note){ h+='<div class="mini" style="margin-top:4px">📝 '+esc(r.note)+'</div>'; }
+      h+='</div>';
+    });
+    h+='</div>';
+  });
+  return h;
+}
+function edExport(email){ var e=employees.find(function(x){return x.email===email;})||{}; var rows=[]; ['onboarding','offboarding'].forEach(function(kind){ (EMP_CHECKLISTS[kind]||[]).forEach(function(G){ G.items.forEach(function(it){ var r=edRec(email,it[0])||{}; var nf=attCount(edAttRec(email,it[0])); var ef=edEff(email,it[0]); var stt=ef==='done'?'تم':(ef==='na'?'لا ينطبق':'ناقص'); rows.push([kind==='onboarding'?'تعيين':'إخلاء طرف',G.g.replace(/[^؀-ۿ \w]/g,'').trim(),it[1],stt,r.note||'',nf]); }); }); }); exportCSV('employee-docs-'+String(e.name||email).replace(/[\s@.]+/g,'_'),['النوع','المجموعة','البند','الحالة','ملاحظة','عدد الملفات'],rows); }
+function edReport(email){ var e=employees.find(function(x){return x.email===email;})||{name:email}; var on=edStats(email,'onboarding'),off=edStats(email,'offboarding'); var B='';
+  ['onboarding','offboarding'].forEach(function(kind){ var title=kind==='onboarding'?('🧳 تعيين (Onboarding) — '+on.pct+'%'):('🚪 إخلاء طرف (Offboarding) — '+off.pct+'%'); B+='<h2>'+title+'</h2>';
+    (EMP_CHECKLISTS[kind]||[]).forEach(function(G){ B+='<h3>'+esc(G.g)+'</h3><table><tr><th style="width:50%">البند</th><th>الحالة</th><th>ملاحظة</th><th>ملفات</th></tr>'; G.items.forEach(function(it){ var r=edRec(email,it[0])||{}; var nf=attCount(edAttRec(email,it[0])); var ef=edEff(email,it[0]); var stt=ef==='done'?'<b style="color:#1a7a4f">تم ✔</b>':(ef==='na'?'<span style="color:#888">لا ينطبق</span>':'<b style="color:#c0392b">ناقص ✗</b>'); B+='<tr><td>'+esc(it[1])+'</td><td>'+stt+'</td><td>'+esc(r.note||'')+'</td><td style="text-align:center">'+(nf||'')+'</td></tr>'; }); B+='</table>'; }); });
+  var miss=[]; ['onboarding','offboarding'].forEach(function(kind){ edItemsFlat(kind).forEach(function(it){ if(edEff(email,it.key)==='missing') miss.push((kind==='onboarding'?'تعيين':'إخلاء طرف')+' — '+it.label); }); });
+  var missHtml=miss.length?('<div style="background:#fdeaea;border:1px solid #c0392b;border-radius:8px;padding:10px;margin:10px 0"><b style="color:#c0392b">⚠ الورق الناقص ('+miss.length+'):</b><ul>'+miss.map(function(m){return '<li>'+esc(m)+'</li>';}).join('')+'</ul></div>'):'<div style="background:#eafaf1;border:1px solid #1a7a4f;border-radius:8px;padding:10px;margin:10px 0;color:#1a7a4f"><b>✔ كل الورق مكتمل.</b></div>';
+  var w=window.open('','_blank'); if(!w){ alert('اسمح بالنوافذ المنبثقة عشان يظهر التقرير.'); return; }
+  w.document.write('<html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>تقرير مستندات '+esc(e.name||email)+'</title><style>body{font-family:Arial,Helvetica,sans-serif;padding:26px;color:#1a2b3c;max-width:900px;margin:auto}h1{color:#0F2A47;margin-bottom:2px}h2{color:#0F2A47;border-bottom:2px solid #C9A227;padding-bottom:4px;margin-top:24px}h3{color:#157f96;margin:14px 0 6px}table{width:100%;border-collapse:collapse;margin-bottom:10px}th,td{border:1px solid #d6dde4;padding:6px 9px;text-align:right;font-size:13px}th{background:#f2f5f8}ul{margin:6px 0}.hdr{color:#5A6B7B;font-size:13px}@media print{button{display:none}}</style></head><body><h1>تقرير مستندات الموظف</h1><div class="hdr"><b>'+esc(e.name||email)+'</b> — '+esc(e.dept||'')+' · '+esc(e.role||'')+' · '+esc((e.branches&&e.branches.join('، '))||e.branch||'')+'<br>تاريخ التقرير: '+today()+' — Sedra Electric HR</div>'+missHtml+B+'<p style="margin-top:22px;color:#8a94a6;font-size:12px;border-top:1px solid #d6dde4;padding-top:8px">Sedra Electric — نظام إدارة الموارد البشرية</p><button onclick="window.print()" style="position:fixed;top:14px;left:14px;padding:8px 16px;background:#0F2A47;color:#fff;border:0;border-radius:8px;cursor:pointer">🖨 طباعة / PDF</button></body></html>'); w.document.close(); }
 /* --- hr19: Policies + acknowledgment --- */
 function _polSafe(em){ return String(em||'').replace(/[.@#$\[\]]/g,'_').replace(/\//g,'_'); }
 function vPolicies(){
