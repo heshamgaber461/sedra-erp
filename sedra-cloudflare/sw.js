@@ -1,5 +1,5 @@
 /* Sedra ERP service worker — network-first so updates always show; cache only as offline fallback. */
-const CACHE = 'sedra-v108';
+const CACHE = 'sedra-v109';
 const SHELL = ['/', '/index.html', '/logo.png', '/manifest.json'];
 self.addEventListener('install', function(e){
   self.skipWaiting();
@@ -15,17 +15,17 @@ self.addEventListener('activate', function(e){
 
 self.addEventListener('fetch', function(e){
   var req = e.request;
-  if(req.method !== 'GET') return;                 /* never touch POST /db, push, etc. */
+  if(req.method !== 'GET') return; /* never touch POST /db, push, etc. */
   var url;
   try{ url = new URL(req.url); }catch(_){ return; }
-  if(url.origin !== self.location.origin) return;  /* leave cross-origin (ipwho.is, Firebase…) to the network */
+  if(url.origin !== self.location.origin) return; /* leave cross-origin (ipwho.is, Firebase…) to the network */
 
   var isDoc = req.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('/index.html') || url.pathname.endsWith('.html');
   if(isDoc){
     /* network-first: always try to fetch the newest HTML; fall back to cache offline */
     e.respondWith(
       fetch(req).then(function(res){ try{ var copy = res.clone(); caches.open(CACHE).then(function(c){ c.put(req, copy); }).catch(function(){}); }catch(_){} return res; })
-        .catch(function(){ return caches.match(req).then(function(m){ return m || caches.match('/index.html'); }); })
+      .catch(function(){ return caches.match(req).then(function(m){ return m || caches.match('/index.html'); }); })
     );
     return;
   }
@@ -37,12 +37,12 @@ self.addEventListener('fetch', function(e){
   );
 });
 
-/* Push notifications (payload: {title, body, url}) */
+/* Push notifications (payload: {title, body, url}) — stay on screen until tapped + vibrate on mobile */
 self.addEventListener('push', function(e){
   var d = {};
   try{ d = e.data ? e.data.json() : {}; }catch(_){ try{ d = { body: (e.data && e.data.text()) || '' }; }catch(__){ d = {}; } }
   var title = d.title || 'Sedra Electric';
-  var opts = { body: d.body || '', icon: '/logo.png', badge: '/logo.png', data: { url: d.url || '/' }, dir: 'auto' };
+  var opts = { body: d.body || '', icon: '/logo.png', badge: '/logo.png', data: { url: d.url || '/' }, dir: 'auto', requireInteraction: true, vibrate: [250, 120, 250, 120, 250] };
   e.waitUntil(self.registration.showNotification(title, opts));
 });
 
