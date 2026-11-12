@@ -245,7 +245,7 @@
   .bell.ring{animation:bellring 1s ease}
   @keyframes badgepulse{0%,100%{transform:scale(1)}50%{transform:scale(1.4);box-shadow:0 0 0 4px rgba(192,57,43,.25)}}
   .badge.pulse{animation:badgepulse .55s ease 3}
-  .bellpanel{position:absolute;top:40px;right:0;width:330px;max-height:72vh;overflow-y:auto;background:#fff;border:1px solid var(--mist);border-radius:10px;box-shadow:0 12px 34px rgba(0,0,0,.16);z-index:60;padding:8px}
+  .bellpanel{position:fixed;width:min(360px,94vw);max-height:76vh;overflow-y:auto;background:#fff;border:1px solid var(--mist);border-radius:10px;box-shadow:0 14px 40px rgba(0,0,0,.22);z-index:2000;padding:8px}
   .bellpanel .bh{font-weight:700;color:var(--navy);font-size:13px;padding:4px 8px 8px;border-bottom:1px solid var(--mist);margin-bottom:4px}
   .bellpanel .ni{display:flex;gap:9px;align-items:flex-start;padding:9px;border-radius:8px;cursor:pointer}
   .bellpanel .ni:hover{background:#f0f6fb}
@@ -3941,7 +3941,8 @@ function vProjects(){
   h+=projectsPanel(rows);
   h+=`<div class="sect"><h2>Projects</h2><div class="sp"></div>${isAdmin()?`<button class="btn gh sm" onclick="sedraImportProjects()" title="Import projects from /projects-seed.json">⬆ Import</button> <button class="btn dn sm" onclick="sedraDeleteAllProjects()" title="Move all projects to Recycle Bin">🗑 Clear all</button> `:''}${canApproveMat()?`<button class="btn cy" onclick="editProject()">+ Add project</button>`:''}</div>`;
   if(!rows.length)return h+`<div class="card empty">No projects yet.</div>`;
-  h+=`<div class="sect" style="margin-top:4px"><input class="tvq" type="search" style="max-width:240px" placeholder="🔍 ${lang==='ar'?'ابحث عن مشروع…':'Search projects…'}" value="${esc(projQ)}" oninput="setProjQ(this.value)"> <select class="tvf" onchange="setProjStatusF(this.value)"><option value="">${lang==='ar'?'كل الحالات':'All statuses'}</option>${PSTAT.map(function(s){return '<option value="'+esc(s)+'" '+(s===projStatusF?'selected':'')+'>'+esc(s)+'</option>';}).join('')}</select><div class="sp"></div><span class="mini">${lang==='ar'?'دوس على السهم ▾ لإجراءات سريعة (حضور / انصراف / طلب ماتريل)':'Tap the ▾ arrow for quick actions'}</span></div>`;
+  var _projDL=rows.map(function(p){return '<option value="'+esc(p.name||'')+'">'+esc((p.client||'')+(p.branch?(' · '+p.branch):''))+'</option>';}).join('');
+  h+=`<div class="sect" style="margin-top:4px"><input id="projSearchBox" class="tvq" type="search" list="projNamesDL" autocomplete="off" style="max-width:260px" placeholder="🔍 ${lang==='ar'?'اكتب أو اختر مشروع…':'Type or pick a project…'}" value="${esc(projQ)}" oninput="setProjQ(this.value)"><datalist id="projNamesDL">${_projDL}</datalist> <select class="tvf" onchange="setProjStatusF(this.value)"><option value="">${lang==='ar'?'كل الحالات':'All statuses'}</option>${PSTAT.map(function(s){return '<option value="'+esc(s)+'" '+(s===projStatusF?'selected':'')+'>'+esc(s)+'</option>';}).join('')}</select>${projQ?`<button class="btn gh sm" onclick="setProjQ('')" title="${lang==='ar'?'مسح البحث':'Clear'}">✕</button>`:''}<div class="sp"></div><span class="mini">${lang==='ar'?'دوس على السهم ▾ لإجراءات سريعة (حضور / انصراف / طلب ماتريل)':'Tap the ▾ arrow for quick actions'}</span></div>`;
   var pq=(projQ||'').trim().toLowerCase();
   var frows=rows.filter(function(p){ if(projStatusF && pstatNorm(p.status)!==projStatusF) return false; if(pq && [p.name,p.client,p.owner,p.branch,p.status,pstatNorm(p.status),p.dept].join(' ').toLowerCase().indexOf(pq)<0) return false; return true; });
   if(!frows.length)return h+`<div class="card empty">${lang==='ar'?'مفيش مشاريع مطابقة للبحث.':'No projects match your search.'}</div>`;
@@ -3962,7 +3963,7 @@ function vProjects(){
 var projOpenRow='';
 var projQ=(function(){try{return localStorage.getItem('sedra_projq')||'';}catch(e){return '';}})();
 var projStatusF=(function(){try{return localStorage.getItem('sedra_projsf')||'';}catch(e){return '';}})();
-function setProjQ(v){ projQ=v; try{localStorage.setItem('sedra_projq',v);}catch(e){} render(); }
+function setProjQ(v){ projQ=v; try{localStorage.setItem('sedra_projq',v);}catch(e){} render(true); /* keepScroll → no jump */ setTimeout(function(){ var s=g('projSearchBox'); if(s){ try{ s.focus(); var L=s.value.length; s.setSelectionRange(L,L); }catch(e){} } },0); }
 function setProjStatusF(v){ projStatusF=v; try{localStorage.setItem('sedra_projsf',v);}catch(e){} render(); }
 function projToggleRow(id){ projOpenRow=(projOpenRow===id?'':id); render(); }
 function projQuickCheckIn(pid){
@@ -5316,7 +5317,7 @@ function genQuoteNo(k){
 }
 /* ===== Import a ready quotation FROM A FILE on the user's device (Excel / CSV) and
    register it in the company quotations. Optional pid → also attach it to that project. ===== */
-var _qfItems=[]; var _qfPid=null;
+var _qfItems=[]; var _qfPid=null; var _qfCur='';
 /* ---- PDF reading (text layer) — load pdf.js on demand, extract rows, map columns by x ---- */
 function ensurePDFJS(cb){ if(window.pdfjsLib){ return cb(true); } var s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'; s.onload=function(){ try{ if(window.pdfjsLib){ window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; } }catch(e){} cb(!!window.pdfjsLib); }; s.onerror=function(){cb(false);}; document.head.appendChild(s); }
 function pdfExtractRows(buf){
@@ -5349,34 +5350,56 @@ function qfRowsToItems(rows){ /* rows: array of arrays of strings */
   return items;
 }
 function qfPdfParse(rows){
-  /* rows: [{y, cells:[{x,s}]}] — try header+column-by-x; fallback to text-merge positional */
+  /* rows: [{y, cells:[{x,s}]}] — column-aware quotation table reader.
+     A real quotation is a table: # | Image | Item-Description | (List/Unit) Price | Qty | Amount.
+     A line is an ITEM only when its Qty cell and Price cell are both numbers; the lines after it
+     without a price are continuation of the same item's description. Totals rows are skipped. */
+  _qfCur='';
   var hdr=null,hi=-1;
-  for(var i=0;i<Math.min(rows.length,20);i++){ var txt=rows[i].cells.map(function(c){return c.s;}).join(' ').toLowerCase();
-    if(/(desc|item|product|بند|وصف|الصنف)/.test(txt) && /(qty|quantity|كمية|عدد|price|سعر|unit|rate)/.test(txt)){ hdr=rows[i]; hi=i; break; } }
-  if(hdr){
-    var cols={};
-    hdr.cells.forEach(function(c){ var n=(c.s||'').toLowerCase();
-      if(cols.qty===undefined && /qty|quantity|كمية|عدد/.test(n)) cols.qty=c.x;
-      else if(cols.price===undefined && /unit|price|سعر|rate/.test(n)) cols.price=c.x;
-      else if(cols.code===undefined && /code|part|sku|model|كود|موديل/.test(n)) cols.code=c.x;
-      else if(cols.total===undefined && /total|اجمالي|إجمالي/.test(n)) cols.total=c.x;
-      else if(cols.desc===undefined && /desc|item|product|بند|وصف|الصنف/.test(n)) cols.desc=c.x;
-    });
-    if(cols.desc!==undefined && (cols.qty!==undefined || cols.price!==undefined)){
-      var items=[];
-      rows.slice(hi+1).forEach(function(r){ var b={desc:[],code:[],qty:[],price:[],total:[]};
-        r.cells.forEach(function(c){ var best=null,bd=1e9; for(var k in cols){ var d=Math.abs(c.x-cols[k]); if(d<bd){bd=d;best=k;} } if(best==='total')return; (b[best]||b.desc).push(c.s); });
-        var desc=(b.desc.join(' ')).trim(); var code=(b.code.join(' ')).trim();
-        var qty=num((b.qty.join('')||'').replace(/[,\s]/g,'')); var price=num((b.price.join('')||'').replace(/[,\s]/g,''));
-        if(!desc)return; var low=desc.toLowerCase();
-        if(/^(total|sub ?total|subtotal|vat|grand|اجمالي|إجمالي|الاجمالي|الإجمالي|الضريبة|ضريبة|discount|خصم|terms|شروط|notes|ملاحظات|page|صفحة)/.test(low)) return;
-        if(!qty && !price && !/\d/.test(r.cells.map(function(c){return c.s;}).join(''))) return;
-        items.push({item:desc,code:code,qty:qty||1,price:price||0,brand:''});
-      });
-      if(items.length) return items;
+  for(var i=0;i<rows.length;i++){ var txt=rows[i].cells.map(function(c){return c.s;}).join(' ').toLowerCase();
+    if(/(item|desc|بند|وصف|الصنف|product)/.test(txt) && /(qty|quantity|كمية|عدد)/.test(txt) && /(price|amount|سعر|اجمالي|إجمالي|المبلغ)/.test(txt)){ hdr=rows[i]; hi=i; break; } }
+  if(!hdr){ return qfRowsToItems(rows.map(function(r){return r.cells.map(function(c){return c.s;});})); }
+  var hc={};
+  hdr.cells.forEach(function(c){ var n=(c.s||'').toLowerCase().trim();
+    if(hc.img===undefined && /image|photo|صورة/.test(n)) hc.img=c.x;                 /* "Product Image" → image col (check first so 'Product' doesn't grab desc) */
+    else if(hc.num===undefined && /^#$|^s\.?n\.?$|^no\.?$|^sr\.?$|^سري|^م$/.test(n)) hc.num=c.x;
+    else if(hc.desc===undefined && /item|desc|بند|وصف|الصنف/.test(n)) hc.desc=c.x;
+    else if(hc.price===undefined && /list|unit|price|سعر|rate/.test(n)) hc.price=c.x;
+    else if(hc.qty===undefined && /qty|quantity|كمية|عدد/.test(n)) hc.qty=c.x;
+    else if(hc.amount===undefined && /amount|total|اجمالي|إجمالي|المبلغ/.test(n)) hc.amount=c.x;
+  });
+  if(hc.desc===undefined || hc.qty===undefined || hc.price===undefined){ return qfRowsToItems(rows.map(function(r){return r.cells.map(function(c){return c.s;});})); }
+  /* The description column is WIDE (text wraps up to just left of the price column), while the
+     numeric columns (price/qty/amount) are narrow and right-ish. So: anything left of the price
+     column (minus a small margin) is description/code/image/serial; inside the numeric band we pick
+     the nearest of price/qty/amount by their header x. This stops wide description words like "20ch"
+     from leaking into the price. */
+  var priceEdge=(hc.price!==undefined?hc.price:(hc.qty!==undefined?hc.qty:1e9))-6;
+  function colOf(x){
+    if(x < priceEdge){
+      if(hc.desc!==undefined && x >= hc.desc-4) return 'desc';
+      var left=[]; ['num','img','desc'].forEach(function(k){ if(hc[k]!==undefined) left.push({k:k,x:hc[k]}); });
+      var best='desc',bd=1e9; left.forEach(function(c){ var d=Math.abs(x-c.x); if(d<bd){bd=d;best=c.k;} }); return best;
     }
+    var nc=[]; ['price','qty','amount'].forEach(function(k){ if(hc[k]!==undefined) nc.push({k:k,x:hc[k]}); });
+    var best2=nc.length?nc[0].k:'desc',bd2=1e9; nc.forEach(function(c){ var d=Math.abs(x-c.x); if(d<bd2){bd2=d;best2=c.k;} }); return best2;
   }
-  return qfRowsToItems(rows.map(function(r){return r.cells.map(function(c){return c.s;});}));
+  function curDetect(s){ if(_qfCur)return; var m=/(USD|EUR|GBP|AED|SAR|EGP|QAR|KWD|\$|€|£)/i.exec(s||''); if(m){ var v=m[1].toUpperCase(); _qfCur=(v==='$'?'USD':(v==='€'?'EUR':(v==='£'?'GBP':v))); } }
+  var items=[],curItem=null;
+  rows.slice(hi+1).forEach(function(r){
+    var b={num:[],img:[],desc:[],price:[],qty:[],amount:[]};
+    r.cells.forEach(function(c){ (b[colOf(c.x)]||b.desc).push(c.s); });
+    var desc=(b.desc.join(' ')).replace(/\s+/g,' ').trim();
+    var priceTxt=b.price.join(' '), qtyTxt=b.qty.join(' '), amtTxt=b.amount.join(' ');
+    curDetect(priceTxt); curDetect(amtTxt);
+    var price=parseFloat((priceTxt.replace(/[^0-9.]/g,'')))||0;
+    var qty=parseFloat((qtyTxt.replace(/[^0-9.]/g,'')))||0;
+    var lowAll=(priceTxt+' '+amtTxt+' '+desc).toLowerCase();
+    if(!qty && /sub ?total|discount|grand|total after|installation|programming|special|vat|ضريبة|اجمالي|إجمالي|خصم/.test(lowAll)){ curItem=null; return; }
+    if(qty>0 && price>0){ curItem={item:desc||('Item '+(items.length+1)),code:'',qty:qty,price:price,brand:''}; items.push(curItem); }
+    else if(curItem && desc){ if((curItem.item.length+desc.length+1)<=160) curItem.item=(curItem.item+' '+desc).trim(); }
+  });
+  return items;
 }
 function qfParse(objs, arrFallback){ var items=qfByHeader(objs||[]); if(items.length) return items; var arr=(arrFallback&&arrFallback.length)?arrFallback:(objs||[]).map(function(r){return Object.keys(r||{}).map(function(k){return r[k];});}); return qfByPosition(arr); }
 function qfByHeader(rows){
@@ -5407,7 +5430,7 @@ function qfByPosition(arr){
 function quoteImportFileOpen(pid){
   var ar=(lang==='ar');
   if(typeof canCreateQuote==='function' && !canCreateQuote()){ alert(ar?'إنشاء الكوتيشن متاح لفريق المبيعات / المدير فقط.':'Creating quotations is limited to Sales / manager.'); return; }
-  _qfItems=[]; _qfPid=pid||null;
+  _qfItems=[]; _qfPid=pid||null; _qfCur='';
   var body=''+
    '<div class="mini" style="margin-bottom:8px">'+(ar?'ارفع ملف الكوتيشن من جهازك (PDF أو Excel أو CSV). الأعمدة المتوقّعة: <b>البند/الوصف</b> · كود (اختياري) · الكمية · سعر الوحدة. هتشوف معاينة قبل الحفظ، والكوتيشن هيتسجّل في كوتيشنات الشركة.':'Upload a quotation file from your device (PDF, Excel or CSV). Expected columns: <b>Item/Description</b> · Code (optional) · Qty · Unit price. You will preview before saving; it will be registered in the company quotations.')+'</div>'+
    '<div class="row2">'+fEl(ar?'اسم العميل':'Client name','qf_client','')+selEl(ar?'الفرع':'Branch','qf_branch',BRANCHES,defBranch())+'</div>'+
@@ -5429,9 +5452,10 @@ function quoteImportPaste(){ var t=(g('qf_paste')&&g('qf_paste').value)||''; if(
 function quoteImportPrev(){ var el=g('qf_prev'); if(!el)return; var ar=(lang==='ar');
   if(!_qfItems.length){ el.innerHTML='<div class="mini" style="color:var(--bad)">'+(ar?'مفيش بنود اتقرت من الملف. اتأكد إن فيه عمود للوصف وعمود للكمية والسعر، أو استخدم اللصق.':'No items were read. Make sure there are Description, Qty and Price columns, or use paste.')+'</div>'; return; }
   var sub=_qfItems.reduce(function(s,i){return s+num(i.qty)*num(i.price);},0);
-  el.innerHTML='<div class="mini" style="margin:6px 0"><b>'+_qfItems.length+'</b> '+(ar?'بند اتقرا — إجمالي تقديري: ':'items read — est. subtotal: ')+'<b>'+nfmt(sub)+'</b> '+(ar?'(معاينة أول 8):':'(first 8):')+'</div>'+
+  var cm=function(v){ return _qfCur?(num(v).toLocaleString(undefined,{maximumFractionDigits:2})+' '+_qfCur):nfmt(v); };
+  el.innerHTML='<div class="mini" style="margin:6px 0"><b>'+_qfItems.length+'</b> '+(ar?'بند اتقرا':'items read')+(_qfCur?(' · '+(ar?'العملة: ':'currency: ')+_qfCur):'')+(ar?' — إجمالي تقديري: ':' — est. subtotal: ')+'<b>'+cm(sub)+'</b> '+(ar?'(معاينة أول 8):':'(first 8):')+'</div>'+
     '<div style="overflow-x:auto"><table><thead><tr><th>'+(ar?'البند':'Item')+'</th><th>'+(ar?'كود':'Code')+'</th><th>'+(ar?'كمية':'Qty')+'</th><th>'+(ar?'سعر':'Price')+'</th></tr></thead><tbody>'+
-    _qfItems.slice(0,8).map(function(i){return '<tr><td>'+esc((''+i.item).slice(0,60))+'</td><td>'+esc(''+(i.code||''))+'</td><td>'+num(i.qty)+'</td><td>'+nfmt(num(i.price))+'</td></tr>';}).join('')+'</tbody></table></div>'+
+    _qfItems.slice(0,8).map(function(i){return '<tr><td>'+esc((''+i.item).slice(0,70))+'</td><td>'+esc(''+(i.code||''))+'</td><td>'+num(i.qty)+'</td><td>'+cm(num(i.price))+'</td></tr>';}).join('')+'</tbody></table></div>'+
     '<div class="mini" style="margin-top:6px;color:var(--muted)">'+(ar?'لو الأرقام مش مظبوطة، صلّح الملف أو استخدم اللصق وأعِد المحاولة. اضغط حفظ لتسجيله في كوتيشنات الشركة.':'If numbers look off, fix the file or use paste. Press Save to register it in company quotations.')+'</div>';
 }
 function quoteImportSave(){ var ar=(lang==='ar'); var client=((g('qf_client')&&g('qf_client').value)||'').trim();
@@ -5443,7 +5467,7 @@ function quoteImportSave(){ var ar=(lang==='ar'); var client=((g('qf_client')&&g
   var items=_qfItems.map(function(i){ return {item:(''+i.item).trim(),code:(''+(i.code||'')).trim(),desc:'',brand:i.brand||'',qty:num(i.qty)||1,price:num(i.price)||0,image:'',optional:false}; });
   var d={ client:client, subject:subject||client, projectName:'', branch:branch, dept:'Operations', service:service,
     date:(typeof today==='function'?today():new Date().toISOString().slice(0,10)), status:'Draft', type:'Quotation',
-    preparedBy:(me&&me.name)||'', currency:(branch==='UAE'?'AED':(branch==='KSA'?'SAR':'EGP')),
+    preparedBy:(me&&me.name)||'', currency:(_qfCur||(branch==='UAE'?'AED':(branch==='KSA'?'SAR':'EGP'))),
     vat:(typeof vatForBranch==='function'?vatForBranch(branch):14),
     sections:[{title:(ar?'بنود الكوتيشن':'Items'),items:items,instOn:false,instType:'percent',instVal:0,discOn:false,discType:'percent',discVal:0,features:'',notes:''}],
     importedFromFile:true, created:new Date().toISOString(), number:genQuoteNo(svcKey(service)) };
@@ -8628,7 +8652,9 @@ function getNotifications(){
   }catch(e){}
   return list;
 }
-function toggleBell(e){ if(e)e.stopPropagation(); const p=g('bellPanel'); if(!p)return; if(p.classList.contains('hide')){ renderBellPanel(); p.classList.remove('hide'); const sr=g('searchResults'); if(sr)sr.classList.add('hide'); markBellSeen(); try{updateBellBadge();}catch(e){} setTimeout(function(){ markNotifSeen(); },3000); } else p.classList.add('hide'); }
+function placeBellPanel(){ var p=g('bellPanel'),bb=g('bellBtn'); if(!p||!bb)return; try{ var r=bb.getBoundingClientRect(); var w=Math.min(360, window.innerWidth*0.94); var left=Math.min(Math.max(8, r.right - w), window.innerWidth - w - 8); p.style.left=left+'px'; p.style.top=(r.bottom+6)+'px'; p.style.right='auto'; }catch(_e){} }
+function toggleBell(e){ if(e)e.stopPropagation(); const p=g('bellPanel'); if(!p)return; if(p.classList.contains('hide')){ renderBellPanel(); placeBellPanel(); p.classList.remove('hide'); const sr=g('searchResults'); if(sr)sr.classList.add('hide'); markBellSeen(); try{updateBellBadge();}catch(e){} setTimeout(function(){ markNotifSeen(); },3000); } else p.classList.add('hide'); }
+window.addEventListener('resize',function(){ var p=g('bellPanel'); if(p&&!p.classList.contains('hide'))placeBellPanel(); });
 function markNotifSeen(){ try{ localStorage.setItem('sedra_notif_seen',String(Date.now())); }catch(e){} }
 function _notifSig(list){ var m={}; (list||[]).forEach(function(x){ var k=x.key||(x.ico+'|'+x.title); m[k]=(m[k]||0)+(x.count||1); }); return m; }
 function _bellSeen(){ try{ return JSON.parse(localStorage.getItem('sedra_bell_sig')||'{}'); }catch(e){ return {}; } }
