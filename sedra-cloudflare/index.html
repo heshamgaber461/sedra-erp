@@ -4089,13 +4089,30 @@ function editTask(id,projectId){
       const d={title:val('t_title'),project:pid,projectName:pn,branch:br,assignee:val('t_assignee'),due:val('t_due'),status:val('t_status'),notes:val('t_notes')};
       if(!d.title){alert(ar?'لازم عنوان للتاسك':'Title required');return false;} if(!id)d.created=new Date().toISOString();
       if(_tkPhoto)d.hasPhoto=true; if(_tkAudio)d.hasAudio=true;
-      var _asgChanged=(d.assignee && d.assignee!==(t.assignee||'')); if(_asgChanged) d.assignedTs=Date.now();
+      var _asgChanged=(d.assignee && d.assignee!==(t.assignee||'')); var _mediaNew=!!(_tkPhoto||_tkAudio);
+      if(_asgChanged||_mediaNew) d.assignedTs=Date.now();
       (id?apiMerge('tasks',id,d):apiAdd('tasks',d)).then((newId)=>{ try{ saveTaskMedia(id||newId); }catch(_m){}
-        try{ /* notify the assignee — in-app bell + push to their phone even if the app is closed */
-          if(_asgChanged){ var _ae=ownerEmailFor(d.assignee); var _meE=((me&&me.email)||'').toLowerCase();
+        try{ /* notify the assignee — in-app bell + phone push (even if app closed) + email.
+               Fires on assignment AND whenever a voice/photo is added to the task. */
+          if((_asgChanged||_mediaNew) && d.assignee){ var _ae=ownerEmailFor(d.assignee); var _meE=((me&&me.email)||'').toLowerCase();
             if(_ae && _ae!==_meE){
-              try{ apiAdd('notifications',{ ts:Date.now(), toEmail:_ae, ico:'🗂️', title:(ar?'تاسك جديد ليك':'New task assigned'), sub:(d.title||'')+(pn?(' — '+pn):''), type:'task', taskId:(id||newId||''), projectId:pid||'', branch:br||'', actor:(me&&me.name)||'', actorEmail:_meE }); }catch(_an){}
-              try{ sendPushToStaff([_ae],(ar?'🗂️ تاسك جديد ليك — Sedra':'🗂️ New task assigned — Sedra'),(d.title||'')+(pn?(' — '+pn):'')+(d.due?(' · '+(ar?'تسليم ':'due ')+d.due):''),'/'); }catch(_ps){}
+              var _hasP=!!(_tkPhoto||d.hasPhoto), _hasA=!!(_tkAudio||d.hasAudio);
+              var _att=(_hasP?(ar?'📷 صورة':'📷 photo'):'')+((_hasP&&_hasA)?' + ':'')+(_hasA?(ar?'🎙️ تسجيل صوتي':'🎙️ voice note'):'');
+              var _ttl=_asgChanged?(ar?'تاسك جديد ليك':'New task assigned'):(ar?'تحديث على تاسك ليك':'Task updated');
+              var _sub=(d.title||'')+(pn?(' — '+pn):'')+(_att?(' · '+_att):'');
+              try{ apiAdd('notifications',{ ts:Date.now(), toEmail:_ae, ico:'🗂️', title:_ttl, sub:_sub, type:'task', taskId:(id||newId||''), projectId:pid||'', branch:br||'', actor:(me&&me.name)||'', actorEmail:_meE }); }catch(_an){}
+              try{ sendPushToStaff([_ae],'🗂️ '+_ttl+' — Sedra',_sub+(d.due?(' · '+(ar?'تسليم ':'due ')+d.due):''),'/'); }catch(_ps){}
+              try{ var _NL=String.fromCharCode(10);
+                var _body=(_asgChanged?(ar?'اتكلّفت بتاسك جديد:':'A new task has been assigned to you:'):(ar?'في تحديث على تاسك مطلوب منك:':'A task assigned to you was updated:'))+_NL+_NL
+                  +(ar?'التاسك: ':'Task: ')+(d.title||'-')+_NL
+                  +(pn?((ar?'المشروع: ':'Project: ')+pn+_NL):'')
+                  +(d.due?((ar?'التسليم: ':'Due: ')+d.due+_NL):'')
+                  +(ar?'من: ':'By: ')+((me&&me.name)||'-')+_NL
+                  +(_att?((ar?'مرفقات: ':'Attachments: ')+_att+_NL):'')
+                  +(d.notes?(_NL+(ar?'ملاحظات: ':'Notes: ')+d.notes+_NL):'')
+                  +_NL+(ar?('ادخل نظام Sedra عشان تشوف التفاصيل'+(_att?' وتسمع/تشوف المرفقات':'')+'.'):('Open the Sedra system to view the details'+(_att?' and open the attachments':'')+'.'));
+                sendEmailAuto(_ae,'🗂️ '+_ttl+' — '+(d.title||''),_body);
+              }catch(_em){}
             }
           }
         }catch(_n){}
