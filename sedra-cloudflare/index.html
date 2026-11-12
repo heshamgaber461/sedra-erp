@@ -4593,6 +4593,7 @@ function opsList(rows){
       +'<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">'
         +(st!=='Done'?'<button class="btn cy" style="flex:1;min-width:140px;padding:11px;font-size:14.5px" onclick="advanceTask(\''+t.id+'\')">'+tStepLabel(st)+'</button>':'')
         +'<button class="btn gh" style="padding:11px" onclick="editTask(\''+t.id+'\')">'+(ar?'تفاصيل':'Edit')+'</button>'
+        +((isMgr()||canApproveMat()||(t.assignee||'')===((me&&me.name)||''))?'<button class="btn dn" style="padding:11px" onclick="delDoc(\'tasks\',\''+t.id+'\')" title="'+(ar?'مسح التاسك':'Delete task')+'">🗑️ '+(ar?'مسح':'Delete')+'</button>':'')
       +'</div></div>';
   }).join('')+'</div>';
 }
