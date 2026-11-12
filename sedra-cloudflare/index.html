@@ -4089,7 +4089,17 @@ function editTask(id,projectId){
       const d={title:val('t_title'),project:pid,projectName:pn,branch:br,assignee:val('t_assignee'),due:val('t_due'),status:val('t_status'),notes:val('t_notes')};
       if(!d.title){alert(ar?'لازم عنوان للتاسك':'Title required');return false;} if(!id)d.created=new Date().toISOString();
       if(_tkPhoto)d.hasPhoto=true; if(_tkAudio)d.hasAudio=true;
-      (id?apiMerge('tasks',id,d):apiAdd('tasks',d)).then((newId)=>{ try{ saveTaskMedia(id||newId); }catch(_m){} syncProjProgress(pid); tkMediaReset(); synced(); }).catch(e=>alert('Save error: '+(e.message||e))); });
+      var _asgChanged=(d.assignee && d.assignee!==(t.assignee||'')); if(_asgChanged) d.assignedTs=Date.now();
+      (id?apiMerge('tasks',id,d):apiAdd('tasks',d)).then((newId)=>{ try{ saveTaskMedia(id||newId); }catch(_m){}
+        try{ /* notify the assignee — in-app bell + push to their phone even if the app is closed */
+          if(_asgChanged){ var _ae=ownerEmailFor(d.assignee); var _meE=((me&&me.email)||'').toLowerCase();
+            if(_ae && _ae!==_meE){
+              try{ apiAdd('notifications',{ ts:Date.now(), toEmail:_ae, ico:'🗂️', title:(ar?'تاسك جديد ليك':'New task assigned'), sub:(d.title||'')+(pn?(' — '+pn):''), type:'task', taskId:(id||newId||''), projectId:pid||'', branch:br||'', actor:(me&&me.name)||'', actorEmail:_meE }); }catch(_an){}
+              try{ sendPushToStaff([_ae],(ar?'🗂️ تاسك جديد ليك — Sedra':'🗂️ New task assigned — Sedra'),(d.title||'')+(pn?(' — '+pn):'')+(d.due?(' · '+(ar?'تسليم ':'due ')+d.due):''),'/'); }catch(_ps){}
+            }
+          }
+        }catch(_n){}
+        syncProjProgress(pid); tkMediaReset(); synced(); }).catch(e=>alert('Save error: '+(e.message||e))); });
 }
 function addMilestone(pid){
   openModal('Add milestone',
@@ -8179,6 +8189,10 @@ function getNotifications(){
   leaves.forEach(function(l){ if((l.email||'').toLowerCase()===myEmail&&(l.status==='Approved'||l.status==='Rejected')&&num(l.decidedTs)>_seen) list.unshift({ico:l.status==='Approved'?'✅':'⛔',key:'leave:'+l.id,title:'Your leave was '+l.status,sub:(l.type||'')+' · '+(l.from||''),count:1,ts:num(l.decidedTs),act:function(){curView='hr';hrTab='leave';markNotifSeen();closeBell();render();}}); });
   expclaims.forEach(function(c){ if((c.email||'').toLowerCase()===myEmail&&(c.status==='Approved'||c.status==='Rejected'||c.status==='Paid')&&num(c.decidedTs)>_seen) list.unshift({ico:c.status==='Rejected'?'⛔':'🧾',key:'claim:'+c.id,title:'Expense claim '+c.status,sub:(c.category||'')+' · '+nfmt(c.amount),count:1,ts:num(c.decidedTs),act:function(){curView='claims';markNotifSeen();closeBell();render();}}); });
   approvals.forEach(function(a){ if((a.email||'').toLowerCase()===myEmail&&(a.status==='Approved'||a.status==='Rejected')&&num(a.decidedTs)>_seen) list.unshift({ico:a.status==='Approved'?'✅':'⛔',key:'appr:'+a.id,title:'Request '+a.status,sub:(a.title||''),count:1,ts:num(a.decidedTs),act:function(){curView='approvals';markNotifSeen();closeBell();render();}}); });
+  // ---- personal: a NEW task was assigned to me (shows in the bell; a phone push is also sent on assignment) ----
+  try{ var _nt=(tasks||[]).filter(function(tk){ if((tk.assignee||'')!==myName) return false; if((tk.status||'')==='Done') return false; var ts=num(tk.assignedTs)||(tk.created?new Date(tk.created).getTime():0); return ts && ts>_seen && (Date.now()-ts)<30*86400000; });
+    _nt.forEach(function(tk){ list.unshift({ico:'🗂️',key:'task:'+tk.id,title:(lang==='ar'?'تاسك جديد ليك':'New task assigned'),sub:(tk.title||'')+(tk.projectName?(' · '+tk.projectName):'')+(tk.due?(' · '+(lang==='ar'?'تسليم ':'due ')+tk.due):''),count:1,ts:(num(tk.assignedTs)||(tk.created?new Date(tk.created).getTime():0)),act:function(){curView='operations';opsScope='mine';markNotifSeen();closeBell();render();}}); });
+  }catch(e){}
   // ---- Quote Requests: notify every stakeholder (managers, team leader, tech manager, assignee, requester) ----
   try{
     var _mineRFQ=(typeof rfqPending==='function')?rfqPending():[];
