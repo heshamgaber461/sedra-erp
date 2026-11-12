@@ -3213,6 +3213,17 @@ function bwBuild(){
   if(!recips.length){ el.innerHTML='<div class="empty">No recipients with a phone number.</div>'; return; }
   el.innerHTML=`<div class="mini" style="margin-bottom:6px"><b>${recips.length}</b> ${lang==='ar'?'مستلم — اضغط Send لفتح واتساب برسالتك':'recipients — click Send to open WhatsApp with your message'}:</div><div style="max-height:300px;overflow:auto">`+recips.slice(0,300).map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--mist)"><span>${esc(r.name||'')} <span class="mini">${esc(r.phone)}</span></span><button class="btn gh sm" onclick="waOpen('${esc(String(r.phone).replace(/'/g,''))}',bwMsg())">Send</button></div>`).join('')+`</div>`;
 }
+/* Which campaign a lead came from — shown in the leads dashboard instead of branch/value.
+   campaignId links to the marketing `campaigns` collection (or an ad campaign); imported leads may
+   carry a plain-text `campaign`. Falls back to a dash. */
+function leadCampaignCell(r){
+  var c=(typeof campaigns!=='undefined'?campaigns:[]).find(function(x){return x.id===r.campaignId;});
+  if(c) return '<b>'+esc(c.name)+'</b>';
+  var ac=(typeof adcampaigns!=='undefined'?adcampaigns:[]).find(function(x){return x.id===r.campaignId;});
+  if(ac) return '<b>'+esc(ac.name)+'</b>';
+  if(r.campaign) return esc(r.campaign);
+  return '<span class="mini" style="color:var(--muted)">—</span>';
+}
 function vSales(){
   if(openLeadId){ const _l=leads.find(x=>x.id===openLeadId); if(_l)return vLeadDetail(); openLeadId=''; }
   const rows=leads.filter(inBranch).filter(r=>canSeeLead(r)).slice().sort((a,b)=>((b.created||b.date||'')+'').localeCompare((a.created||a.date||'')+''));
@@ -3227,13 +3238,13 @@ function vSales(){
   var lrows=rows;
   if(leadStaleFilter){ lrows=rows.filter(isStaleNew); h+=`<div class="card" style="background:#fdecea;border-color:var(--bad);display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px"><span>⏳ ${lang==='ar'?'بعرض الليدز الراكدة (New أقدم من 30 يوم)':'Showing stale leads (New older than 30 days)'} — <b>${lrows.length}</b></span><button class="btn gh sm" onclick="leadStaleFilter=false;render()">✕ ${lang==='ar'?'إلغاء الفلتر':'Clear filter'}</button></div>`; }
   h+=tableView('leads', lrows,
-    `<th>Name</th><th>Date</th><th>Branch</th><th>Owner</th><th>Source</th><th>Stage</th><th>Score</th><th>Value</th><th>Next follow-up</th><th></th>`,
+    `<th>Name</th><th>Date</th><th>${lang==='ar'?'الحملة':'Campaign'}</th><th>Owner</th><th>Source</th><th>Stage</th><th>Score</th><th>Next follow-up</th><th></th>`,
     r=>{const due=r.next&&r.next<=today()&&r.stage!=='Won'&&r.stage!=='Lost';return `<tr>
     <td><b>${esc(r.name)}</b>${r.company?` <span class="mini">\u00B7 ${esc(r.company)}</span>`:''}${r.villaOwner?` <span class="mini" title="Villa owner">\u{1F3E1} ${esc(r.villaOwner)}</span>`:''}<div class="mini">${esc(r.phone||'')}</div><div style="margin-top:3px">${lifeBadge(r)}${slaBreached(r)?' <span class="tag" title="SLA breach — no response within 4h" style="background:#c0392b22;color:#c0392b">⏰ SLA</span>':''}${isStaleNew(r)?' <span class="tag" title="'+(lang==='ar'?'راكد في New أكثر من 30 يوم':'Stale — New over 30 days')+'" style="background:#e0a93b22;color:#b9770b">⏳ '+(lang==='ar'?'راكد':'Stale')+'</span>':''}</div></td>
-    <td class="mini" style="white-space:nowrap">${(r.created||r.date)?esc((''+(r.created||r.date)).slice(0,10)):'—'}</td><td>${FLAG[r.branch]||''} ${esc(r.branch||'')}</td><td>${r.owner?esc(r.owner):assignSelect(r)}</td><td>${esc(r.source||'—')}</td>
+    <td class="mini" style="white-space:nowrap">${(r.created||r.date)?esc((''+(r.created||r.date)).slice(0,10)):'—'}</td><td>${leadCampaignCell(r)}</td><td>${r.owner?esc(r.owner):assignSelect(r)}</td><td>${esc(r.source||'—')}</td>
     <td>${stageSelect(r)}</td>
     <td>${scoreBadge(r)}</td>
-    <td>${money(r.branch,r.value)}</td><td style="${due?'color:var(--bad);font-weight:700':''}">${esc(r.next||'—')}${due?' ⚠️':''}</td>
+    <td style="${due?'color:var(--bad);font-weight:700':''}">${esc(r.next||'—')}${due?' ⚠️':''}</td>
     <td style="white-space:nowrap"><button class="btn cy sm" onclick="openLeadId='${r.id}';render()">Open</button> <button class="btn gh sm" title="WhatsApp" onclick="waLead('${r.id}')">💬</button> ${r.stage!=='Lost'&&!r.quoteId?`<button class="btn gh sm" onclick="leadToQuote('${r.id}')">→ Quote</button> `:''}<button class="btn gh sm" onclick="editLead('${r.id}')">Edit</button>${canDelLead(r)?`  <button class="btn dn sm" title="Delete" onclick="delDoc('leads','${r.id}')">✕</button>`:''}</td></tr>`},
     {empty:'No leads yet. Click “Add lead”.', placeholder:'🔍 Search leads…',
      search:r=>[r.company,r.name,r.phone,r.owner,r.source,r.service,r.branch].join(' '),
@@ -3839,7 +3850,7 @@ function pendingMatPanel(){
   if(!pend.length) return '';
   var h='<div class="card" style="border-left:4px solid #e0a93b;margin-bottom:12px"><div class="ch-t" style="color:#a9781a">🧰 '+(ar?'طلبات مواد معلّقة':'Pending material requests')+' <span class="tag" style="background:#e0a93b22;color:#a9781a">'+pend.length+'</span></div>';
   h+='<div style="overflow-x:auto"><table><thead><tr><th>'+(ar?'المشروع':'Project')+'</th><th>'+(ar?'الصنف':'Item')+'</th><th>'+(ar?'كمية':'Qty')+'</th><th>'+(ar?'الطالب':'By')+'</th><th>'+(ar?'التاريخ':'Date')+'</th><th></th></tr></thead><tbody>';
-  pend.forEach(function(r){ h+='<tr><td><b>'+esc(r.project||'—')+'</b></td><td>'+esc(r.item||'')+(r.note?'<div class="mini">'+esc(r.note)+'</div>':'')+'</td><td>'+num(r.qty)+'</td><td>'+esc(r.by||'')+'</td><td class="mini">'+esc((r.date||'').slice(0,10))+'</td><td style="white-space:nowrap"><button class="btn cy sm" onclick="decideMatReq(\''+r.id+'\',true)">'+(ar?'موافقة':'Approve')+'</button> <button class="btn dn sm" onclick="decideMatReq(\''+r.id+'\',false)">'+(ar?'رفض':'Reject')+'</button></td></tr>'; });
+  pend.forEach(function(r){ var _ph=(r.hasTakePhoto?' <a href="#" onclick="matPhoto(\''+r.id+'\',\'take\');return false" title="'+(ar?'صورة الماتريل اللي اتصوّرت':'live material photo')+'">📷</a>':''); h+='<tr><td><b>'+esc(r.project||'—')+'</b></td><td>'+esc(r.item||'')+_ph+(r.note?'<div class="mini">'+esc(r.note)+'</div>':'')+'</td><td>'+num(r.qty)+'</td><td>'+esc(r.by||'')+'</td><td class="mini">'+esc((r.date||'').slice(0,10))+'</td><td style="white-space:nowrap"><button class="btn cy sm" onclick="decideMatReq(\''+r.id+'\',true)">'+(ar?'موافقة':'Approve')+'</button> <button class="btn dn sm" onclick="decideMatReq(\''+r.id+'\',false)">'+(ar?'رفض':'Reject')+'</button></td></tr>'; });
   h+='</tbody></table></div></div>';
   return h;
 }
@@ -3859,15 +3870,64 @@ function vProjects(){
   h+=projectsPanel(rows);
   h+=`<div class="sect"><h2>Projects</h2><div class="sp"></div>${isAdmin()?`<button class="btn gh sm" onclick="sedraImportProjects()" title="Import projects from /projects-seed.json">⬆ Import</button> <button class="btn dn sm" onclick="sedraDeleteAllProjects()" title="Move all projects to Recycle Bin">🗑 Clear all</button> `:''}${canApproveMat()?`<button class="btn cy" onclick="editProject()">+ Add project</button>`:''}</div>`;
   if(!rows.length)return h+`<div class="card empty">No projects yet.</div>`;
-  h+=`<table><thead><tr><th>Project</th><th>Client</th><th>Branch</th><th>Dept</th><th>Status</th><th>Progress</th><th>Tasks</th><th>Value</th><th></th></tr></thead><tbody>`+rows.map(p=>{const pr=projProgress(p),ts=tasks.filter(t=>t.project===p.id),done=ts.filter(t=>t.status==='Done').length;return `<tr>
+  h+=`<div class="sect" style="margin-top:4px"><input class="tvq" type="search" style="max-width:280px" placeholder="🔍 ${lang==='ar'?'ابحث عن مشروع…':'Search projects…'}" value="${esc(projQ)}" oninput="projQ=this.value;render()"><div class="sp"></div><span class="mini">${lang==='ar'?'دوس على السهم ▾ لإجراءات سريعة (حضور / انصراف / طلب ماتريل)':'Tap the ▾ arrow for quick actions (check-in / out / request material)'}</span></div>`;
+  var pq=(projQ||'').trim().toLowerCase();
+  var frows=pq?rows.filter(function(p){return [p.name,p.client,p.owner,p.branch,p.status,p.dept].join(' ').toLowerCase().indexOf(pq)>=0;}):rows;
+  if(!frows.length)return h+`<div class="card empty">${lang==='ar'?'مفيش مشاريع مطابقة للبحث.':'No projects match your search.'}</div>`;
+  h+=`<table><thead><tr><th></th><th>Project</th><th>Client</th><th>Branch</th><th>Dept</th><th>Status</th><th>Progress</th><th>Tasks</th><th>Value</th><th></th></tr></thead><tbody>`+frows.map(p=>{const pr=projProgress(p),ts=tasks.filter(t=>t.project===p.id),done=ts.filter(t=>t.status==='Done').length;const _op=(projOpenRow===p.id);return `<tr>
+    <td style="text-align:center"><button class="btn gh sm" title="${lang==='ar'?'إجراءات سريعة':'Quick actions'}" onclick="projToggleRow('${p.id}')" style="font-size:13px;min-width:30px;padding:3px 7px">${_op?'▾':'▸'}</button></td>
     <td><b>${esc(p.name)}</b><div class="mini">${esc(p.owner||'')}</div></td><td>${esc(p.client||'')}</td>
     <td>${FLAG[p.branch]||''} ${esc(p.branch||'')}</td><td>${esc(p.dept||'')}</td>
     <td><span class="tag" style="background:${PSTAT_COL[p.status]||'#eee'}22;color:${PSTAT_COL[p.status]||'#333'}">${esc(p.status||'Planning')}</span></td>
     <td><div style="background:#eef2f6;border-radius:6px;height:8px;width:80px;overflow:hidden"><div style="background:var(--cyan);height:8px;width:${pr}%"></div></div><span class="mini">${pr}%</span></td>
     <td>${ts.length?done+'/'+ts.length:'—'}</td>
     <td>${money(p.branch,p.value)}</td>
-    <td style="white-space:nowrap"><button class="btn cy sm" onclick="openProjectId='${p.id}';render()">Open</button> ${p.file?`<button class="btn gh sm" title="Open attached file" onclick="openRecFile('projects','${p.id}')">📎</button> `:''}<button class="btn gh sm" title="Open record" onclick="recOpen('${p.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${p.id}')">📎</button> ${canApproveMat()?`<button class="btn gh sm" onclick="editProject('${p.id}')">Edit</button>`:''} ${canApproveMat()?`<button class="btn dn sm" title="${lang==='ar'?'مسح المشروع (سلة المحذوفات)':'Delete project (Recycle Bin)'}" onclick="delDoc('projects','${p.id}')">✕</button>`:''}</td></tr>`}).join('')+`</tbody></table>`;
+    <td style="white-space:nowrap"><button class="btn cy sm" onclick="openProjectId='${p.id}';render()">Open</button> ${p.file?`<button class="btn gh sm" title="Open attached file" onclick="openRecFile('projects','${p.id}')">📎</button> `:''}<button class="btn gh sm" title="Open record" onclick="recOpen('${p.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${p.id}')">📎</button> ${canApproveMat()?`<button class="btn gh sm" onclick="editProject('${p.id}')">Edit</button>`:''} ${canApproveMat()?`<button class="btn dn sm" title="${lang==='ar'?'مسح المشروع (سلة المحذوفات)':'Delete project (Recycle Bin)'}" onclick="delDoc('projects','${p.id}')">✕</button>`:''}</td></tr>${_op?projActionsRow(p):''}`}).join('')+`</tbody></table>`;
   return h;
+}
+/* ===== Projects list quick actions (the ▾ arrow on each project row) =====
+   Lets a technician/manager check-in, check-out or request materials for a project straight from the
+   list without opening it. */
+var projOpenRow='', projQ='';
+function projToggleRow(id){ projOpenRow=(projOpenRow===id?'':id); render(); }
+function projQuickCheckIn(pid){
+  var p=projects.find(function(x){return x.id===pid;}); if(!p)return; var ar=(lang==='ar');
+  if(scOpen()){ alert(ar?'عندك جلسة مفتوحة — اعمل Check-out الأول':'You have an open session — check out first'); return; }
+  var target=(typeof scLatLng==='function')?scLatLng(p.gps):null;
+  var canOverride=(typeof isAdmin==='function'&&isAdmin())||isMgr();
+  _scCtx={mode:'in',proj:p.name,site:'',pobj:p,target:target,canOverride:canOverride,photo:null,geo:null,ip:null,dist:null};
+  openModal((ar?'📍 تسجيل حضور — ':'📍 Check-in — ')+p.name, scCamBody(ar), function(){ scCommit(); return false; });
+  var sb=g('mSave'); if(sb)sb.textContent=(ar?'✓ سجّل حضور':'✓ Check in');
+  scGather();
+}
+function projQuickCheckOut(pid){
+  var p=projects.find(function(x){return x.id===pid;}); if(!p)return; var ar=(lang==='ar');
+  var myE=((me&&me.email)||'').toLowerCase();
+  var v=(sitevisits||[]).find(function(x){ return x.inTs&&!x.outTs&&((x.empEmail||'').toLowerCase()===myE)&&(((x.project||'')===p.name)||nameEq(x.project,p.name)); });
+  if(!v){ alert(ar?'مفيش جلسة حضور مفتوحة على المشروع ده':'No open check-in session on this project'); return; }
+  siteCheckOut(v.id);
+}
+function projQuickMat(pid){
+  var p=projects.find(function(x){return x.id===pid;}); if(!p)return; var ar=(lang==='ar');
+  if(!canUseMaterials(p)){ alert(ar?'الطلب للفني المكلّف بالمشروع أو المدير فقط.':'Only an assigned technician or manager can request.'); return; }
+  var cl=projChecklist(p);
+  if(!cl.length){ alert(ar?'المشروع ملوش قائمة مواد لسه. افتح المشروع واعمل Import من الكوتيشن.':'This project has no materials checklist yet. Open it and import from the quotation.'); return; }
+  var avail=cl.map(function(it,i){return {it:it,i:i};}).filter(function(x){return clRemaining(x.it)>0;});
+  if(!avail.length){ alert(ar?'كل المواد اتصرفت بالكامل.':'All materials fully issued.'); return; }
+  var body='<div class="card mini" style="margin-bottom:8px">'+(ar?'اختر الصنف اللي محتاج تطلبه — هتتصوّر صورة حيّة للماتريل عند الطلب.':'Pick the item to request — a live photo will be required.')+'</div>'+
+    avail.map(function(x){ return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--mist)"><div><b>'+esc(x.it.item)+'</b><div class="mini">'+(ar?'متبقّي':'remaining')+': '+clRemaining(x.it)+'</div></div><button class="btn cy sm" onclick="closeModal();requestMaterial(\''+pid+'\','+x.i+')">'+(ar?'طلب':'Request')+'</button></div>'; }).join('');
+  openModal((ar?'🧰 طلب ماتريل — ':'🧰 Request material — ')+esc(p.name), body, null);
+  var sb=g('mSave'); if(sb)sb.classList.add('hide');
+}
+function projActionsRow(p){
+  var ar=(lang==='ar'); var myE=((me&&me.email)||'').toLowerCase();
+  var openV=(sitevisits||[]).find(function(x){ return x.inTs&&!x.outTs&&((x.empEmail||'').toLowerCase()===myE)&&(((x.project||'')===p.name)||nameEq(x.project,p.name)); });
+  var btns='';
+  if(openV){ btns+='<button class="btn dn sm" onclick="projQuickCheckOut(\''+p.id+'\')">🚪 '+(ar?'تسجيل انصراف':'Check out')+'</button> '; }
+  else { btns+='<button class="btn cy sm" onclick="projQuickCheckIn(\''+p.id+'\')">📍 '+(ar?'تسجيل حضور':'Check in')+'</button> '; }
+  if(canUseMaterials(p)){ btns+='<button class="btn gh sm" onclick="projQuickMat(\''+p.id+'\')">🧰 '+(ar?'طلب ماتريل':'Request material')+'</button> '; }
+  btns+='<button class="btn gh sm" onclick="openProjectId=\''+p.id+'\';render()">📂 '+(ar?'افتح المشروع':'Open project')+'</button>';
+  return '<tr class="projActRow" style="background:#f6f9fc"><td colspan="10" style="padding:10px 12px"><div class="mini" style="margin-bottom:6px;color:var(--muted)">⚡ '+(ar?'إجراءات سريعة':'Quick actions')+(openV?(' · <span style="color:#1a7a4f;font-weight:700">'+(ar?'إنت مسجّل حضور هنا':'You are checked in here')+'</span>'):'')+'</div>'+btns+'</td></tr>';
 }
 function vProfit(rows){
   rows=rows||[];
@@ -4076,19 +4136,59 @@ function notifyLeaders(p,subject,body,opts){
 }
 /* Remove notifications older than 4 days so the collection stays small (admin runs it once per session). */
 function purgeOldNotifs(){ try{ if(!isAdmin())return; var cut=Date.now()-4*86400000; (appNotifs||[]).forEach(function(n){ if(num(n.ts)&&num(n.ts)<cut&&n.id){ try{apiDelete('notifications',n.id);}catch(_){} } }); }catch(e){} }
+/* ===== Material live-photo capture — MANDATORY on pickup & return =====
+   Self-contained (does not reuse the site-visit camera). The photo is a small JPEG data URL
+   saved to matphotos/<reqId> ({take:…} on pickup, {ret:…} on return) — a separate node kept out of
+   the bulk load, lazy-fetched by matPhoto() when someone views it. */
+var _mpStream=null,_mpPhoto=null;
+function mpStopCam(){ if(_mpStream){ try{_mpStream.getTracks().forEach(function(t){t.stop();});}catch(e){} _mpStream=null; } }
+function mpReset(){ _mpPhoto=null; mpStopCam(); }
+function mpStartCam(){
+  var ar=(lang==='ar'); var s=g('mpStatus');
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ if(s)s.innerHTML='⚠️ '+(ar?'الكاميرا مش متاحة على المتصفح ده':'Camera not available on this browser'); return; }
+  navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}).then(function(st){ _mpStream=st; var v=g('mpVid'); if(v){ v.srcObject=st; try{v.play();}catch(e){} } if(s)s.innerHTML=(ar?'📷 صوّر الماتريل وبعدين دوس «التقط صورة»':'📷 Point at the material, then tap “Capture”'); }).catch(function(){ if(s)s.innerHTML='⚠️ '+(ar?'لازم تسمح بالكاميرا عشان تسجّل — الصورة إجبارية':'Allow camera access — a photo is required'); });
+}
+function mpSnap(){
+  var ar=(lang==='ar'); var vid=g('mpVid'); if(!vid||!vid.videoWidth){ alert(ar?'الكاميرا لسه بتفتح، استنى ثانية…':'Camera still loading…'); return; }
+  var maxW=640; var w=vid.videoWidth,h=vid.videoHeight; if(w>maxW){ h=Math.round(h*maxW/w); w=maxW; }
+  var c=g('mpCanvas'); c.width=w; c.height=h; try{ c.getContext('2d').drawImage(vid,0,0,w,h); }catch(e){ alert('Camera error'); return; }
+  _mpPhoto=c.toDataURL('image/jpeg',0.5);
+  var im=g('mpShot'); if(im){ im.src=_mpPhoto; im.style.display='block'; } vid.style.display='none';
+  var sb=g('mpShotBtn'),rb=g('mpRetakeBtn'); if(sb)sb.style.display='none'; if(rb)rb.style.display='inline-block';
+  var s=g('mpStatus'); if(s)s.innerHTML='✅ '+(ar?'اتصوّرت — تقدر تكمّل':'Captured — you can submit');
+  mpStopCam();
+}
+function mpRetake(){ _mpPhoto=null; var im=g('mpShot'); if(im)im.style.display='none'; var v=g('mpVid'); if(v)v.style.display='block'; var sb=g('mpShotBtn'),rb=g('mpRetakeBtn'); if(sb)sb.style.display='inline-block'; if(rb)rb.style.display='none'; mpStartCam(); }
+function mpCamBody(ar,label){
+  return '<div class="fld"><label>'+(label||(ar?'📷 صورة حيّة للماتريل (إجبارية)':'📷 Live photo of the material (required)'))+'</label>'
+   +'<video id="mpVid" playsinline autoplay muted style="width:100%;max-height:230px;border-radius:8px;background:#000;object-fit:cover"></video>'
+   +'<img id="mpShot" alt="" style="display:none;width:100%;max-height:230px;border-radius:8px;object-fit:contain;background:#000">'
+   +'<canvas id="mpCanvas" style="display:none"></canvas>'
+   +'<div id="mpStatus" class="mini" style="margin-top:4px">'+(ar?'⏳ بفتح الكاميرا…':'⏳ opening camera…')+'</div>'
+   +'<div style="margin-top:6px"><button type="button" id="mpShotBtn" class="btn cy sm" onclick="mpSnap()">📸 '+(ar?'التقط صورة':'Capture')+'</button> '
+   +'<button type="button" id="mpRetakeBtn" class="btn gh sm" style="display:none" onclick="mpRetake()">↻ '+(ar?'إعادة التصوير':'Retake')+'</button></div></div>';
+}
+/* Persist the captured photo to matphotos/<reqId>. which = 'take' (pickup) or 'ret' (return). */
+function saveMatPhoto(reqId,which,dataUrl){ if(!reqId||!dataUrl)return; var patch={}; patch[which]=dataUrl; patch[which+'At']=new Date().toISOString(); patch[which+'By']=(me&&me.name)||''; try{ apiCall('PATCH','/matphotos/'+reqId+'.json',patch); }catch(e){} }
+function matPhoto(reqId,which){ var ar=(lang==='ar'); apiCall('GET','/matphotos/'+reqId+'.json').then(function(rec){ var d=rec&&rec[which]; if(!d){ alert(ar?'الصورة مش موجودة':'No photo'); return; } _openDataUrl(d,(which==='take'?'material-take':'material-return')+'-'+reqId+'.jpg'); }).catch(function(e){ alert('Error: '+(e&&e.message||e)); }); }
 function projMatReqs(p){ return (typeof matreqs!=='undefined'?matreqs:[]).filter(function(r){return r.projectId===p.id;}); }
 function requestMaterial(pid,idx){
   var p=projects.find(function(x){return x.id===pid;}); if(!p)return;
   if(!canUseMaterials(p)){ alert(lang==='ar'?'الطلب للفني المكلّف بالمشروع أو المدير فقط.':'Only an assigned technician or manager can request.'); return; }
   var it=(p.checklist||[])[idx]; if(!it)return; var rem=clRemaining(it); var ar=(lang==='ar');
+  mpReset();
   openModal((ar?'طلب مواد/أدوات — ':'Request material/tools — ')+esc(it.item),
     '<div class="card mini" style="margin-bottom:8px">'+(ar?'متبقّي في مخزن المشروع':'Remaining in project store')+': <b>'+rem+'</b></div>'+
-    fEl(ar?'الكمية المطلوبة':'Quantity requested','rm_qty',1,'number')+fTa(ar?'ملاحظة (اختياري)':'Note (optional)','rm_note',''),
-    function(){ var q=num(val('rm_qty')); if(q<=0){alert('Enter quantity');return false;}
-      apiAdd('matreqs',{project:p.name,projectId:pid,item:it.item,itemIdx:idx,qty:q,by:(me&&me.name)||'',byEmail:((me&&me.email)||'').toLowerCase(),branch:p.branch,status:'Pending',note:val('rm_note'),date:new Date().toISOString()})
-        .then(function(){ try{logAudit('create','matreqs','',p.name);}catch(e){} try{ notifyLeaders(p,(ar?'🧰 طلب مواد — ':'🧰 Material request — ')+p.name,((me&&me.name)||'')+(ar?' طلب ':' requested ')+q+' × '+it.item+(ar?' — محتاج موافقتك':' — needs your approval'),{ico:'🧰',type:'material'}); }catch(_n){} synced(); alert(ar?'اتبعت الطلب ✔ — مستني موافقة مدير Operations أو Team Leader':'Request sent ✔ — awaiting Operations Manager / Team Leader approval'); })
+    fEl(ar?'الكمية المطلوبة':'Quantity requested','rm_qty',1,'number')+fTa(ar?'ملاحظة (اختياري)':'Note (optional)','rm_note','')+
+    mpCamBody(ar,(ar?'📷 صورة حيّة للماتريل اللي بتاخده (إجبارية)':'📷 Live photo of the material you are taking (required)')),
+    function(){ var q=num(val('rm_qty')); if(q<=0){alert(ar?'اكتب الكمية':'Enter quantity');return false;}
+      if(!_mpPhoto){ alert(ar?'لازم تصوّر الماتريل صورة حيّة قبل ما تبعت الطلب 📷':'Capture a live photo of the material before sending the request 📷'); return false; }
+      var _ph=_mpPhoto;
+      apiAdd('matreqs',{project:p.name,projectId:pid,item:it.item,itemIdx:idx,qty:q,by:(me&&me.name)||'',byEmail:((me&&me.email)||'').toLowerCase(),branch:p.branch,status:'Pending',note:val('rm_note'),date:new Date().toISOString(),hasTakePhoto:true})
+        .then(function(newId){ try{ saveMatPhoto(newId,'take',_ph); }catch(_p){} try{logAudit('create','matreqs',newId||'',p.name);}catch(e){} try{ notifyLeaders(p,(ar?'🧰 طلب مواد — ':'🧰 Material request — ')+p.name,((me&&me.name)||'')+(ar?' طلب ':' requested ')+q+' × '+it.item+(ar?' — محتاج موافقتك (مع صورة)':' — needs your approval (photo attached)'),{ico:'🧰',type:'material'}); }catch(_n){} mpReset(); synced(); alert(ar?'اتبعت الطلب ✔ — مستني موافقة مدير Operations أو Team Leader':'Request sent ✔ — awaiting Operations Manager / Team Leader approval'); })
         .catch(function(e){alert('Error: '+(e.message||e));});
     });
+  mpStartCam();
 }
 function decideMatReq(reqId,approve){
   var r=(typeof matreqs!=='undefined'?matreqs:[]).find(function(x){return x.id===reqId;}); if(!r)return;
@@ -4120,16 +4220,21 @@ function returnMat(reqId){
   if(!isReq && !canApproveMat(p)){ alert(ar?'المرتجع للفني صاحب الطلب أو المدير / Team Leader فقط.':'Only the requester or a manager can return.'); return; }
   if(r.status!=='Approved'){ alert(ar?'المرتجع للطلبات المعتمدة فقط.':'Returns are only for approved requests.'); return; }
   var already=num(r.returnedQty); var maxRet=num(r.qty)-already; if(maxRet<=0){ alert(ar?'الطلب ده اترجّع بالكامل.':'Already fully returned.'); return; }
+  mpReset();
   openModal((ar?'↩ مرتجع من الفني — ':'↩ Return material — ')+esc(r.item),
     '<div class="card mini" style="margin-bottom:8px">'+(ar?'المأخوذ':'Taken')+': <b>'+num(r.qty)+'</b>'+(already?(' · '+(ar?'مرتجع سابقًا':'returned before')+': '+already):'')+' · '+(ar?'أقصى كمية مرتجعة':'max return')+': <b>'+maxRet+'</b></div>'+
-    fEl(ar?'الكمية المرتجعة لمخزن المشروع':'Quantity returned to project store','mrt_qty',maxRet,'number')+fTa(ar?'ملاحظة (اختياري)':'Note (optional)','mrt_note',''),
+    fEl(ar?'الكمية المرتجعة لمخزن المشروع':'Quantity returned to project store','mrt_qty',maxRet,'number')+fTa(ar?'ملاحظة (اختياري)':'Note (optional)','mrt_note','')+
+    mpCamBody(ar,(ar?'📷 صورة حيّة للماتريل اللي بترجّعه (إجبارية)':'📷 Live photo of the material you are returning (required)')),
     function(){ var q=num(val('mrt_qty')); if(q<=0){alert(ar?'اكتب كمية':'Enter quantity');return false;} if(q>maxRet){alert((ar?'أكبر من المسموح ':'Exceeds max ')+'('+maxRet+')');return false;}
+      if(!_mpPhoto){ alert(ar?'لازم تصوّر الماتريل صورة حيّة قبل ما ترجّعه 📷':'Capture a live photo of the material before returning it 📷'); return false; }
+      var _ph=_mpPhoto;
       var cl=(p.checklist||[]).map(function(x){return Object.assign({},x);});
       var it=cl[r.itemIdx];
       if(it){ it.qtyUsed=Math.max(0,num(it.qtyUsed)-q); apiMerge('projects',r.projectId,{checklist:cl}).catch(function(){}); }
       try{ apiAdd('stockMoves',{item:r.item,project:p.name,projectId:r.projectId,branch:p.branch,type:'in',qty:q,by:(me&&me.name)||'',note:(ar?'مرتجع من الفني لمخزن المشروع':'Return to project store')+' (طلب '+((r.by)||'')+')'+(val('mrt_note')?(' — '+val('mrt_note')):''),date:new Date().toISOString().slice(0,16).replace('T',' ')}); }catch(e){}
-      apiMerge('matreqs',reqId,{returnedQty:already+q,returnedAt:new Date().toISOString(),returnedBy:(me&&me.name)||''}).then(function(){ try{logAudit('return','matreqs',reqId,p.name+' +'+q+' '+r.item);}catch(e){} try{ notifyLeaders(p,(ar?'↩ مرتجع خامات — ':'↩ Material returned — ')+p.name,((me&&me.name)||'')+(ar?' رجّع ':' returned ')+q+' × '+r.item+(ar?' لمخزن المشروع':' to the project store')); }catch(_n){} synced(); alert(ar?('✔ اترجّع '+q+' لمخزن المشروع'):('✔ '+q+' returned to project store')); }).catch(function(e){alert('Error: '+(e.message||e));});
+      apiMerge('matreqs',reqId,{returnedQty:already+q,returnedAt:new Date().toISOString(),returnedBy:(me&&me.name)||'',hasReturnPhoto:true}).then(function(){ try{ saveMatPhoto(reqId,'ret',_ph); }catch(_p){} try{logAudit('return','matreqs',reqId,p.name+' +'+q+' '+r.item);}catch(e){} try{ notifyLeaders(p,(ar?'↩ مرتجع خامات — ':'↩ Material returned — ')+p.name,((me&&me.name)||'')+(ar?' رجّع ':' returned ')+q+' × '+r.item+(ar?' لمخزن المشروع (مع صورة)':' to the project store (photo attached)')); }catch(_n){} mpReset(); synced(); alert(ar?('✔ اترجّع '+q+' لمخزن المشروع'):('✔ '+q+' returned to project store')); }).catch(function(e){alert('Error: '+(e.message||e));});
     });
+  mpStartCam();
 }
 function setCollected(pid){ var p=projects.find(function(x){return x.id===pid;}); if(!p)return;
   openModal(lang==='ar'?'تحديث المبلغ المحصّل':'Update collected amount',
@@ -4159,7 +4264,8 @@ function projExtraDetail(p){
     reqs.slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');}).forEach(function(r){
       var col=r.status==='Approved'?'var(--ok)':(r.status==='Rejected'?'var(--bad)':'#e0a93b');
       var ret=num(r.returnedQty); var net=num(r.qty)-ret; var isReq=((r.byEmail||'')===((me&&me.email||'').toLowerCase())); var canRet=(r.status==='Approved'&&ret<num(r.qty)&&(isReq||canAp));
-      h+='<tr><td><b>'+esc(r.item)+'</b>'+(r.note?'<div class="mini">'+esc(r.note)+'</div>':'')+'</td><td>'+num(r.qty)+(ret?'<div class="mini" style="color:var(--ok)">↩ '+(ar?'مرتجع ':'returned ')+ret+' · '+(ar?'صافي ':'net ')+net+'</div>':'')+'</td><td>'+esc(r.by||'')+'<div class="mini">'+esc((r.date||'').slice(0,10))+'</div></td>'
+      var _mph=(r.hasTakePhoto?' <a href="#" onclick="matPhoto(\''+r.id+'\',\'take\');return false" title="'+(ar?'صورة الاستلام':'pickup photo')+'">📷</a>':'')+(r.hasReturnPhoto?' <a href="#" onclick="matPhoto(\''+r.id+'\',\'ret\');return false" title="'+(ar?'صورة المرتجع':'return photo')+'">📷↩</a>':'');
+      h+='<tr><td><b>'+esc(r.item)+'</b>'+_mph+(r.note?'<div class="mini">'+esc(r.note)+'</div>':'')+'</td><td>'+num(r.qty)+(ret?'<div class="mini" style="color:var(--ok)">↩ '+(ar?'مرتجع ':'returned ')+ret+' · '+(ar?'صافي ':'net ')+net+'</div>':'')+'</td><td>'+esc(r.by||'')+'<div class="mini">'+esc((r.date||'').slice(0,10))+'</div></td>'
         +'<td><span class="tag" style="background:'+col+'22;color:'+col+'">'+esc(r.status||'')+'</span>'+(r.decidedBy?'<div class="mini">'+esc(r.decidedBy)+'</div>':'')+(ret>=num(r.qty)?'<div class="mini" style="color:var(--ok)">'+(ar?'↩ اترجّع بالكامل':'fully returned')+'</div>':'')+'</td>'
         +'<td style="white-space:nowrap">'+((canAp&&r.status==='Pending')?'<button class="btn cy sm" onclick="decideMatReq(\''+r.id+'\',true)">'+(ar?'موافقة':'Approve')+'</button> <button class="btn dn sm" onclick="decideMatReq(\''+r.id+'\',false)">'+(ar?'رفض':'Reject')+'</button> ':'')+(canRet?'<button class="btn gh sm" onclick="returnMat(\''+r.id+'\')" title="'+(ar?'مرتجع من الفني لمخزن المشروع':'Return to project store')+'">↩ '+(ar?'مرتجع':'Return')+'</button>':'')+'</td></tr>';
     });
@@ -7717,7 +7823,7 @@ let _onSave=null;
 function _mSaveClick(){ if(_onSave){ const r=_onSave(); if(r!==false)closeModal(); } else closeModal(); }
 var _modalGuard=false;
 function openModal(title,body,onSave,opts){ const ro=(me&&me.role==='Viewer'); const sb=g('mSave'); if(sb){ if(ro){ sb.classList.add('hide'); } else { sb.classList.remove('hide'); sb.textContent='Save'; sb.onclick=_mSaveClick; } } var mc=g('mCard'); if(mc){ if(opts&&opts.wide){ mc.classList.add('wide'); } else { mc.classList.remove('wide'); } } _modalGuard=!!(opts&&opts.confirmClose); g('mTitle').textContent=title; g('mBody').innerHTML=(ro?'<div class="card mini" style="background:#eef3f8;border-color:#ccd;color:#143F63;margin-bottom:8px">\u{1F441}\uFE0F '+(lang==='ar'?'\u0648\u0636\u0639 \u0627\u0644\u0645\u0634\u0627\u0647\u062F\u0629 \u2014 \u0644\u0644\u0639\u0631\u0636 \u0641\u0642\u0637':'Viewer mode \u2014 view only')+'</div>':'')+body; _onSave=onSave; g('modal').classList.add('show'); if(lang==='ar'){ try{translateDOM(g('modal'));}catch(e){} } }
-function closeModal(){ try{stopScan&&stopScan();}catch(e){} try{scStopCam&&scStopCam();}catch(e){} try{qacHide&&qacHide();}catch(e){} _scCtx=null; g('modal').classList.remove('show'); _onSave=null; _modalGuard=false; }
+function closeModal(){ try{stopScan&&stopScan();}catch(e){} try{scStopCam&&scStopCam();}catch(e){} try{mpStopCam&&mpStopCam();}catch(e){} try{qacHide&&qacHide();}catch(e){} _scCtx=null; g('modal').classList.remove('show'); _onSave=null; _modalGuard=false; }
 /* Guarded close: when a modal opted into confirmClose (e.g. the quote editor), asking before
    discarding unsaved work. Used by ESC, the \u2715 and Cancel. Save calls closeModal() directly. */
 function guardedClose(){ if(_modalGuard){ if(!confirm(lang==='ar'?'\u062A\u0642\u0641\u0644 \u0645\u0646 \u063A\u064A\u0631 \u062D\u0641\u0638\u061F \u0643\u0644 \u0627\u0644\u0644\u064A \u0643\u062A\u0628\u062A\u0647 \u0641\u064A \u0627\u0644\u0643\u0648\u062A\u064A\u0634\u0646 \u0647\u064A\u0636\u064A\u0639.':'Close without saving? Everything you entered will be lost.')) return; } closeModal(); }
