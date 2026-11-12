@@ -4019,26 +4019,77 @@ function projectDetail(p){
 var TSTAT_DEF=['To Do','In Progress','Done']; var TSTAT=TSTAT_DEF.slice();
 const TSTAT_COL={'To Do':'#5A6B7B','In Progress':'#2C77B0','Done':'#1a7a4f'};
 function taskRow(t){ const st=t.status||'To Do', overdue=t.due&&t.due<today()&&st!=='Done'; return `<tr>
-  <td><b>${esc(t.title)}</b>${t.projectName?`<div class="mini">${esc(t.projectName)}</div>`:''}</td><td>${esc(t.assignee||'—')}</td>
+  <td><b>${esc(t.title)}</b>${t.hasPhoto?` <a href="#" title="${lang==='ar'?'صورة الملاحظة':'note photo'}" onclick="taskMedia('${t.id}','photo');return false">📷</a>`:''}${t.hasAudio?` <a href="#" title="${lang==='ar'?'تسجيل صوتي':'voice note'}" onclick="taskMedia('${t.id}','audio');return false">🎙️</a>`:''}${t.projectName?`<div class="mini">${esc(t.projectName)}</div>`:''}</td><td>${esc(t.assignee||'—')}</td>
   <td style="${overdue?'color:var(--bad);font-weight:700':''}">${esc(t.due||'—')}${overdue?' ⚠️':''}</td>
   <td><span class="tag" style="background:${TSTAT_COL[st]}22;color:${TSTAT_COL[st]}">${st}</span></td>
   <td style="white-space:nowrap">${st!=='Done'?`<button class="btn cy sm" onclick="advanceTask('${t.id}')">${st==='To Do'?'Start':'✔ Done'}</button> `:''}<button class="btn gh sm" title="Open record" onclick="recOpen('${t.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${t.id}')">📎</button> <button class="btn gh sm" onclick="editTask('${t.id}')">Edit</button> <button class="btn dn sm" onclick="delTask('${t.id}')">✕</button></td></tr>`; }
 function advanceTask(id){ const t=tasks.find(x=>x.id===id); if(!t)return; const st=t.status||'To Do'; const nx=st==='To Do'?'In Progress':'Done'; apiMerge('tasks',id,{status:nx}).then(()=>{ syncProjProgress(t.project); synced(); }); }
 function delTask(id){ const t=tasks.find(x=>x.id===id); if(confirm('Delete this task?'))apiDelete('tasks',id).then(()=>{ if(t)syncProjProgress(t.project); synced(); }); }
 function syncProjProgress(pid){ if(!pid)return; const p=projects.find(x=>x.id===pid); if(!p)return; const ts=tasks.filter(t=>t.project===pid); if(!ts.length)return; const pr=Math.round(ts.filter(t=>t.status==='Done').length/ts.length*100); apiMerge('projects',pid,{progress:pr}); }
+/* ===== Task note media (optional): live photo + voice recording =====
+   Captured into globals, then saved to taskmedia/<taskId> (a separate node kept out of the bulk load)
+   when the task is saved. hasPhoto/hasAudio flags on the task drive the 📷/🎙️ icons in the task row. */
+var _tkPhoto=null,_tkAudio=null,_tkRec=null,_tkMicStream=null,_tkChunks=[],_tkCamStream=null;
+function tkMediaReset(){ _tkPhoto=null; _tkAudio=null; try{if(_tkRec&&_tkRec.state&&_tkRec.state!=='inactive')_tkRec.stop();}catch(e){} _tkRec=null; _tkChunks=[]; try{if(_tkMicStream)_tkMicStream.getTracks().forEach(function(t){t.stop();});}catch(e){} _tkMicStream=null; tkCamStop(); }
+function tkCamStop(){ try{if(_tkCamStream)_tkCamStream.getTracks().forEach(function(t){t.stop();});}catch(e){} _tkCamStream=null; }
+function tkCamOpen(){ var ar=(lang==='ar'); if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ alert(ar?'الكاميرا مش متاحة على المتصفح ده':'Camera not available'); return; } var wrap=g('tkCamWrap'); if(wrap)wrap.style.display='block'; navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}).then(function(st){ _tkCamStream=st; var v=g('tkVid'); if(v){ v.style.display='block'; v.srcObject=st; try{v.play();}catch(e){} } var sb=g('tkSnapBtn'); if(sb)sb.style.display='inline-block'; }).catch(function(){ alert(ar?'اسمح للكاميرا بالوصول':'Allow camera access'); }); }
+function tkSnap(){ var ar=(lang==='ar'); var vid=g('tkVid'); if(!vid||!vid.videoWidth){ alert(ar?'الكاميرا لسه بتفتح…':'Camera still loading…'); return; } var maxW=640,w=vid.videoWidth,h=vid.videoHeight; if(w>maxW){h=Math.round(h*maxW/w);w=maxW;} var c=g('tkCanvas'); c.width=w;c.height=h; try{c.getContext('2d').drawImage(vid,0,0,w,h);}catch(e){alert('Camera error');return;} _tkPhoto=c.toDataURL('image/jpeg',0.5); var im=g('tkShot'); if(im){im.src=_tkPhoto;im.style.display='block';} vid.style.display='none'; tkCamStop(); var sb=g('tkSnapBtn'),rb=g('tkRetakeBtn'); if(sb)sb.style.display='none'; if(rb)rb.style.display='inline-block'; }
+function tkRetake(){ _tkPhoto=null; var im=g('tkShot'); if(im)im.style.display='none'; var rb=g('tkRetakeBtn'); if(rb)rb.style.display='none'; tkCamOpen(); }
+function tkPhotoDrop(){ _tkPhoto=null; var im=g('tkShot'); if(im){im.style.display='none';im.src='';} var wrap=g('tkCamWrap'); if(wrap)wrap.style.display='none'; tkCamStop(); var sb=g('tkSnapBtn'),rb=g('tkRetakeBtn'); if(sb)sb.style.display='none'; if(rb)rb.style.display='none'; }
+function tkRecToggle(){ var ar=(lang==='ar'); var btn=g('tkRecBtn'),st=g('tkRecStatus');
+  if(_tkRec&&_tkRec.state==='recording'){ try{_tkRec.stop();}catch(e){} return; }
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||!window.MediaRecorder){ alert(ar?'التسجيل الصوتي مش متاح على المتصفح ده':'Audio recording not supported on this browser'); return; }
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+    _tkMicStream=stream; _tkChunks=[]; try{ _tkRec=new MediaRecorder(stream); }catch(e){ _tkRec=new MediaRecorder(stream,{}); }
+    _tkRec.ondataavailable=function(e){ if(e.data&&e.data.size)_tkChunks.push(e.data); };
+    _tkRec.onstop=function(){ var blob=new Blob(_tkChunks,{type:(_tkRec&&_tkRec.mimeType)||'audio/webm'}); var rd=new FileReader(); rd.onloadend=function(){ _tkAudio=rd.result; var au=g('tkAudio'); if(au){au.src=_tkAudio;au.style.display='block';} if(st)st.innerHTML='✅ '+(ar?'اتسجّل — تقدر تسمعه':'recorded — you can play it'); var dr=g('tkAudDrop'); if(dr)dr.style.display='inline-block'; }; rd.readAsDataURL(blob); try{_tkMicStream.getTracks().forEach(function(t){t.stop();});}catch(e){} _tkMicStream=null; if(btn)btn.textContent='🎙️ '+(ar?'سجّل من جديد':'Re-record'); };
+    _tkRec.start(); if(btn)btn.textContent='⏹ '+(ar?'إيقاف التسجيل':'Stop'); if(st)st.innerHTML='🔴 '+(ar?'بيسجّل…':'recording…');
+  }).catch(function(){ alert(ar?'اسمح للميكروفون بالوصول':'Allow microphone access'); });
+}
+function tkAudioDrop(){ _tkAudio=null; var au=g('tkAudio'); if(au){au.style.display='none';au.src='';} var st=g('tkRecStatus'); if(st)st.textContent=''; var btn=g('tkRecBtn'); if(btn)btn.textContent='🎙️ '+(lang==='ar'?'سجّل صوت':'Record voice'); var dr=g('tkAudDrop'); if(dr)dr.style.display='none'; }
+function tkMediaBody(ar,hasP,hasA){
+  return '<div class="fld"><label>'+(ar?'📎 مرفقات الملاحظة (اختياري)':'📎 Note attachments (optional)')+'</label>'
+   +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
+     +'<button type="button" class="btn gh sm" onclick="tkCamOpen()">📷 '+(ar?'صورة':'Photo')+'</button>'
+     +'<button type="button" id="tkRecBtn" class="btn gh sm" onclick="tkRecToggle()">🎙️ '+(ar?'سجّل صوت':'Record voice')+'</button>'
+     +(hasP?'<span class="mini" style="color:var(--ok)">📷 '+(ar?'في صورة محفوظة':'photo on file')+'</span>':'')
+     +(hasA?'<span class="mini" style="color:var(--ok)">🎙️ '+(ar?'في صوت محفوظ':'voice on file')+'</span>':'')
+   +'</div>'
+   +'<div id="tkCamWrap" style="display:none;margin-bottom:6px">'
+     +'<video id="tkVid" playsinline autoplay muted style="display:none;width:100%;max-height:220px;border-radius:8px;background:#000;object-fit:cover"></video>'
+     +'<img id="tkShot" alt="" style="display:none;width:100%;max-height:220px;border-radius:8px;object-fit:contain;background:#000">'
+     +'<canvas id="tkCanvas" style="display:none"></canvas>'
+     +'<div style="margin-top:6px"><button type="button" id="tkSnapBtn" class="btn cy sm" style="display:none" onclick="tkSnap()">📸 '+(ar?'التقط':'Capture')+'</button> '
+       +'<button type="button" id="tkRetakeBtn" class="btn gh sm" style="display:none" onclick="tkRetake()">↻ '+(ar?'إعادة':'Retake')+'</button> '
+       +'<button type="button" class="btn dn sm" onclick="tkPhotoDrop()">✕ '+(ar?'شيل الصورة':'Remove photo')+'</button></div>'
+   +'</div>'
+   +'<audio id="tkAudio" controls style="display:none;width:100%;margin-top:4px"></audio>'
+   +'<div style="margin-top:4px"><span id="tkRecStatus" class="mini"></span> <button type="button" id="tkAudDrop" class="btn dn sm" style="display:none" onclick="tkAudioDrop()">✕ '+(ar?'شيل الصوت':'Remove voice')+'</button></div>'
+   +'</div>';
+}
+function saveTaskMedia(taskId){ if(!taskId)return false; var patch={}; if(_tkPhoto)patch.photo=_tkPhoto; if(_tkAudio)patch.audio=_tkAudio; if(!Object.keys(patch).length)return false; patch.at=new Date().toISOString(); patch.by=(me&&me.name)||''; try{ apiCall('PATCH','/taskmedia/'+taskId+'.json',patch); }catch(e){} return true; }
+function taskMedia(taskId,which){ var ar=(lang==='ar'); apiCall('GET','/taskmedia/'+taskId+'.json').then(function(rec){ var d=rec&&rec[which]; if(!d){ alert(ar?'مش موجود':'Not found'); return; } if(which==='photo'){ _openDataUrl(d,'task-'+taskId+'.jpg'); } else { openModal(ar?'🎙️ تسجيل صوتي للتاسك':'🎙️ Task voice note','<audio controls autoplay src="'+d+'" style="width:100%"></audio>',null); var sb=g('mSave'); if(sb)sb.classList.add('hide'); } }).catch(function(e){ alert('Error: '+(e&&e.message||e)); }); }
 function editTask(id,projectId){
   const t=id?tasks.find(x=>x.id===id):{status:'To Do',assignee:me.name,due:'',project:projectId||''};
-  const myProjects=projects.filter(inBranch);
+  const myProjects=projects.filter(inBranch); const ar=(lang==='ar');
+  tkMediaReset();
+  var emps=(employees||[]).slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+  var assigneeSel='<div class="fld"><label>'+(ar?'المسؤول (موظف / فني)':'Assignee (employee)')+'</label><select id="t_assignee"><option value="">'+(ar?'— اختر موظف —':'— select employee —')+'</option>'
+    +emps.map(function(e){ return e.name?('<option value="'+esc(e.name)+'" '+(e.name===t.assignee?'selected':'')+'>'+esc(e.name)+(e.role?' · '+esc(e.role):'')+'</option>'):''; }).join('')
+    +((t.assignee&&!emps.some(function(e){return e.name===t.assignee;}))?('<option value="'+esc(t.assignee)+'" selected>'+esc(t.assignee)+'</option>'):'')
+    +'</select></div>';
   openModal(id?'Edit task':'Add task',
     fEl('Task title','t_title',t.title)+
     `<div class="fld"><label>Project</label><select id="t_project">${['<option value="">— none —</option>'].concat(myProjects.map(p=>`<option value="${p.id}" ${p.id===(t.project)?'selected':''}>${esc(p.name)}</option>`)).join('')}</select></div>`+
-    `<div class="row2">${fEl('Assignee','t_assignee',t.assignee)}${fEl('Due date','t_due',t.due,'date')}</div>`+
+    `<div class="row2">${assigneeSel}${fEl('Due date','t_due',t.due,'date')}</div>`+
     selEl('Status','t_status',TSTAT,t.status||'To Do')+
-    fTa('Notes','t_notes',t.notes),
+    fTa(ar?'ملاحظات (نص)':'Notes (text)','t_notes',t.notes)+
+    tkMediaBody(ar,!!(t.hasPhoto),!!(t.hasAudio)),
     ()=>{ const pid=val('t_project'); const pn=(projects.find(x=>x.id===pid)||{}).name||''; const br=(projects.find(x=>x.id===pid)||{}).branch||defBranch();
       const d={title:val('t_title'),project:pid,projectName:pn,branch:br,assignee:val('t_assignee'),due:val('t_due'),status:val('t_status'),notes:val('t_notes')};
-      if(!d.title){alert('Title required');return false;} if(!id)d.created=new Date().toISOString();
-      (id?apiMerge('tasks',id,d):apiAdd('tasks',d)).then(()=>{ syncProjProgress(pid); synced(); }).catch(e=>alert('Save error: '+(e.message||e))); });
+      if(!d.title){alert(ar?'لازم عنوان للتاسك':'Title required');return false;} if(!id)d.created=new Date().toISOString();
+      if(_tkPhoto)d.hasPhoto=true; if(_tkAudio)d.hasAudio=true;
+      (id?apiMerge('tasks',id,d):apiAdd('tasks',d)).then((newId)=>{ try{ saveTaskMedia(id||newId); }catch(_m){} syncProjProgress(pid); tkMediaReset(); synced(); }).catch(e=>alert('Save error: '+(e.message||e))); });
 }
 function addMilestone(pid){
   openModal('Add milestone',
@@ -7873,7 +7924,7 @@ let _onSave=null;
 function _mSaveClick(){ if(_onSave){ const r=_onSave(); if(r!==false)closeModal(); } else closeModal(); }
 var _modalGuard=false;
 function openModal(title,body,onSave,opts){ const ro=(me&&me.role==='Viewer'); const sb=g('mSave'); if(sb){ if(ro){ sb.classList.add('hide'); } else { sb.classList.remove('hide'); sb.textContent='Save'; sb.onclick=_mSaveClick; } } var mc=g('mCard'); if(mc){ if(opts&&opts.wide){ mc.classList.add('wide'); } else { mc.classList.remove('wide'); } } _modalGuard=!!(opts&&opts.confirmClose); g('mTitle').textContent=title; g('mBody').innerHTML=(ro?'<div class="card mini" style="background:#eef3f8;border-color:#ccd;color:#143F63;margin-bottom:8px">\u{1F441}\uFE0F '+(lang==='ar'?'\u0648\u0636\u0639 \u0627\u0644\u0645\u0634\u0627\u0647\u062F\u0629 \u2014 \u0644\u0644\u0639\u0631\u0636 \u0641\u0642\u0637':'Viewer mode \u2014 view only')+'</div>':'')+body; _onSave=onSave; g('modal').classList.add('show'); if(lang==='ar'){ try{translateDOM(g('modal'));}catch(e){} } }
-function closeModal(){ try{stopScan&&stopScan();}catch(e){} try{scStopCam&&scStopCam();}catch(e){} try{mpStopCam&&mpStopCam();}catch(e){} try{qacHide&&qacHide();}catch(e){} _scCtx=null; g('modal').classList.remove('show'); _onSave=null; _modalGuard=false; }
+function closeModal(){ try{stopScan&&stopScan();}catch(e){} try{scStopCam&&scStopCam();}catch(e){} try{mpStopCam&&mpStopCam();}catch(e){} try{tkCamStop&&tkCamStop();}catch(e){} try{if(_tkMicStream)_tkMicStream.getTracks().forEach(function(t){t.stop();});}catch(e){} try{qacHide&&qacHide();}catch(e){} _scCtx=null; g('modal').classList.remove('show'); _onSave=null; _modalGuard=false; }
 /* Guarded close: when a modal opted into confirmClose (e.g. the quote editor), asking before
    discarding unsaved work. Used by ESC, the \u2715 and Cancel. Save calls closeModal() directly. */
 function guardedClose(){ if(_modalGuard){ if(!confirm(lang==='ar'?'\u062A\u0642\u0641\u0644 \u0645\u0646 \u063A\u064A\u0631 \u062D\u0641\u0638\u061F \u0643\u0644 \u0627\u0644\u0644\u064A \u0643\u062A\u0628\u062A\u0647 \u0641\u064A \u0627\u0644\u0643\u0648\u062A\u064A\u0634\u0646 \u0647\u064A\u0636\u064A\u0639.':'Close without saving? Everything you entered will be lost.')) return; } closeModal(); }
