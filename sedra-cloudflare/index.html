@@ -5464,13 +5464,22 @@ function quoteImportSave(){ var ar=(lang==='ar'); var client=((g('qf_client')&&g
   var branch=((g('qf_branch')&&g('qf_branch').value))||defBranch();
   var service=((g('qf_service')&&g('qf_service').value))||'Home Automation';
   var subject=((g('qf_subject')&&g('qf_subject').value)||'').trim();
-  var items=_qfItems.map(function(i){ return {item:(''+i.item).trim(),code:(''+(i.code||'')).trim(),desc:'',brand:i.brand||'',qty:num(i.qty)||1,price:num(i.price)||0,image:'',optional:false}; });
+  /* The system stores quote prices in the branch base currency (EGP) and converts to the document
+     currency for display via the saved FX rate. A file priced in a FOREIGN currency (e.g. USD) must
+     therefore be converted to the base on import, with the rate locked, so the list/print show the
+     real foreign total instead of mis-dividing it. */
+  var cur=(_qfCur||'').toUpperCase();
+  var baseCur=((typeof CUR!=='undefined'&&CUR[branch])||'EGP');
+  var foreign=(cur && cur!==baseCur && cur!=='EGP');
+  var rate=0, egpPer=1, lockFx=false;
+  if(foreign){ rate=(typeof fxRateFor==='function'?num(fxRateFor(cur)):0); if(rate>0){ egpPer=1/rate; lockFx=true; } }
+  var items=_qfItems.map(function(i){ var p=num(i.price)||0; var pStore=(lockFx? Math.round(p*egpPer*100)/100 : p); return {item:(''+i.item).trim(),code:(''+(i.code||'')).trim(),desc:'',brand:i.brand||'',qty:num(i.qty)||1,price:pStore,image:'',optional:false}; });
   var d={ client:client, subject:subject||client, projectName:'', branch:branch, dept:'Operations', service:service,
     date:(typeof today==='function'?today():new Date().toISOString().slice(0,10)), status:'Draft', type:'Quotation',
-    preparedBy:(me&&me.name)||'', currency:(_qfCur||(branch==='UAE'?'AED':(branch==='KSA'?'SAR':'EGP'))),
-    vat:(typeof vatForBranch==='function'?vatForBranch(branch):14),
+    preparedBy:(me&&me.name)||'', currency:(cur||baseCur), vat:0,
     sections:[{title:(ar?'بنود الكوتيشن':'Items'),items:items,instOn:false,instType:'percent',instVal:0,discOn:false,discType:'percent',discVal:0,features:'',notes:''}],
     importedFromFile:true, created:new Date().toISOString(), number:genQuoteNo(svcKey(service)) };
+  if(foreign){ d.fxManual=true; if(lockFx){ d.fxRate=rate; d.fxEgp=Math.round(egpPer*100)/100; } else { d.fxRate=1; } }
   var pid=_qfPid;
   apiAdd('quotes',d).then(function(nid){
     try{ d.id=nid; if(typeof quotes!=='undefined'&&quotes){ quotes.unshift(d); } }catch(e){}
