@@ -634,6 +634,7 @@ const MODULES = [
   {id:'sales',     label:'Sales / CRM', icon:'📈', depts:['Sales']},
   {id:'customers', label:'Customers', icon:'🤝', depts:['Sales','Operations','Technical','Accounting']},
   {id:'marketing', label:'Marketing', icon:'📣', depts:['Marketing']},
+  {id:'field',     label:'Field Work', icon:'📲', access:'all'},
   {id:'projects',  label:'Projects', icon:'🏗️', depts:['Operations','Technical']},
   {id:'operations',label:'Operations', icon:'🛠️', depts:['Operations','Technical']},
   {id:'servicereqs', label:'Service Requests', icon:'\uD83D\uDEE0\uFE0F', depts:['Sales','Operations','Technical']},
@@ -902,7 +903,7 @@ function baseOut(v){ return (num(v.amount)-num(v.paid))*fxOf(v); }
 function isForeign(v){ return v.currency && v.currency!==(CUR[v.branch]||''); }
 function allowedBranches(){ if(!me)return[]; return (roleRank(me.role)>=ROLE_RANK['Director']||me.role==='Viewer')?BRANCHES.slice():(me.branches&&me.branches.length?me.branches:BRANCHES.slice()); }
 function inBranch(item){ const a=allowedBranches(); const b=item&&item.branch; if(!b)return true; /* no branch = shared/catalog item, always visible */ if(curBranch!=='All'&&b!==curBranch)return false; return a.includes(b); }
-var LOCK_PERSONAL=['hub','dashboard','profile','myhr','todo','calendar','sitecheck','attendance','announcements','leavecal','birthdays','suggestions','chat','training'];
+var LOCK_PERSONAL=['hub','dashboard','profile','myhr','todo','calendar','field','sitecheck','attendance','announcements','leavecal','birthdays','suggestions','chat','training'];
 var DEPT_HOME={Sales:'sales',Marketing:'marketing',Operations:'projects',Technical:'projects',Accounting:'accounting',Inventory:'inventory',HR:'hr',Management:'dashboard'};
 var SENSITIVE_MODS=['hr','accounting','finance','payroll','payslips','loans'];
 function canSee(m){ if(!me)return false; if(m&&m.id!=='admin'&&settings&&settings.hiddenModules&&settings.hiddenModules[m.id])return false; if(me.role==='Super Admin')return true; if(roleRank(me.role)>=ROLE_RANK['CEO']) return !m.adminOnly; /* CEO / CO Founder: see every module except Admin-only system screens (no system/settings/mass-delete) */ if(m.adminOnly)return false; if(me.role==='Viewer'){ return SENSITIVE_MODS.indexOf(m.id)<0; } if(SENSITIVE_MODS.indexOf(m.id)>=0){ if((me.accessModules||[]).indexOf(m.id)>=0)return true; if(me.role==='Member')return false; var essS=(typeof ROLE_ESSENTIALS!=='undefined'&&(ROLE_ESSENTIALS[me.dept]||ROLE_ESSENTIALS._default))||[]; return essS.indexOf(m.id)>=0; } if(LOCK_PERSONAL.indexOf(m.id)>=0)return true; if((me.accessModules||[]).indexOf(m.id)>=0)return true; if(me.role==='Member'){ return m.id==='projects'; } /* Members (ALL depts): personal screens (check-in/out) + their assigned projects + material requests only — no department/management screens; grant extras per-person via accessModules */ var ess=(typeof ROLE_ESSENTIALS!=='undefined'&&(ROLE_ESSENTIALS[me.dept]||ROLE_ESSENTIALS._default))||[]; return ess.indexOf(m.id)>=0; }
@@ -2104,7 +2105,7 @@ const NAV_GROUPS=[
   {k:'overview',t:'Overview',ic:'🏠',ids:['workqueue','dashboard','execdash','alerts','datahealth','kpiscore','performance','reports']},
   {k:'sales',t:'Sales & CRM',ic:'💼',ids:['sales','blueprint','customers','servicereqs','contacts','calllog','clientportal','discountreqs','cust360','funnel','leadsource','commission','tenders','salesorders','quicksale','quotes','variations','bookings','bot']},
   {k:'marketing',t:'Marketing',ic:'📣',ids:['marketing','adspend','revops','mktplan','mktprod','contentcal','growth','mktlib','casestudy','audiences','partners','seoranks','eventlead','competitorads','brandcheck','surveys','feedback']},
-  {k:'projects',t:'Projects & Field',ic:'🏗️',ids:['projects','sitecheck','sitehours','livesites','operations','gantt','workorders','issues','scheduling','manpower','dsr','costctrl','ipc','snags','quality','tandc','ncr','calibration','handover','methods','siteinstr','subipc','asbuilt','scurve','ncranalysis','submittals','rfi','doccontrol','risks','permits','maintenance','warranty','support','subcontractors','equipment']},
+  {k:'projects',t:'Projects & Field',ic:'🏗️',ids:['field','projects','sitecheck','sitehours','livesites','operations','gantt','workorders','issues','scheduling','manpower','dsr','costctrl','ipc','snags','quality','tandc','ncr','calibration','handover','methods','siteinstr','subipc','asbuilt','scurve','ncranalysis','submittals','rfi','doccontrol','risks','permits','maintenance','warranty','support','subcontractors','equipment']},
   {k:'tech',t:'Technical Office',ic:'📐',ids:['quotes','quoterequests','variations','catalog','boqtpl','scopelib','termslib','designlib','engtime','marginrep','bomrecon','lessons','submittals','doccontrol','rfi']},
   {k:'inventory',t:'Inventory & Purchasing',ic:'📦',ids:['inventory','reorder','grn','gatepass','stockcount','stockledger','invvalue','requisitions','purchasereq','rfq','prequal','suppscore']},
   {k:'finance',t:'Finance & Accounting',ic:'💰',ids:['accounting','ledger','glreport','bonds','retention','finance','cashpos','openbal','taxcodes','taxsummary','fxrates','transfers','capital','creditnotes','debitnotes','subscriptions','billabletime','claims','pettycash','deprec','intangibles','investments','araging','apaging','expanalysis','branchcompare','orderbook']},
@@ -2137,8 +2138,8 @@ function buildMobileBar(){
 var ROLE_ESSENTIALS={
  Sales:['dashboard','sales','customers','quotes','cust360','servicereqs','salesorders','todo','calendar'],
  Marketing:['dashboard','adspend','marketing','contentcal','mktplan','mktprod','surveys','todo','calendar'],
- Operations:['dashboard','projects','livesites','sitecheck','operations','workorders','dsr','snags','todo','calendar'],
- Technical:['dashboard','quotes','projects','livesites','submittals','rfi','ncr','sitecheck','todo'],
+ Operations:['field','dashboard','projects','livesites','sitecheck','operations','workorders','dsr','snags','todo','calendar'],
+ Technical:['field','dashboard','quotes','projects','livesites','submittals','rfi','ncr','sitecheck','todo'],
  Accounting:['dashboard','accounting','ledger','finance','claims','customers','todo'],
  Inventory:['dashboard','inventory','reorder','grn','stockcount','suppscore','todo'],
  HR:['dashboard','hr','attendance','livesites','recruit','applicants','myhr','todo'],
@@ -2738,7 +2739,7 @@ function render(keepScroll){
   try{ localStorage.setItem('orbit_view', curView); }catch(_ov){} /* persist current view every render so a page refresh always returns here (not the hub), whatever navigated us */
   g('viewTitle').textContent=m.label;
   markNav();
-  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,clientreqs:vClientReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,devroadmap:vDevRoadmap,datahealth:vDataHealth,orgchart:vOrgChart,attexcept:vAttExcept,onboard:vOnboard,policies:vPolicies,exitiv:vExitIv,calllog:vCallLog,docexp:vDocExp,probation:vProbation,roster:vRoster,headcount:vHeadcount,clientportal:vClientPortal,catalog:vCatalog,boqtpl:vBoqTpl,termslib:vTermsLib,scopelib:vScopeLib,designlib:vDesignLib,engtime:vEngTime,marginrep:vMarginRep,bomrecon:vBomRecon,lessons:vLessons,competitorads:vCompetitorAds,casestudy:vCaseStudy,audiences:vAudiences,partners:vPartners,seoranks:vSeoRanks,eventlead:vEventLead,brandcheck:vBrandCheck,discountreqs:vDiscountReqs,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,sitehours:vSiteHours,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,trash:vTrash,findreplace:vFindReplace,quoterequests:vQuoteRequests,offhours:vOffHours,attreport:vAttReport,livesites:vLiveSites,admin:vAdmin,profile:vProfile}[curView];
+  const fn={hub:vHub,adspend:vAdSpend,dashboard:vDashboard,workqueue:vWorkqueue,blueprint:vBlueprint,sales:vSales,customers:vCustomers,marketing:vMarketing,field:vField,projects:vProjects,operations:vOperations,support:vSupport,quotes:vQuotes,variations:vVariations,inventory:vInventory,accounting:vFinanceHub,ledger:vLedger,finance:vFinance,claims:vClaims,reports:vReports,hr:vHR,recruit:vRecruit,applicants:vApplicants,servicereqs:vServiceReqs,clientreqs:vClientReqs,fleet:vFleet,assets:vAssets,attendance:vAttendance,chat:vChat,calendar:vCalendar,todo:vTodo,workplan:vWorkPlan,performance:vPerformance,weekly:vWeekly,bot:vBot,training:vTraining,documents:vDocuments,approvals:vApprovals,maintenance:vMaintenance,safety:vSafety,purchasereq:vPRs,pettycash:vPetty,snags:vSnags,rfq:vRFQ,goals:vGoals,kbase:vKBase,agreements:vAgreements,meetings:vMeetings,workorders:vWorkOrders,costctrl:vCostControl,reorder:vReorder,courses:vCourses,execdash:vExecDash,alerts:vAlerts,exporthub:vExportHub,branchcompare:vBranchCompare,suppscore:vSuppScore,commission:vCommission,cust360:vCust360,araging:vARAging,funnel:vFunnel,expanalysis:vExpAnalysis,scheduling:vScheduling,quality:vQuality,feedback:vFeedback,subcontractors:vSubs,equipment:vEquipment,licenses:vLicenses,gantt:vGantt,cashpos:vCashPos,leadsource:vLeadSource,warranty:vWarranty,tenders:vTenders,doccontrol:vDocControl,toolbox:vToolbox,kpiscore:vKPIScore,submittals:vSubmittals,ipc:vIPC,risks:vRisks,manpower:vManpower,rfi:vRFI,dsr:vDSR,contacts:vContacts,apaging:vAPAging,taxcodes:vTaxCodes,transfers:vTransfers,capital:vCapital,creditnotes:vCreditNotes,debitnotes:vDebitNotes,glreport:vGLReport,taxsummary:vTaxSummary,fxrates:vFXRates,billabletime:vBillableTime,openbal:vOpenBal,intangibles:vIntangibles,investments:vInvestments,salesorders:vSalesOrders,subscriptions:vSubscriptions,bookings:vBookings,issues:vIssues,surveys:vSurveys,esign:vEsign,quicksale:vQuickSale,invvalue:vInvValue,stockledger:vStockLedger,leavecal:vLeaveCal,birthdays:vBirthdays,orderbook:vOrderBook,announcements:vAnnouncements,suggestions:vSuggestions,overtime:vOvertime,devroadmap:vDevRoadmap,datahealth:vDataHealth,orgchart:vOrgChart,attexcept:vAttExcept,onboard:vOnboard,policies:vPolicies,exitiv:vExitIv,calllog:vCallLog,docexp:vDocExp,probation:vProbation,roster:vRoster,headcount:vHeadcount,clientportal:vClientPortal,catalog:vCatalog,boqtpl:vBoqTpl,termslib:vTermsLib,scopelib:vScopeLib,designlib:vDesignLib,engtime:vEngTime,marginrep:vMarginRep,bomrecon:vBomRecon,lessons:vLessons,competitorads:vCompetitorAds,casestudy:vCaseStudy,audiences:vAudiences,partners:vPartners,seoranks:vSeoRanks,eventlead:vEventLead,brandcheck:vBrandCheck,discountreqs:vDiscountReqs,auditlog:vAuditLog,deprec:vDeprec,myhr:vMyHR,grn:vGRN,stockcount:vStockCount,automation:vAutomation,permits:vPermits,requisitions:vRequisitions,sitecheck:vSiteCheck,sitehours:vSiteHours,tandc:vTandC,ncr:vNCR,gatepass:vGatePass,bonds:vBonds,calibration:vCalibration,handover:vHandover,retention:vRetention,insurance:vInsurance,methods:vMethods,siteinstr:vSiteInstr,subipc:vSubIPC,asbuilt:vAsBuilt,waste:vWaste,prequal:vPrequal,drills:vDrills,sheets:vSheets,worddocs:vWordDocs,slides:vSlides,mktprod:vMktProd,mktlib:vMktLib,mktplan:vMktPlan,contentcal:vContentCal,growth:vGrowth,revops:vRevOps,workflow:vWorkflow,scurve:vSCurve,hsereport:vHSEReport,ncranalysis:vNCRAnalysis,trash:vTrash,findreplace:vFindReplace,quoterequests:vQuoteRequests,offhours:vOffHours,attreport:vAttReport,livesites:vLiveSites,admin:vAdmin,profile:vProfile}[curView];
   g('view').innerHTML = fn?fn():'';
   if(curView==='sales' && window._afterSales)window._afterSales();
   if(curView==='chat' && window._afterChat)window._afterChat();
@@ -3979,6 +3980,68 @@ function projActionsRow(p){
   btns+='<button class="btn gh sm" onclick="openProjectId=\''+p.id+'\';render()">📂 '+(ar?'افتح المشروع':'Open project')+'</button>';
   return '<tr class="projActRow" style="background:#f6f9fc"><td colspan="10" style="padding:10px 12px"><div class="mini" style="margin-bottom:6px;color:var(--muted)">⚡ '+(ar?'إجراءات سريعة':'Quick actions')+(openV?(' · <span style="color:#1a7a4f;font-weight:700">'+(ar?'إنت مسجّل حضور هنا':'You are checked in here')+'</span>'):'')+'</div>'+btns+'</td></tr>';
 }
+function projQuickReturn(pid){
+  var p=projects.find(function(x){return x.id===pid;}); if(!p)return; var ar=(lang==='ar');
+  var myE=((me&&me.email)||'').toLowerCase();
+  var reqs=projMatReqs(p).filter(function(r){ return r.status==='Approved' && num(r.returnedQty)<num(r.qty) && (((r.byEmail||'')===myE)||canApproveMat(p)); });
+  if(!reqs.length){ alert(ar?'مفيش ماتريل متاح للمرتجع في المشروع ده.':'No material available to return on this project.'); return; }
+  var body='<div class="card mini" style="margin-bottom:8px">'+(ar?'اختر الطلب اللي عايز ترجّع منه — هتتصوّر صورة حيّة للماتريل.':'Pick the request to return from — a live photo will be required.')+'</div>'+
+    reqs.map(function(r){ var rem=num(r.qty)-num(r.returnedQty); return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--mist)"><div><b>'+esc(r.item)+'</b><div class="mini">'+(ar?'متاح للمرتجع':'returnable')+': '+rem+'</div></div><button class="btn gh sm" onclick="closeModal();returnMat(\''+r.id+'\')">↩ '+(ar?'مرتجع':'Return')+'</button></div>'; }).join('');
+  openModal((ar?'↩ مرتجع ماتريل — ':'↩ Return material — ')+esc(p.name), body, null);
+  var sb=g('mSave'); if(sb)sb.classList.add('hide');
+}
+/* ===== Field Work — a simple, mobile-first one-screen hub for technicians =====
+   Everything a site technician needs with big tap targets: current session, my tasks, and my projects
+   each with one-tap Check-in / Check-out / Request material / Return material. No typing a project name. */
+function vField(){
+  var ar=(lang==='ar'); var myName=(me&&me.name)||''; var myE=((me&&me.email)||'').toLowerCase();
+  var open=(typeof scOpen==='function')?scOpen():null;
+  var all=(projects||[]).filter(inBranch);
+  var mine=all.filter(function(p){ return projIsAssigned(p)||nameEq(p.owner,myName); });
+  var list=(mine.length?mine:all.filter(function(p){ return canUseMaterials(p); })).slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+  var h='<div class="sect"><h2>📲 '+(ar?'شغل الموقع':'Field work')+'</h2></div>';
+  h+='<div class="card mini" style="margin-bottom:10px">'+(ar?'كل اللي محتاجه في مكان واحد: سجّل حضور/انصراف، اطلب أو رجّع ماتريل، وشوف تاسكاتك — بضغطة واحدة.':'Everything in one place: check in/out, request or return material, and see your tasks — one tap each.')+'</div>';
+  if(open){
+    h+='<div class="card" style="border:2px solid var(--ok);background:#eafaf1;margin-bottom:14px;padding:14px">'
+      +'<div class="mini">'+(ar?'🟢 إنت مسجّل حضور دلوقتي في':'🟢 You are checked in at')+'</div>'
+      +'<div style="font-size:18px;font-weight:800;color:var(--navy);margin:2px 0">'+esc(open.project||'')+'</div>'
+      +'<div class="mini">'+(ar?'من':'since')+' '+hhmm(open.inTs)+' · ⏱ '+fmtHrs(scHours(open))+'</div>'
+      +'<button class="btn dn" style="width:100%;font-size:17px;padding:14px;margin-top:10px" onclick="siteCheckOut(\''+open.id+'\')">⏹ '+(ar?'تسجيل انصراف':'Check out')+'</button></div>';
+  }
+  var myTasks=(tasks||[]).filter(function(t){ return (t.assignee||'')===myName && (t.status||'')!=='Done'; }).sort(function(a,b){ return (a.due||'zzz').localeCompare(b.due||'zzz'); });
+  h+='<div class="sect" style="margin-top:4px"><h2 style="font-size:16px">✅ '+(ar?'تاسكاتي':'My tasks')+(myTasks.length?' ('+myTasks.length+')':'')+'</h2></div>';
+  if(!myTasks.length){ h+='<div class="card mini">'+(ar?'مفيش تاسكات مفتوحة عليك 🎉':'No open tasks 🎉')+'</div>'; }
+  else { h+=myTasks.map(function(t){ var st=t.status||'To Do'; var overdue=t.due&&t.due<today()&&st!=='Done';
+    return '<div class="card" style="margin-bottom:8px;padding:12px">'
+      +'<div style="font-weight:800;font-size:15px">'+esc(t.title)+(t.hasPhoto?' <a href="#" title="'+(ar?'صورة':'photo')+'" onclick="taskMedia(\''+t.id+'\',\'photo\');return false">📷</a>':'')+(t.hasAudio?' <a href="#" title="'+(ar?'صوت':'voice')+'" onclick="taskMedia(\''+t.id+'\',\'audio\');return false">🎙️</a>':'')+'</div>'
+      +(t.projectName?'<div class="mini">🏗️ '+esc(t.projectName)+'</div>':'')
+      +(t.due?'<div class="mini" style="'+(overdue?'color:var(--bad);font-weight:700':'')+'">📅 '+(ar?'تسليم ':'due ')+esc(t.due)+(overdue?' ⚠️':'')+'</div>':'')
+      +(t.notes?'<div class="mini">📝 '+esc(t.notes)+'</div>':'')
+      +'<div style="display:flex;gap:8px;margin-top:8px">'
+        +'<button class="btn cy" style="flex:1;padding:12px;font-size:15px" onclick="advanceTask(\''+t.id+'\')">'+(st==='To Do'?(ar?'▶ ابدأ':'▶ Start'):(ar?'✔ خلّصت':'✔ Done'))+'</button>'
+        +'<button class="btn gh" style="padding:12px" onclick="editTask(\''+t.id+'\')">'+(ar?'تفاصيل':'Details')+'</button>'
+      +'</div></div>';
+  }).join(''); }
+  h+='<div class="sect" style="margin-top:10px"><h2 style="font-size:16px">🏗️ '+(ar?'مشاريعي':'My projects')+'</h2></div>';
+  if(!list.length){ h+='<div class="card mini">'+(ar?'مفيش مشاريع متاحة ليك دلوقتي.':'No projects available to you.')+'</div>'; return h; }
+  h+=list.map(function(p){
+    var myOpen=(sitevisits||[]).find(function(x){ return x.inTs&&!x.outTs&&((x.empEmail||'').toLowerCase()===myE)&&(((x.project||'')===p.name)||nameEq(x.project,p.name)); });
+    var hasGps=!!((typeof scLatLng==='function')&&scLatLng(p.gps));
+    var pr=projProgress(p);
+    var btns='';
+    if(myOpen){ btns+='<button class="btn dn" style="flex:1;min-width:120px;padding:12px;font-size:15px" onclick="projQuickCheckOut(\''+p.id+'\')">⏹ '+(ar?'انصراف':'Check out')+'</button>'; }
+    else { btns+='<button class="btn cy" style="flex:1;min-width:120px;padding:12px;font-size:15px" onclick="projQuickCheckIn(\''+p.id+'\')">📍 '+(ar?'حضور':'Check in')+'</button>'; }
+    btns+='<button class="btn gh" style="flex:1;min-width:120px;padding:12px;font-size:15px" onclick="projQuickMat(\''+p.id+'\')">🧰 '+(ar?'طلب ماتريل':'Material')+'</button>';
+    btns+='<button class="btn gh" style="flex:1;min-width:120px;padding:12px;font-size:15px" onclick="projQuickReturn(\''+p.id+'\')">↩ '+(ar?'مرتجع':'Return')+'</button>';
+    btns+='<button class="btn gh" style="padding:12px" title="'+(ar?'افتح المشروع':'Open project')+'" onclick="openProjectId=\''+p.id+'\';curView=\'projects\';render()">📂</button>';
+    return '<div class="card" style="margin-bottom:10px;padding:14px'+(myOpen?';border:2px solid var(--ok)':'')+'">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="font-weight:800;font-size:16px;color:var(--navy)">'+esc(p.name)+(myOpen?' 🟢':'')+(hasGps?'':' <span class="mini" title="'+(ar?'المشروع ملوش موقع GPS — الحضور مش هيشتغل لحد ما المدير يحدّد الموقع':'no GPS set')+'">⚠️</span>')+'</div><span class="tag" style="background:'+(PSTAT_COL[p.status]||'#eee')+'22;color:'+(PSTAT_COL[p.status]||'#333')+'">'+esc(p.status||'Planning')+'</span></div>'
+      +(p.client?'<div class="mini">'+esc(p.client)+'</div>':'')
+      +'<div style="background:#eef2f6;border-radius:6px;height:7px;overflow:hidden;margin:8px 0"><div style="background:var(--cyan);height:7px;width:'+pr+'%"></div></div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap">'+btns+'</div></div>';
+  }).join('');
+  return h;
+}
 function vProfit(rows){
   rows=rows||[];
   let h=`<div class="sect"><h2>💹 ${lang==='ar'?'ربحية المشاريع':'Project profitability'}</h2></div>`;
@@ -4496,17 +4559,35 @@ function opsKanban(rows){
   h+=`</div>`;
   return h;
 }
-function renderOpsBoard(){ const a=g('opsBoardArea'); if(a)a.innerHTML=opsKanban(opsRows()); }
+var opsLayout='list';
+function opsList(rows){
+  var ar=(lang==='ar'); var q=(opsQ||'').toLowerCase();
+  var filt=q?rows.filter(function(t){return [t.title,t.assignee,t.projectName,t.status].join(' ').toLowerCase().indexOf(q)>=0;}):rows;
+  filt=filt.slice().sort(function(a,b){ var sa=(a.status==='Done'?2:0), sb=(b.status==='Done'?2:0); if(sa!==sb)return sa-sb; return (a.due||'zzz').localeCompare(b.due||'zzz'); });
+  if(!filt.length) return '<div class="card empty" style="margin-top:12px">'+(q?(ar?'مفيش تاسكات مطابقة.':'No matching tasks.'):(ar?'مفيش تاسكات.':'No tasks.'))+'</div>';
+  return '<div style="margin-top:12px">'+filt.map(function(t){ var st=t.status||'To Do'; var overdue=t.due&&t.due<today()&&st!=='Done'; var done=(st==='Done');
+    return '<div class="card" style="margin-bottom:8px;padding:12px;border-left:4px solid '+(TSTAT_COL[st]||'#999')+(done?';opacity:.65':'')+'">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="font-weight:800;font-size:15px'+(done?';text-decoration:line-through':'')+'">'+esc(t.title)+(t.hasPhoto?' <a href="#" title="'+(ar?'صورة':'photo')+'" onclick="taskMedia(\''+t.id+'\',\'photo\');return false">📷</a>':'')+(t.hasAudio?' <a href="#" title="'+(ar?'صوت':'voice')+'" onclick="taskMedia(\''+t.id+'\',\'audio\');return false">🎙️</a>':'')+'</div><span class="tag" style="background:'+(TSTAT_COL[st]||'#999')+'22;color:'+(TSTAT_COL[st]||'#999')+'">'+esc(st)+'</span></div>'
+      +(t.projectName?'<div class="mini">🏗️ '+esc(t.projectName)+'</div>':'')
+      +'<div class="mini">👤 '+esc(t.assignee||'—')+(t.due?' · 📅 <span style="'+(overdue?'color:var(--bad);font-weight:700':'')+'">'+esc(t.due)+(overdue?' ⚠️':'')+'</span>':'')+'</div>'
+      +'<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">'
+        +(st!=='Done'?'<button class="btn cy" style="flex:1;min-width:120px;padding:11px;font-size:14.5px" onclick="advanceTask(\''+t.id+'\')">'+(st==='To Do'?(ar?'▶ ابدأ':'▶ Start'):(ar?'✔ خلّصت':'✔ Done'))+'</button>':'')
+        +'<button class="btn gh" style="padding:11px" onclick="editTask(\''+t.id+'\')">'+(ar?'تفاصيل':'Edit')+'</button>'
+      +'</div></div>';
+  }).join('')+'</div>';
+}
+function renderOpsBoard(){ const a=g('opsBoardArea'); if(a)a.innerHTML=(opsLayout==='list'?opsList(opsRows()):opsKanban(opsRows())); }
 function opsBoard(){
   const rows=opsRows();
   const done=rows.filter(t=>t.status==='Done').length, overdue=rows.filter(t=>t.due&&t.due<today()&&t.status!=='Done').length, prog=rows.filter(t=>t.status==='In Progress').length;
   let h=`<div class="tabs">
-    <button class="${opsScope==='all'?'active':''}" onclick="opsScope='all';render()">All tasks</button>
-    <button class="${opsScope==='mine'?'active':''}" onclick="opsScope='mine';render()">My tasks</button>
-    <input class="tvq" type="search" style="max-width:240px" placeholder="🔍 Search tasks…" value="${esc(opsQ)}" oninput="opsQ=this.value;renderOpsBoard()">
-    <div class="sp"></div><button class="btn cy" onclick="editTask()">+ Add task</button></div>`;
-  h+=`<div class="grid kpis"><div class="card kpi"><div class="n">${rows.length}</div><div class="l">Total tasks</div></div><div class="card kpi"><div class="n" style="color:#2C77B0">${prog}</div><div class="l">In progress</div></div><div class="card kpi"><div class="n" style="color:var(--ok)">${done}</div><div class="l">Done</div></div><div class="card kpi"><div class="n" style="color:var(--bad)">${overdue}</div><div class="l">Overdue</div></div></div>`;
-  h+=`<div id="opsBoardArea">${opsKanban(rows)}</div>`;
+    <button class="${opsScope==='all'?'active':''}" onclick="opsScope='all';render()">${lang==='ar'?'كل التاسكات':'All tasks'}</button>
+    <button class="${opsScope==='mine'?'active':''}" onclick="opsScope='mine';render()">${lang==='ar'?'تاسكاتي':'My tasks'}</button>
+    <span style="display:inline-flex;gap:4px;margin-inline-start:6px"><button class="btn ${opsLayout==='list'?'cy':'gh'} sm" onclick="opsLayout='list';renderOpsBoard()" title="${lang==='ar'?'قائمة':'List'}">📋</button><button class="btn ${opsLayout==='board'?'cy':'gh'} sm" onclick="opsLayout='board';renderOpsBoard()" title="${lang==='ar'?'لوحة':'Board'}">🗂️</button></span>
+    <input class="tvq" type="search" style="max-width:220px" placeholder="🔍 ${lang==='ar'?'ابحث في التاسكات…':'Search tasks…'}" value="${esc(opsQ)}" oninput="opsQ=this.value;renderOpsBoard()">
+    <div class="sp"></div><button class="btn cy" onclick="editTask()">+ ${lang==='ar'?'تاسك':'Add task'}</button></div>`;
+  h+=`<div class="grid kpis"><div class="card kpi"><div class="n">${rows.length}</div><div class="l">${lang==='ar'?'إجمالي':'Total tasks'}</div></div><div class="card kpi"><div class="n" style="color:#2C77B0">${prog}</div><div class="l">${lang==='ar'?'شغّالة':'In progress'}</div></div><div class="card kpi"><div class="n" style="color:var(--ok)">${done}</div><div class="l">${lang==='ar'?'خلصت':'Done'}</div></div><div class="card kpi"><div class="n" style="color:var(--bad)">${overdue}</div><div class="l">${lang==='ar'?'متأخرة':'Overdue'}</div></div></div>`;
+  h+=`<div id="opsBoardArea">${opsLayout==='list'?opsList(rows):opsKanban(rows)}</div>`;
   return h;
 }
 function moveTask(id,dir){ const t=tasks.find(x=>x.id===id); if(!t)return; const i=TSTAT.indexOf(t.status||'To Do'); const ni=Math.max(0,Math.min(TSTAT.length-1,i+dir)); apiMerge('tasks',id,{status:TSTAT[ni]}).then(()=>{ syncProjProgress(t.project); synced(); }); }
@@ -11862,7 +11943,7 @@ function vSiteCheck(){
     h+=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div style="flex:1;min-width:200px"><div class="mini">${lang==='ar'?'جلسة مفتوحة الآن في':'Active session at'}</div><b style="font-size:16px">${esc(open.project||'')}</b>${open.site?`<div class="mini">📍 ${esc(open.site)}</div>`:''}<div class="mini">${lang==='ar'?'من':'since'} ${hhmm(open.inTs)} · ⏱ <b id="scLive">${fmtHrs(scHours(open))}</b></div></div>
       <button class="btn dn" style="font-size:16px;padding:12px 22px" onclick="siteCheckOut('${open.id}')">⏹ Check out</button></div>`;
   } else {
-    h+=`<div class="row2"><div class="fld"><label>${lang==='ar'?'الموقع / المشروع':'Site / Project'}</label><input id="sc_project" list="sc_proj_dl" placeholder="${lang==='ar'?'اختر أو اكتب':'select or type'}"><datalist id="sc_proj_dl">${projects.filter(inBranch).map(p=>'<option value="'+esc(p.name||'')+'">').join('')}</datalist></div>${fEl('Location detail (optional)','sc_site','')}</div>
+    h+=`<div class="row2"><div class="fld"><label>${lang==='ar'?'الموقع / المشروع':'Site / Project'}</label><select id="sc_project"><option value="">${lang==='ar'?'— اختر المشروع —':'— select project —'}</option>${projects.filter(inBranch).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(p=>'<option value="'+esc(p.name||'')+'">'+esc(p.name||'')+'</option>').join('')}</select></div>${fEl(lang==='ar'?'تفصيل الموقع (اختياري)':'Location detail (optional)','sc_site','')}</div>
       <button class="btn cy" style="font-size:16px;padding:12px 22px;margin-top:8px" onclick="siteCheckIn()">▶ Check in</button>`;
   }
   h+=`</div>`;
