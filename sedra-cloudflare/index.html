@@ -606,6 +606,10 @@ const ROLE_RANK={'Viewer':1,'Member':2,'Team Leader':3,'Manager':4,'Director':5,
 function roleRank(r){ return ROLE_RANK[r||(me&&me.role)]||0; }
 function isMgr(){ return !!(me && roleRank(me.role)>=ROLE_RANK['Manager']); }
 function isExec(){ return !!(me && roleRank(me.role)>=ROLE_RANK['Director']); }
+/* Ordinary field technicians: Operations dept below Team Leader. They can see projects, check-in/out,
+   request/return material and view quotation SCOPE — but never prices, profits or any money. */
+function isOrdinaryOps(){ return !!(me && me.dept==='Operations' && roleRank(me.role)<ROLE_RANK['Team Leader'] && !(me.role==='Super Admin')); }
+function canSeeMoney(){ return !isOrdinaryOps(); }
 /* Who may CREATE a quotation. From the Sales team only a Team Leader or Manager (and above)
    can; regular sales members cannot. Super Admin, Management and other departments (e.g. the
    Technical office that prepares quotes) are unaffected. */
@@ -906,7 +910,7 @@ function inBranch(item){ const a=allowedBranches(); const b=item&&item.branch; i
 var LOCK_PERSONAL=['hub','dashboard','profile','myhr','todo','calendar','field','sitecheck','attendance','announcements','leavecal','birthdays','suggestions','chat','training'];
 var DEPT_HOME={Sales:'sales',Marketing:'marketing',Operations:'projects',Technical:'projects',Accounting:'accounting',Inventory:'inventory',HR:'hr',Management:'dashboard'};
 var SENSITIVE_MODS=['hr','accounting','finance','payroll','payslips','loans'];
-function canSee(m){ if(!me)return false; if(m&&m.id!=='admin'&&settings&&settings.hiddenModules&&settings.hiddenModules[m.id])return false; if(me.role==='Super Admin')return true; if(roleRank(me.role)>=ROLE_RANK['CEO']) return !m.adminOnly; /* CEO / CO Founder: see every module except Admin-only system screens (no system/settings/mass-delete) */ if(m.adminOnly)return false; if(me.role==='Viewer'){ return SENSITIVE_MODS.indexOf(m.id)<0; } if(SENSITIVE_MODS.indexOf(m.id)>=0){ if((me.accessModules||[]).indexOf(m.id)>=0)return true; if(me.role==='Member')return false; var essS=(typeof ROLE_ESSENTIALS!=='undefined'&&(ROLE_ESSENTIALS[me.dept]||ROLE_ESSENTIALS._default))||[]; return essS.indexOf(m.id)>=0; } if(LOCK_PERSONAL.indexOf(m.id)>=0)return true; if((me.accessModules||[]).indexOf(m.id)>=0)return true; if(me.role==='Member'){ return m.id==='projects'; } /* Members (ALL depts): personal screens (check-in/out) + their assigned projects + material requests only — no department/management screens; grant extras per-person via accessModules */ var ess=(typeof ROLE_ESSENTIALS!=='undefined'&&(ROLE_ESSENTIALS[me.dept]||ROLE_ESSENTIALS._default))||[]; return ess.indexOf(m.id)>=0; }
+function canSee(m){ if(!me)return false; if(m&&m.id!=='admin'&&settings&&settings.hiddenModules&&settings.hiddenModules[m.id])return false; if(me.role==='Super Admin')return true; if(roleRank(me.role)>=ROLE_RANK['CEO']) return !m.adminOnly; /* CEO / CO Founder: see every module except Admin-only system screens (no system/settings/mass-delete) */ if(m.adminOnly)return false; if(me.role==='Viewer'){ return SENSITIVE_MODS.indexOf(m.id)<0; } if(SENSITIVE_MODS.indexOf(m.id)>=0){ if((me.accessModules||[]).indexOf(m.id)>=0)return true; if(me.role==='Member')return false; var essS=(typeof ROLE_ESSENTIALS!=='undefined'&&(ROLE_ESSENTIALS[me.dept]||ROLE_ESSENTIALS._default))||[]; return essS.indexOf(m.id)>=0; } if(LOCK_PERSONAL.indexOf(m.id)>=0)return true; if((me.accessModules||[]).indexOf(m.id)>=0)return true; if(me.role==='Member'){ if(m.id==='projects')return true; if(m.id==='field')return true; if(m.id==='quotes' && me.dept==='Operations')return true; /* ordinary Operations can VIEW quote scope (no prices — enforced in the view) */ return false; } /* Members (ALL depts): personal screens (check-in/out) + their assigned projects + material requests only — no department/management screens; grant extras per-person via accessModules */ var ess=(typeof ROLE_ESSENTIALS!=='undefined'&&(ROLE_ESSENTIALS[me.dept]||ROLE_ESSENTIALS._default))||[]; return ess.indexOf(m.id)>=0; }
 function canEdit(){ if(me&&me.role==='Viewer')return false; return me && me.role!=='Member' ? true : (me&&me.role==='Member'); }
 function isViewer(){ return !!(me&&me.role==='Viewer'); }
 function canWrite(){ return !(me&&me.role==='Viewer'); }
@@ -3915,8 +3919,8 @@ function vProjects(){
        materials stay restricted to Team Leader + Manager via canApproveMat (Hesham 4 Nov). */
     return true;
   });
-  let h=`<div class="tabs"><button class="${projTab==='list'?'active':''}" onclick="projTab='list';render()">🏗️ ${lang==='ar'?'المشاريع':'Projects'}</button><button class="${projTab==='profit'?'active':''}" onclick="projTab='profit';render()">💹 ${lang==='ar'?'الربحية':'Profitability'}</button></div>`;
-  if(projTab==='profit') return h+vProfit(rows);
+  let h=`<div class="tabs"><button class="${projTab==='list'?'active':''}" onclick="projTab='list';render()">🏗️ ${lang==='ar'?'المشاريع':'Projects'}</button>${canSeeMoney()?`<button class="${projTab==='profit'?'active':''}" onclick="projTab='profit';render()">💹 ${lang==='ar'?'الربحية':'Profitability'}</button>`:''}</div>`;
+  if(projTab==='profit'){ if(canSeeMoney()) return h+vProfit(rows); projTab='list'; }
   h+=pendingMatPanel();
   h+=projectsPanel(rows);
   h+=`<div class="sect"><h2>Projects</h2><div class="sp"></div>${isAdmin()?`<button class="btn gh sm" onclick="sedraImportProjects()" title="Import projects from /projects-seed.json">⬆ Import</button> <button class="btn dn sm" onclick="sedraDeleteAllProjects()" title="Move all projects to Recycle Bin">🗑 Clear all</button> `:''}${canApproveMat()?`<button class="btn cy" onclick="editProject()">+ Add project</button>`:''}</div>`;
@@ -3925,14 +3929,14 @@ function vProjects(){
   var pq=(projQ||'').trim().toLowerCase();
   var frows=pq?rows.filter(function(p){return [p.name,p.client,p.owner,p.branch,p.status,p.dept].join(' ').toLowerCase().indexOf(pq)>=0;}):rows;
   if(!frows.length)return h+`<div class="card empty">${lang==='ar'?'مفيش مشاريع مطابقة للبحث.':'No projects match your search.'}</div>`;
-  h+=`<table><thead><tr><th></th><th>Project</th><th>Client</th><th>Branch</th><th>Dept</th><th>Status</th><th>Progress</th><th>Tasks</th><th>Value</th><th></th></tr></thead><tbody>`+frows.map(p=>{const pr=projProgress(p),ts=tasks.filter(t=>t.project===p.id),done=ts.filter(t=>t.status==='Done').length;const _op=(projOpenRow===p.id);return `<tr>
+  h+=`<table><thead><tr><th></th><th>Project</th><th>Client</th><th>Branch</th><th>Dept</th><th>Status</th><th>Progress</th><th>Tasks</th>${canSeeMoney()?'<th>Value</th>':''}<th></th></tr></thead><tbody>`+frows.map(p=>{const pr=projProgress(p),ts=tasks.filter(t=>t.project===p.id),done=ts.filter(t=>t.status==='Done').length;const _op=(projOpenRow===p.id);return `<tr>
     <td style="text-align:center"><button class="btn gh sm" title="${lang==='ar'?'إجراءات سريعة':'Quick actions'}" onclick="projToggleRow('${p.id}')" style="font-size:13px;min-width:30px;padding:3px 7px">${_op?'▾':'▸'}</button></td>
     <td><b>${esc(p.name)}</b><div class="mini">${esc(p.owner||'')}</div></td><td>${esc(p.client||'')}</td>
     <td>${FLAG[p.branch]||''} ${esc(p.branch||'')}</td><td>${esc(p.dept||'')}</td>
     <td><span class="tag" style="background:${PSTAT_COL[p.status]||'#eee'}22;color:${PSTAT_COL[p.status]||'#333'}">${esc(p.status||'Planning')}</span></td>
     <td><div style="background:#eef2f6;border-radius:6px;height:8px;width:80px;overflow:hidden"><div style="background:var(--cyan);height:8px;width:${pr}%"></div></div><span class="mini">${pr}%</span></td>
     <td>${ts.length?done+'/'+ts.length:'—'}</td>
-    <td>${money(p.branch,p.value)}</td>
+    ${canSeeMoney()?`<td>${money(p.branch,p.value)}</td>`:''}
     <td style="white-space:nowrap"><button class="btn cy sm" onclick="openProjectId='${p.id}';render()">Open</button> ${p.file?`<button class="btn gh sm" title="Open attached file" onclick="openRecFile('projects','${p.id}')">📎</button> `:''}<button class="btn gh sm" title="Open record" onclick="recOpen('${p.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${p.id}')">📎</button> ${canApproveMat()?`<button class="btn gh sm" onclick="editProject('${p.id}')">Edit</button>`:''} ${canApproveMat()?`<button class="btn dn sm" title="${lang==='ar'?'مسح المشروع (سلة المحذوفات)':'Delete project (Recycle Bin)'}" onclick="delDoc('projects','${p.id}')">✕</button>`:''}</td></tr>${_op?projActionsRow(p):''}`}).join('')+`</tbody></table>`;
   return h;
 }
@@ -3978,7 +3982,7 @@ function projActionsRow(p){
   else { btns+='<button class="btn cy sm" onclick="projQuickCheckIn(\''+p.id+'\')">📍 '+(ar?'تسجيل حضور':'Check in')+'</button> '; }
   if(canUseMaterials(p)){ btns+='<button class="btn gh sm" onclick="projQuickMat(\''+p.id+'\')">🧰 '+(ar?'طلب ماتريل':'Request material')+'</button> '; }
   btns+='<button class="btn gh sm" onclick="openProjectId=\''+p.id+'\';render()">📂 '+(ar?'افتح المشروع':'Open project')+'</button>';
-  return '<tr class="projActRow" style="background:#f6f9fc"><td colspan="10" style="padding:10px 12px"><div class="mini" style="margin-bottom:6px;color:var(--muted)">⚡ '+(ar?'إجراءات سريعة':'Quick actions')+(openV?(' · <span style="color:#1a7a4f;font-weight:700">'+(ar?'إنت مسجّل حضور هنا':'You are checked in here')+'</span>'):'')+'</div>'+btns+'</td></tr>';
+  return '<tr class="projActRow" style="background:#f6f9fc"><td colspan="12" style="padding:10px 12px"><div class="mini" style="margin-bottom:6px;color:var(--muted)">⚡ '+(ar?'إجراءات سريعة':'Quick actions')+(openV?(' · <span style="color:#1a7a4f;font-weight:700">'+(ar?'إنت مسجّل حضور هنا':'You are checked in here')+'</span>'):'')+'</div>'+btns+'</td></tr>';
 }
 function projQuickReturn(pid){
   var p=projects.find(function(x){return x.id===pid;}); if(!p)return; var ar=(lang==='ar');
@@ -4066,7 +4070,7 @@ function projectDetail(p){
     <div class="mini">${FLAG[p.branch]||''} ${esc(p.branch||'')} · ${esc(p.client||'—')} · ${esc(p.dept||'')} · Owner: ${esc(p.owner||'—')}</div></div>
     <div><span class="tag" style="background:${PSTAT_COL[p.status]||'#eee'}22;color:${PSTAT_COL[p.status]||'#333'}">${esc(p.status||'Planning')}</span> <button class="btn gh sm" title="Open record" onclick="recOpen('${p.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${p.id}')">📎</button> ${canApproveMat()?`<button class="btn gh sm" onclick="editProject('${p.id}')">Edit</button> <button class="btn dn sm" title="${lang==='ar'?'مسح المشروع (سلة المحذوفات)':'Delete project (Recycle Bin)'}" onclick="delDoc('projects','${p.id}')">🗑 ${lang==='ar'?'مسح':'Delete'}</button>`:''}</div></div>
     <div style="margin-top:12px">Progress <b>${pr}%</b><div style="background:#eef2f6;border-radius:6px;height:10px;overflow:hidden;margin-top:4px"><div style="background:var(--cyan);height:10px;width:${pr}%"></div></div></div>
-    <div class="mini" style="margin-top:8px">${p.start?'Start: '+esc(p.start)+' · ':''}${p.end?'End: '+esc(p.end)+' · ':''}Value: ${money(p.branch,p.value)}</div></div>`;
+    <div class="mini" style="margin-top:8px">${p.start?'Start: '+esc(p.start)+' · ':''}${p.end?'End: '+esc(p.end)+' · ':''}${canSeeMoney()?('Value: '+money(p.branch,p.value)):''}</div></div>`;
   // Milestones
   h+=`<div class="sect"><h2>🎯 Milestones</h2><div class="sp"></div><button class="btn gh sm" onclick="addMilestone('${p.id}')">+ Add milestone</button></div>`;
   h+= mil.length?`<div class="card">`+mil.map((m,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--mist)">
@@ -4157,7 +4161,7 @@ function editTask(id,projectId){
       (id?apiMerge('tasks',id,d):apiAdd('tasks',d)).then((newId)=>{ try{ saveTaskMedia(id||newId); }catch(_m){}
         try{ /* notify the assignee — in-app bell + phone push (even if app closed) + email.
                Fires on assignment AND whenever a voice/photo is added to the task. */
-          if((_asgChanged||_mediaNew) && d.assignee){ var _ae=ownerEmailFor(d.assignee); var _meE=((me&&me.email)||'').toLowerCase();
+          if((_asgChanged||_mediaNew) && d.assignee){ var _aEmp=(employees||[]).find(function(x){return (x.name||'')===d.assignee;}); var _ae=((_aEmp&&_aEmp.email)||'').toLowerCase(); var _meE=((me&&me.email)||'').toLowerCase();
             if(_ae && _ae!==_meE){
               var _hasP=!!(_tkPhoto||d.hasPhoto), _hasA=!!(_tkAudio||d.hasAudio);
               var _att=(_hasP?(ar?'📷 صورة':'📷 photo'):'')+((_hasP&&_hasA)?' + ':'')+(_hasA?(ar?'🎙️ تسجيل صوتي':'🎙️ voice note'):'');
@@ -4439,11 +4443,13 @@ function projExtraDetail(p){
   h+='<div class="sect"><h2>📍 '+(ar?'الموقع':'Location')+'</h2></div>';
   h+='<div class="card mini">'+(p.address?esc(p.address):'<span style="color:var(--muted)">'+(ar?'مفيش عنوان':'No address')+'</span>')+(p.gps?' · GPS: '+esc(p.gps)+' <a href="https://maps.google.com/?q='+encodeURIComponent(p.gps)+'" target="_blank">🗺️</a>':' · <span style="color:#c0392b">'+(ar?'مفيش GPS — لازم للحضور':'No GPS — needed for check-in')+'</span>')+'</div>';
   if(canApproveMat(p)){ h+='<div style="margin:8px 0 2px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn cy sm" onclick="addProjectQuote(\''+p.id+'\')">📄 '+(ar?'كوتيشن جديد للمشروع':'Add quotation')+'</button></div>'; }
+  if(canSeeMoney()){
   h+='<div class="sect"><h2>💰 '+(ar?'الفلوس':'Financials')+'</h2><div class="sp"></div>'+((isMgr()||isAdmin())?'<button class="btn gh sm" onclick="setCollected(\''+p.id+'\')">'+(ar?'تحديث المحصّل':'Update collected')+'</button>':'')+'</div>';
   h+='<div class="grid kpis"><div class="card kpi"><div class="n">'+money(p.branch,val0)+'</div><div class="l">'+(ar?'قيمة العقد':'Contract value')+'</div></div>'
     +'<div class="card kpi"><div class="n" style="color:var(--ok)">'+money(p.branch,col)+'</div><div class="l">'+(ar?'محصّل':'Collected')+'</div></div>'
     +'<div class="card kpi"><div class="n" style="color:#e0a93b">'+money(p.branch,out)+'</div><div class="l">'+(ar?'متبقّي':'Outstanding')+'</div></div>'
     +'<div class="card kpi"><div class="n">'+(val0?Math.round(col/val0*100):0)+'%</div><div class="l">'+(ar?'نسبة التحصيل':'Collected %')+'</div></div></div>';
+  }
   h+='<div class="sect"><h2>📊 '+(ar?'تحليلات':'Analytics')+'</h2></div>';
   h+='<div class="grid kpis"><div class="card kpi"><div class="n">'+(typeof fmtHrs==='function'?fmtHrs(hrs):hrs.toFixed(1)+'h')+'</div><div class="l">'+(ar?'ساعات موقعية':'Site hours')+'</div></div>'
     +'<div class="card kpi"><div class="n">'+cl.length+'</div><div class="l">'+(ar?'أصناف':'Items')+'</div></div>'
@@ -4779,8 +4785,31 @@ function quoteTotal(q){ const secs=quoteSections(q); let grand=0; const secTotal
   const vat=grand*num(q.vat)/100;
   if(q.zohoId){ var zg=num(q.zohoGrandTotal); if(zg>0){ var zsub=(grand>0?grand:num(q.zohoSubTotal)); if(!(zsub>0)) zsub=zg; var adj=zg-zsub; return {sub:zsub,secTotals:(secTotals.length?secTotals:[zsub]),secDetail,vat:0,total:zg,adj:adj,secs,fromZoho:true}; } }
   return {sub:grand,secTotals,secDetail,vat,total:grand+vat,secs}; }
+/* Price-free scope viewer — what a field technician needs from a quotation: the items, brands and
+   quantities to execute on site, with NO prices or totals. */
+function quoteScope(id){
+  var q=quotes.find(function(x){return x.id===id;}); if(!q)return; var ar=(lang==='ar');
+  var secs=(typeof quoteSections==='function')?quoteSections(q):[];
+  var body='<div class="card mini" style="margin-bottom:8px">'+(ar?'بنود الكوتيشن (الوصف والكميات) للتنفيذ في الموقع — من غير أسعار.':'Quotation scope (items & quantities) for site execution — no prices.')+'</div>';
+  if(!secs.length){ body+='<div class="card empty">'+(ar?'مفيش بنود.':'No items.')+'</div>'; }
+  else { body+=secs.map(function(s){ return '<div class="sect" style="margin:8px 0 4px"><h2 style="font-size:14px">'+esc(s.title||(ar?'بنود':'Items'))+'</h2></div><div style="overflow-x:auto"><table><thead><tr><th>'+(ar?'الصنف':'Item')+'</th><th>'+(ar?'الماركة':'Brand')+'</th><th class="r">'+(ar?'الكمية':'Qty')+'</th></tr></thead><tbody>'+(s.items||[]).map(function(i){ return '<tr><td><b>'+esc(i.item||'')+'</b>'+(i.desc?'<div class="mini">'+esc(i.desc)+'</div>':'')+(i.optional?' <span class="tag" style="background:#e0a93b22;color:#a9781a">'+(ar?'اختياري':'optional')+'</span>':'')+'</td><td>'+esc(i.brand||'—')+'</td><td class="r"><b>'+num(i.qty)+'</b></td></tr>'; }).join('')+'</tbody></table></div>'; }).join(''); }
+  openModal((ar?'📋 بنود — ':'📋 Scope — ')+esc(q.number||q.client||''),body,null,{wide:true});
+  var sb=g('mSave'); if(sb)sb.classList.add('hide');
+}
 function vQuotes(){
   const meName=(me&&me.name)||'';
+  if(!canSeeMoney()){
+    var ar=(lang==='ar');
+    var srows=quotes.filter(function(q){ return (!q.isRFQ||q.rfqDone) && inBranch(q); });
+    var hs='<div class="sect"><h2>'+(ar?'الكوتيشنات':'Quotations')+'</h2></div>';
+    hs+='<div class="card mini" style="margin-bottom:8px">'+(ar?'بتشوف بنود الكوتيشن والتفاصيل التنفيذية بس — الأسعار والأرباح مخفية.':'You see the scope and execution details only — prices and profits are hidden.')+'</div>';
+    hs+=tableView('quotes_scope', srows,
+      '<th>#</th><th>'+(ar?'العميل':'Client')+'</th><th>'+(ar?'النوع':'Type')+'</th><th>'+(ar?'الحالة':'Status')+'</th><th></th>',
+      function(q){ return '<tr><td><b>'+esc(q.number||q.id.slice(-5))+'</b><div class="mini">'+esc(q.date||'')+'</div></td><td>'+esc(q.client||'')+'</td><td>'+esc(q.type||'Quotation')+'</td><td><span class="tag" style="background:'+(QSTAT_COL[q.status]||'#eee')+'22;color:'+(QSTAT_COL[q.status]||'#333')+'">'+esc(q.status||'Draft')+'</span></td><td style="white-space:nowrap"><button class="btn cy sm" onclick="quoteScope(\''+q.id+'\')">📋 '+(ar?'شوف البنود':'View scope')+'</button> <button class="btn gh sm" onclick="attachOpen(\''+q.id+'\')">📎'+(attCount(q.id)?' '+attCount(q.id):'')+'</button></td></tr>'; },
+      {empty:(ar?'مفيش كوتيشنات.':'No quotations.'), placeholder:'🔍 '+(ar?'ابحث…':'Search…'), search:function(q){return [q.number,q.client,q.type,q.status].join(' ');},
+       filters:[{label:(ar?'الحالة':'Status'),opts:QSTAT,match:function(q,v){return (q.status||'Draft')===v;}}]});
+    return hs;
+  }
   const techAssignees=Object.keys(TECH_ROUTING).map(function(k){return TECH_ROUTING[k].name;});
   const isTechAssignee = techAssignees.indexOf(meName)>=0 || (me.dept==='Technical');
   const seesAllQuotes = me.role==='Super Admin'||me.dept==='Management'||isMgr();
