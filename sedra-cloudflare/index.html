@@ -3873,6 +3873,10 @@ var PSTAT_DEF=['المتابعات','تحت التركيب','جاري التسل
 const PSTAT_COL={'المتابعات':'#2C77B0','تحت التركيب':'#37c0dc','جاري التسليم':'#e0a93b','تم التسليم':'#1a7a4f','Hold':'#8a5a00','تم الإلغاء':'#c0392b',
   /* legacy statuses kept so older projects still show a colour */
   Planning:'#5A6B7B','In Progress':'#2C77B0','On Hold':'#e0a93b',Completed:'#1a7a4f',Cancelled:'#c0392b'};
+/* Normalise legacy English project statuses onto the new Arabic set so the whole Projects
+   area reads in one language (old imported projects still carry English status strings). */
+function pstatNorm(st){ var m={Planning:'المتابعات','In Progress':'تحت التركيب','On Hold':'Hold',Completed:'تم التسليم',Cancelled:'تم الإلغاء'}; return m[st]||st||'المتابعات'; }
+function pstatDone(st){ var n=pstatNorm(st); return n==='تم التسليم'||n==='تم الإلغاء'; }
 let openProjectId=null;
 function projProgress(p){ const ts=tasks.filter(t=>t.project===p.id); if(ts.length){ return Math.round(ts.filter(t=>t.status==='Done').length/ts.length*100); } return num(p.progress); }
 let projTab='list';
@@ -3882,26 +3886,26 @@ function projPO(p){ return pos.filter(x=>x.project===p.name&&x.status==='Receive
 function projMaterial(p){ return stockMoves.filter(m=>m.type==='out'&&m.project===p.name).reduce((s,m)=>s+num(m.qty)*num(m.cost),0); }
 function projectsPanel(rows){
   var ar=(typeof lang!=='undefined'&&lang==='ar'); var T=today();
-  var active=rows.filter(function(p){var st=p.status||'Planning';return st!=='Completed'&&st!=='Cancelled';});
+  var active=rows.filter(function(p){return !pstatDone(p.status);});
   var attAll=active.filter(function(p){return !p.gps||!p.drawingApproved||(p.end&&p.end<T);});
   var att=attAll.slice(0,8);
   var items=att.length?att.map(function(p){
     var reasons=[]; if(!p.gps)reasons.push(ar?'مفيش GPS':'no GPS'); if(!p.drawingApproved)reasons.push(ar?'رسومات مش معتمدة':'drawings pending'); if(p.end&&p.end<T)reasons.push(ar?'متأخر':'overdue');
-    var col=PSTAT_COL[p.status]||'#888';
+    var _ps=pstatNorm(p.status); var col=PSTAT_COL[_ps]||'#888';
     return '<div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-top:1px solid var(--mist)">'
       +'<div style="width:38px;height:38px;border-radius:10px;background:#fff4e6;color:#e0a93b;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0">\u26A0\uFE0F</div>'
       +'<div style="flex:1;min-width:0"><b style="font-size:13.5px">'+esc(p.name||'')+'</b><div class="mini">'+esc(reasons.join(' \u00B7 '))+'</div></div>'
-      +'<span class="tag" style="background:'+col+'22;color:'+col+'">'+esc(p.status||'Planning')+'</span> '
+      +'<span class="tag" style="background:'+col+'22;color:'+col+'">'+esc(_ps)+'</span> '
       +'<button class="btn cy sm" onclick="openProjectId=\''+p.id+'\';render()">'+(ar?'فتح':'Open')+'</button>'
       +'</div>';
   }).join(''):'<div class="empty">'+(ar?'كل المشاريع تمام 🎉':'All projects on track 🎉')+'</div>';
-  var order=['Planning','In Progress','On Hold','Completed','Cancelled'];
-  var sm={}; order.forEach(function(k){sm[k]=0;}); rows.forEach(function(p){var st=p.status||'Planning'; if(sm[st]===undefined)sm[st]=0; sm[st]++;});
+  var order=PSTAT_DEF.slice();
+  var sm={}; order.forEach(function(k){sm[k]=0;}); rows.forEach(function(p){var st=pstatNorm(p.status); if(sm[st]===undefined)sm[st]=0; sm[st]++;});
   var mx=Math.max(1,rows.length);
   var bars=order.map(function(k){ var w=Math.round((sm[k]||0)/mx*100); return '<div style="display:flex;align-items:center;gap:10px;margin:7px 0"><div style="width:84px;font-size:12px;color:var(--muted)">'+k+'</div><div style="flex:1;height:9px;background:#eef2f7;border-radius:6px;overflow:hidden"><div style="width:'+w+'%;height:100%;background:'+(PSTAT_COL[k]||'#888')+';border-radius:6px"></div></div><div style="width:28px;text-align:right;font-weight:800;color:var(--navy);font-size:13px">'+(sm[k]||0)+'</div></div>'; }).join('');
   var kpis='<div class="grid kpis"><div class="card kpi"><div class="n">'+rows.length+'</div><div class="l">'+(ar?'كل المشاريع':'Projects')+'</div></div>'
     +'<div class="card kpi"><div class="n" style="color:var(--cyan)">'+active.length+'</div><div class="l">'+(ar?'جارية':'Active')+'</div></div>'
-    +'<div class="card kpi"><div class="n" style="color:var(--ok)">'+(sm['Completed']||0)+'</div><div class="l">'+(ar?'مكتملة':'Completed')+'</div></div>'
+    +'<div class="card kpi"><div class="n" style="color:var(--ok)">'+(sm['تم التسليم']||0)+'</div><div class="l">'+(ar?'متسلّمة':'Delivered')+'</div></div>'
     +'<div class="card kpi"><div class="n" style="color:#e0a93b">'+attAll.length+'</div><div class="l">'+(ar?'محتاجة انتباه':'Need attention')+'</div></div></div>';
   return kpis+'<div class="grid" style="grid-template-columns:1.15fr .85fr;gap:14px;margin:14px 0">'
     +'<div class="card"><div class="ch-t" style="color:#e0a93b">🔴 '+(ar?'مشاريع محتاجة انتباه':'Projects needing attention')+' <span class="tag" style="background:#e0a93b22;color:#e0a93b">'+attAll.length+'</span></div>'+items+'</div>'
@@ -3939,13 +3943,13 @@ function vProjects(){
   if(!rows.length)return h+`<div class="card empty">No projects yet.</div>`;
   h+=`<div class="sect" style="margin-top:4px"><input class="tvq" type="search" style="max-width:240px" placeholder="🔍 ${lang==='ar'?'ابحث عن مشروع…':'Search projects…'}" value="${esc(projQ)}" oninput="setProjQ(this.value)"> <select class="tvf" onchange="setProjStatusF(this.value)"><option value="">${lang==='ar'?'كل الحالات':'All statuses'}</option>${PSTAT.map(function(s){return '<option value="'+esc(s)+'" '+(s===projStatusF?'selected':'')+'>'+esc(s)+'</option>';}).join('')}</select><div class="sp"></div><span class="mini">${lang==='ar'?'دوس على السهم ▾ لإجراءات سريعة (حضور / انصراف / طلب ماتريل)':'Tap the ▾ arrow for quick actions'}</span></div>`;
   var pq=(projQ||'').trim().toLowerCase();
-  var frows=rows.filter(function(p){ if(projStatusF && (p.status||'')!==projStatusF) return false; if(pq && [p.name,p.client,p.owner,p.branch,p.status,p.dept].join(' ').toLowerCase().indexOf(pq)<0) return false; return true; });
+  var frows=rows.filter(function(p){ if(projStatusF && pstatNorm(p.status)!==projStatusF) return false; if(pq && [p.name,p.client,p.owner,p.branch,p.status,pstatNorm(p.status),p.dept].join(' ').toLowerCase().indexOf(pq)<0) return false; return true; });
   if(!frows.length)return h+`<div class="card empty">${lang==='ar'?'مفيش مشاريع مطابقة للبحث.':'No projects match your search.'}</div>`;
   h+=`<table><thead><tr><th></th><th>Project</th><th>Client</th><th>Branch</th><th>Dept</th><th>Status</th><th>Progress</th><th>Tasks</th>${canSeeMoney()?'<th>Value</th>':''}<th></th></tr></thead><tbody>`+frows.map(p=>{const pr=projProgress(p),ts=tasks.filter(t=>t.project===p.id),done=ts.filter(t=>t.status==='Done').length;const _op=(projOpenRow===p.id);return `<tr>
     <td style="text-align:center"><button class="btn gh sm" title="${lang==='ar'?'إجراءات سريعة':'Quick actions'}" onclick="projToggleRow('${p.id}')" style="font-size:13px;min-width:30px;padding:3px 7px">${_op?'▾':'▸'}</button></td>
     <td><b>${esc(p.name)}</b><div class="mini">${esc(p.owner||'')}</div></td><td>${esc(p.client||'')}</td>
     <td>${FLAG[p.branch]||''} ${esc(p.branch||'')}</td><td>${esc(p.dept||'')}</td>
-    <td><span class="tag" style="background:${PSTAT_COL[p.status]||'#eee'}22;color:${PSTAT_COL[p.status]||'#333'}">${esc(p.status||'Planning')}</span></td>
+    <td><span class="tag" style="background:${PSTAT_COL[pstatNorm(p.status)]||'#eee'}22;color:${PSTAT_COL[pstatNorm(p.status)]||'#333'}">${esc(pstatNorm(p.status))}</span></td>
     <td><div style="background:#eef2f6;border-radius:6px;height:8px;width:80px;overflow:hidden"><div style="background:var(--cyan);height:8px;width:${pr}%"></div></div><span class="mini">${pr}%</span></td>
     <td>${ts.length?done+'/'+ts.length:'—'}</td>
     ${canSeeMoney()?`<td>${money(p.branch,p.value)}</td>`:''}
@@ -4072,7 +4076,7 @@ function vField(){
     btns+='<button class="btn gh" style="flex:1;min-width:120px;padding:12px;font-size:15px" onclick="projQuickReturn(\''+p.id+'\')">↩ '+(ar?'مرتجع':'Return')+'</button>';
     btns+='<button class="btn gh" style="padding:12px" title="'+(ar?'افتح المشروع':'Open project')+'" onclick="openProjectId=\''+p.id+'\';curView=\'projects\';render()">📂</button>';
     return '<div class="card" style="margin-bottom:10px;padding:14px'+(myOpen?';border:2px solid var(--ok)':'')+'">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="font-weight:800;font-size:16px;color:var(--navy)">'+esc(p.name)+(myOpen?' 🟢':'')+(hasGps?'':' <span class="mini" title="'+(ar?'المشروع ملوش موقع GPS — الحضور مش هيشتغل لحد ما المدير يحدّد الموقع':'no GPS set')+'">⚠️</span>')+'</div><span class="tag" style="background:'+(PSTAT_COL[p.status]||'#eee')+'22;color:'+(PSTAT_COL[p.status]||'#333')+'">'+esc(p.status||'Planning')+'</span></div>'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="font-weight:800;font-size:16px;color:var(--navy)">'+esc(p.name)+(myOpen?' 🟢':'')+(hasGps?'':' <span class="mini" title="'+(ar?'المشروع ملوش موقع GPS — الحضور مش هيشتغل لحد ما المدير يحدّد الموقع':'no GPS set')+'">⚠️</span>')+'</div><span class="tag" style="background:'+(PSTAT_COL[pstatNorm(p.status)]||'#eee')+'22;color:'+(PSTAT_COL[pstatNorm(p.status)]||'#333')+'">'+esc(pstatNorm(p.status))+'</span></div>'
       +(p.client?'<div class="mini">'+esc(p.client)+'</div>':'')
       +'<div style="background:#eef2f6;border-radius:6px;height:7px;overflow:hidden;margin:8px 0"><div style="background:var(--cyan);height:7px;width:'+pr+'%"></div></div>'
       +'<div style="display:flex;gap:8px;flex-wrap:wrap">'+btns+'</div></div>';
@@ -4101,7 +4105,7 @@ function projectDetail(p){
   h+=`<div class="card" style="margin-top:10px"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;align-items:center">
     <div><div style="font-size:19px;font-weight:800;color:var(--navy)">${esc(p.name)}</div>
     <div class="mini">${FLAG[p.branch]||''} ${esc(p.branch||'')} · ${esc(p.client||'—')} · ${esc(p.dept||'')} · Owner: ${esc(p.owner||'—')}</div></div>
-    <div><span class="tag" style="background:${PSTAT_COL[p.status]||'#eee'}22;color:${PSTAT_COL[p.status]||'#333'}">${esc(p.status||'Planning')}</span> <button class="btn gh sm" title="Open record" onclick="recOpen('${p.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${p.id}')">📎</button> ${canApproveMat()?`<button class="btn gh sm" onclick="editProject('${p.id}')">Edit</button> <button class="btn dn sm" title="${lang==='ar'?'مسح المشروع (سلة المحذوفات)':'Delete project (Recycle Bin)'}" onclick="delDoc('projects','${p.id}')">🗑 ${lang==='ar'?'مسح':'Delete'}</button>`:''}</div></div>
+    <div><span class="tag" style="background:${PSTAT_COL[pstatNorm(p.status)]||'#eee'}22;color:${PSTAT_COL[pstatNorm(p.status)]||'#333'}">${esc(pstatNorm(p.status))}</span> <button class="btn gh sm" title="Open record" onclick="recOpen('${p.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${p.id}')">📎</button> ${canApproveMat()?`<button class="btn gh sm" onclick="editProject('${p.id}')">Edit</button> <button class="btn dn sm" title="${lang==='ar'?'مسح المشروع (سلة المحذوفات)':'Delete project (Recycle Bin)'}" onclick="delDoc('projects','${p.id}')">🗑 ${lang==='ar'?'مسح':'Delete'}</button>`:''}</div></div>
     <div style="margin-top:12px">Progress <b>${pr}%</b><div style="background:#eef2f6;border-radius:6px;height:10px;overflow:hidden;margin-top:4px"><div style="background:var(--cyan);height:10px;width:${pr}%"></div></div></div>
     <div class="mini" style="margin-top:8px">${p.start?'Start: '+esc(p.start)+' · ':''}${p.end?'End: '+esc(p.end)+' · ':''}${canSeeMoney()?('Value: '+money(p.branch,p.value)):''}</div></div>`;
   // Milestones
@@ -4259,7 +4263,7 @@ function editProject(id){
     _quoteOpts+
     fEl('Project name','p_name',r.name)+fEl('Client','p_client',r.client)+
     `<div class="row2">${selEl('Branch','p_branch',branchOpts(),r.branch)}${selEl('Department','p_dept',['Operations','Technical'],r.dept||'Operations')}</div>`+
-    `<div class="row2">${selEl('Status','p_status',PSTAT,r.status||'Planning')}${fEl('Progress %','p_progress',r.progress,'number')}</div>`+
+    `<div class="row2">${selEl('Status','p_status',PSTAT,pstatNorm(r.status))}${fEl('Progress %','p_progress',r.progress,'number')}</div>`+
     `<div class="row2">${fEl('Start date','p_start',r.start,'date')}${fEl('End date','p_end',r.end,'date')}</div>`+
     `<div class="row2">${fEl('Owner','p_owner',r.owner)}${fEl('Value','p_value',r.value,'number')}</div>`+
     `<div class="row2"><div class="fld"><label>${lang==='ar'?'موقع المشروع على الخريطة (GPS)':'GPS location (lat,lng or link)'}</label>`+(_gpsLocked?`<input id="p_gps" value="${esc(r.gps||'')}" readonly style="background:#eef2f6;color:#5A6B7B"><div class="mini" style="margin-top:6px">🔒 ${lang==='ar'?'الموقع متسجّل ومتقفل — أي تغيير لازم موافقة الإدارة':'Location set & locked — any change needs management approval'}</div><button type="button" class="btn gh sm" style="margin-top:6px" onclick="reqLocChange('${id}')">📍 ${lang==='ar'?'اطلب تغيير الموقع':'Request location change'}</button>`:`<input id="p_gps" value="${esc(r.gps||'')}" placeholder="${lang==='ar'?'مثال: 30.0512, 31.2405 أو إحداثيات DMS':'e.g. 30.0512, 31.2405'}"><button type="button" class="btn gh sm" style="margin-top:6px" onclick="fillMyGps()">📍 ${lang==='ar'?'استخدم موقعي الحالي':'Use my current location'}</button> <button type="button" class="btn gh sm" style="margin-top:6px" onclick="pickGpsMap()">🗺️ ${lang==='ar'?'اختر على الخريطة':'Pick on map'}</button>`)+`</div>${selEl('Drawings approved?','p_draw',['No','Yes'],r.drawingApproved?'Yes':'No')}</div>`+
