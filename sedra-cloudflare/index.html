@@ -4021,8 +4021,9 @@ function vField(){
       +(t.projectName?'<div class="mini">🏗️ '+esc(t.projectName)+'</div>':'')
       +(t.due?'<div class="mini" style="'+(overdue?'color:var(--bad);font-weight:700':'')+'">📅 '+(ar?'تسليم ':'due ')+esc(t.due)+(overdue?' ⚠️':'')+'</div>':'')
       +(t.notes?'<div class="mini">📝 '+esc(t.notes)+'</div>':'')
-      +'<div style="display:flex;gap:8px;margin-top:8px">'
-        +'<button class="btn cy" style="flex:1;padding:12px;font-size:15px" onclick="advanceTask(\''+t.id+'\')">'+(st==='To Do'?(ar?'▶ ابدأ':'▶ Start'):(ar?'✔ خلّصت':'✔ Done'))+'</button>'
+      +'<div class="mini" style="margin-top:4px">'+tStatLabel(st)+'</div>'
+      +'<div style="display:flex;gap:8px;margin-top:6px">'
+        +'<button class="btn cy" style="flex:1;padding:12px;font-size:15px" onclick="advanceTask(\''+t.id+'\')">'+tStepLabel(st)+'</button>'
         +'<button class="btn gh" style="padding:12px" onclick="editTask(\''+t.id+'\')">'+(ar?'تفاصيل':'Details')+'</button>'
       +'</div></div>';
   }).join(''); }
@@ -4085,11 +4086,19 @@ function projectDetail(p){
 }
 var TSTAT_DEF=['To Do','In Progress','Done']; var TSTAT=TSTAT_DEF.slice();
 const TSTAT_COL={'To Do':'#5A6B7B','In Progress':'#2C77B0','Done':'#1a7a4f'};
+/* Friendly, self-explanatory status labels (stored values stay English). */
+function tStatLabel(st){ var ar=(lang==='ar'); st=st||'To Do';
+  if(st==='To Do') return ar?'🕓 لسه مابدأش':'🕓 Not started';
+  if(st==='In Progress') return ar?'🔧 شغّال عليها':'🔧 In progress';
+  if(st==='Done') return ar?'✅ خلصت':'✅ Done';
+  return st; }
+/* The next-step action button text for a task in a given status. */
+function tStepLabel(st){ var ar=(lang==='ar'); st=st||'To Do'; return st==='To Do'?(ar?'▶ ابدأ الشغل':'▶ Start work'):(ar?'✅ علّمها خلصت':'✅ Mark done'); }
 function taskRow(t){ const st=t.status||'To Do', overdue=t.due&&t.due<today()&&st!=='Done'; return `<tr>
   <td><b>${esc(t.title)}</b>${t.hasPhoto?` <a href="#" title="${lang==='ar'?'صورة الملاحظة':'note photo'}" onclick="taskMedia('${t.id}','photo');return false">📷</a>`:''}${t.hasAudio?` <a href="#" title="${lang==='ar'?'تسجيل صوتي':'voice note'}" onclick="taskMedia('${t.id}','audio');return false">🎙️</a>`:''}${t.projectName?`<div class="mini">${esc(t.projectName)}</div>`:''}</td><td>${esc(t.assignee||'—')}</td>
   <td style="${overdue?'color:var(--bad);font-weight:700':''}">${esc(t.due||'—')}${overdue?' ⚠️':''}</td>
-  <td><span class="tag" style="background:${TSTAT_COL[st]}22;color:${TSTAT_COL[st]}">${st}</span></td>
-  <td style="white-space:nowrap">${st!=='Done'?`<button class="btn cy sm" onclick="advanceTask('${t.id}')">${st==='To Do'?'Start':'✔ Done'}</button> `:''}<button class="btn gh sm" title="Open record" onclick="recOpen('${t.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${t.id}')">📎</button> <button class="btn gh sm" onclick="editTask('${t.id}')">Edit</button> <button class="btn dn sm" onclick="delTask('${t.id}')">✕</button></td></tr>`; }
+  <td><span class="tag" style="background:${TSTAT_COL[st]}22;color:${TSTAT_COL[st]}">${tStatLabel(st)}</span></td>
+  <td style="white-space:nowrap">${st!=='Done'?`<button class="btn cy sm" onclick="advanceTask('${t.id}')">${tStepLabel(st)}</button> `:''}<button class="btn gh sm" title="Open record" onclick="recOpen('${t.id}')">👁</button> <button class="btn gh sm" title="Attachments" onclick="attachOpen('${t.id}')">📎</button> <button class="btn gh sm" onclick="editTask('${t.id}')">Edit</button> <button class="btn dn sm" onclick="delTask('${t.id}')">✕</button></td></tr>`; }
 function advanceTask(id){ const t=tasks.find(x=>x.id===id); if(!t)return; const st=t.status||'To Do'; const nx=st==='To Do'?'In Progress':'Done'; apiMerge('tasks',id,{status:nx}).then(()=>{ syncProjProgress(t.project); synced(); }); }
 function delTask(id){ const t=tasks.find(x=>x.id===id); if(confirm('Delete this task?'))apiDelete('tasks',id).then(()=>{ if(t)syncProjProgress(t.project); synced(); }); }
 function syncProjProgress(pid){ if(!pid)return; const p=projects.find(x=>x.id===pid); if(!p)return; const ts=tasks.filter(t=>t.project===pid); if(!ts.length)return; const pr=Math.round(ts.filter(t=>t.status==='Done').length/ts.length*100); apiMerge('projects',pid,{progress:pr}); }
@@ -4187,13 +4196,14 @@ function editTask(id,projectId){
             }
           }
         }catch(_n){}
+        try{ if(!id && newId) recordUndo((ar?'اتضاف تاسك: ':'Task added: ')+(d.title||''), function(){ return apiDelete('tasks', newId); }); }catch(_u){}
         syncProjProgress(pid); tkMediaReset(); synced(); }).catch(e=>alert('Save error: '+(e.message||e))); });
 }
 function addMilestone(pid){
   openModal('Add milestone',
     fEl('Milestone name','ms_name','')+fEl('Target date','ms_date',today(),'date'),
     ()=>{ const p=projects.find(x=>x.id===pid); if(!p)return; const name=val('ms_name'); if(!name){alert('Name required');return false;}
-      const mil=(p.milestones||[]).concat([{name,date:val('ms_date'),done:false}]); apiMerge('projects',pid,{milestones:mil}).then(synced); });
+      const _prevMil=(p.milestones||[]).slice(); const mil=_prevMil.concat([{name,date:val('ms_date'),done:false}]); apiMerge('projects',pid,{milestones:mil}).then(function(){ try{ recordUndo((lang==='ar'?'اتضافت مرحلة: ':'Milestone added: ')+name, function(){ return apiMerge('projects',pid,{milestones:_prevMil}); }); }catch(_u){} synced(); }); });
 }
 function toggleMilestone(pid,i){ const p=projects.find(x=>x.id===pid); if(!p)return; const mil=(p.milestones||[]).map((m,j)=>j===i?Object.assign({},m,{done:!m.done}):m); apiMerge('projects',pid,{milestones:mil}).then(synced); }
 function delMilestone(pid,i){ const p=projects.find(x=>x.id===pid); if(!p)return; const mil=(p.milestones||[]).filter((m,j)=>j!==i); apiMerge('projects',pid,{milestones:mil}).then(synced); }
@@ -4384,7 +4394,7 @@ function requestMaterial(pid,idx){
       if(!_mpPhoto){ alert(ar?'لازم تصوّر الماتريل صورة حيّة قبل ما تبعت الطلب 📷':'Capture a live photo of the material before sending the request 📷'); return false; }
       var _ph=_mpPhoto;
       apiAdd('matreqs',{project:p.name,projectId:pid,item:it.item,itemIdx:idx,qty:q,by:(me&&me.name)||'',byEmail:((me&&me.email)||'').toLowerCase(),branch:p.branch,status:'Pending',note:val('rm_note'),date:new Date().toISOString(),hasTakePhoto:true})
-        .then(function(newId){ try{ saveMatPhoto(newId,'take',_ph); }catch(_p){} try{logAudit('create','matreqs',newId||'',p.name);}catch(e){} try{ notifyLeaders(p,(ar?'🧰 طلب مواد — ':'🧰 Material request — ')+p.name,((me&&me.name)||'')+(ar?' طلب ':' requested ')+q+' × '+it.item+(ar?' — محتاج موافقتك (مع صورة)':' — needs your approval (photo attached)'),{ico:'🧰',type:'material'}); }catch(_n){} mpReset(); synced(); alert(ar?'اتبعت الطلب ✔ — مستني موافقة مدير Operations أو Team Leader':'Request sent ✔ — awaiting Operations Manager / Team Leader approval'); })
+        .then(function(newId){ try{ saveMatPhoto(newId,'take',_ph); }catch(_p){} try{logAudit('create','matreqs',newId||'',p.name);}catch(e){} try{ notifyLeaders(p,(ar?'🧰 طلب مواد — ':'🧰 Material request — ')+p.name,((me&&me.name)||'')+(ar?' طلب ':' requested ')+q+' × '+it.item+(ar?' — محتاج موافقتك (مع صورة)':' — needs your approval (photo attached)'),{ico:'🧰',type:'material'}); }catch(_n){} try{ if(newId) recordUndo((ar?'اتبعت طلب ماتريل: ':'Material requested: ')+it.item, function(){ return apiDelete('matreqs', newId); }); }catch(_u){} mpReset(); synced(); alert(ar?'اتبعت الطلب ✔ — مستني موافقة مدير Operations أو Team Leader':'Request sent ✔ — awaiting Operations Manager / Team Leader approval'); })
         .catch(function(e){alert('Error: '+(e.message||e));});
     });
   mpStartCam();
@@ -4557,7 +4567,7 @@ function opsKanban(rows){
   const filt=q?rows.filter(t=>[t.title,t.assignee,t.projectName,t.status].join(' ').toLowerCase().indexOf(q)>=0):rows;
   let h=`<div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:14px">`;
   TSTAT.forEach(col=>{ const cards=filt.filter(t=>(t.status||'To Do')===col);
-    h+=`<div class="card" style="background:#f6f9fc"><div class="ch-t" style="display:flex;justify-content:space-between"><span>${col}</span><span class="tag" style="background:${TSTAT_COL[col]}22;color:${TSTAT_COL[col]}">${cards.length}</span></div>`;
+    h+=`<div class="card" style="background:#f6f9fc"><div class="ch-t" style="display:flex;justify-content:space-between"><span>${tStatLabel(col)}</span><span class="tag" style="background:${TSTAT_COL[col]}22;color:${TSTAT_COL[col]}">${cards.length}</span></div>`;
     h+= cards.length?cards.map(t=>{const overdue=t.due&&t.due<today()&&col!=='Done';return `<div style="background:#fff;border:1px solid var(--mist);border-left:3px solid ${TSTAT_COL[col]};border-radius:7px;padding:9px;margin-bottom:8px">
       <div style="font-weight:700;font-size:13.5px">${esc(t.title)}</div>
       ${t.projectName?`<div class="mini">🏗️ ${esc(t.projectName)}</div>`:''}
@@ -4577,11 +4587,11 @@ function opsList(rows){
   if(!filt.length) return '<div class="card empty" style="margin-top:12px">'+(q?(ar?'مفيش تاسكات مطابقة.':'No matching tasks.'):(ar?'مفيش تاسكات.':'No tasks.'))+'</div>';
   return '<div style="margin-top:12px">'+filt.map(function(t){ var st=t.status||'To Do'; var overdue=t.due&&t.due<today()&&st!=='Done'; var done=(st==='Done');
     return '<div class="card" style="margin-bottom:8px;padding:12px;border-left:4px solid '+(TSTAT_COL[st]||'#999')+(done?';opacity:.65':'')+'">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="font-weight:800;font-size:15px'+(done?';text-decoration:line-through':'')+'">'+esc(t.title)+(t.hasPhoto?' <a href="#" title="'+(ar?'صورة':'photo')+'" onclick="taskMedia(\''+t.id+'\',\'photo\');return false">📷</a>':'')+(t.hasAudio?' <a href="#" title="'+(ar?'صوت':'voice')+'" onclick="taskMedia(\''+t.id+'\',\'audio\');return false">🎙️</a>':'')+'</div><span class="tag" style="background:'+(TSTAT_COL[st]||'#999')+'22;color:'+(TSTAT_COL[st]||'#999')+'">'+esc(st)+'</span></div>'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="font-weight:800;font-size:15px'+(done?';text-decoration:line-through':'')+'">'+esc(t.title)+(t.hasPhoto?' <a href="#" title="'+(ar?'صورة':'photo')+'" onclick="taskMedia(\''+t.id+'\',\'photo\');return false">📷</a>':'')+(t.hasAudio?' <a href="#" title="'+(ar?'صوت':'voice')+'" onclick="taskMedia(\''+t.id+'\',\'audio\');return false">🎙️</a>':'')+'</div><span class="tag" style="background:'+(TSTAT_COL[st]||'#999')+'22;color:'+(TSTAT_COL[st]||'#999')+'">'+tStatLabel(st)+'</span></div>'
       +(t.projectName?'<div class="mini">🏗️ '+esc(t.projectName)+'</div>':'')
       +'<div class="mini">👤 '+esc(t.assignee||'—')+(t.due?' · 📅 <span style="'+(overdue?'color:var(--bad);font-weight:700':'')+'">'+esc(t.due)+(overdue?' ⚠️':'')+'</span>':'')+'</div>'
       +'<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">'
-        +(st!=='Done'?'<button class="btn cy" style="flex:1;min-width:120px;padding:11px;font-size:14.5px" onclick="advanceTask(\''+t.id+'\')">'+(st==='To Do'?(ar?'▶ ابدأ':'▶ Start'):(ar?'✔ خلّصت':'✔ Done'))+'</button>':'')
+        +(st!=='Done'?'<button class="btn cy" style="flex:1;min-width:140px;padding:11px;font-size:14.5px" onclick="advanceTask(\''+t.id+'\')">'+tStepLabel(st)+'</button>':'')
         +'<button class="btn gh" style="padding:11px" onclick="editTask(\''+t.id+'\')">'+(ar?'تفاصيل':'Edit')+'</button>'
       +'</div></div>';
   }).join('')+'</div>';
@@ -8104,7 +8114,17 @@ function toTrash(coll,id){
     return apiAdd('trash',t).then(function(){ return apiDelete(coll,id); });
   }).catch(function(){ return apiDelete(coll,id); });
 }
-function delDoc(coll,id){ if(confirm(lang==='ar'?'يتنقل لسلة المحذوفات؟ (هيتمسح تلقائي بعد 30 يوم، وتقدر ترجّعه قبلها)':'Move to Recycle Bin? (auto-deleted after 30 days — you can restore it before then)')) toTrash(coll,id).then(function(){ logAudit('delete',coll,id,''); try{ if(ACC_SRC[coll]){ autoUnpost(coll+':'+id); if(coll==='bills')autoUnpost('billpay:'+id); } }catch(e){} synced(); }).catch(function(e){ alert('Delete error: '+(e.message||e)); }); }
+/* ===== One-tap Undo for the last action (add / delete / etc.) — shows a toast with ↩ Undo ===== */
+var _lastUndo=null, _undoTmr=null;
+function recordUndo(label, undoFn){ _lastUndo={label:label, fn:undoFn, ts:Date.now()}; showUndoToast(label); }
+function doUndo(){ var u=_lastUndo; if(!u){ alert(lang==='ar'?'مفيش أمر تتراجع عنه':'Nothing to undo'); return; } _lastUndo=null; var t=g('undoToast'); if(t)t.style.display='none';
+  try{ var r=u.fn(); if(r&&r.then){ r.then(function(){ try{logAudit('undo','','',u.label);}catch(e){} try{synced();}catch(e){} try{alert(lang==='ar'?'اترجّع ✔':'Undone ✔');}catch(e){} }).catch(function(e){ alert('Undo error: '+(e&&e.message||e)); }); } else { try{synced();}catch(e){} } }catch(e){ alert('Undo error: '+(e&&e.message||e)); }
+}
+function showUndoToast(label){ var ar=(lang==='ar'); var t=g('undoToast'); if(!t){ t=document.createElement('div'); t.id='undoToast'; t.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#143F63;color:#fff;padding:10px 14px;border-radius:10px;z-index:99999;box-shadow:0 6px 18px rgba(0,0,0,.3);font-size:14px;display:flex;align-items:center;gap:12px;max-width:92vw'; document.body.appendChild(t); }
+  t.innerHTML='<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">✔ '+esc(label)+'</span><button onclick="doUndo()" style="background:#37c0dc;color:#062b3a;border:none;border-radius:7px;padding:7px 14px;font-weight:800;cursor:pointer;flex-shrink:0">↩ '+(ar?'تراجع':'Undo')+'</button>';
+  t.style.display='flex'; clearTimeout(_undoTmr); _undoTmr=setTimeout(function(){ var x=g('undoToast'); if(x)x.style.display='none'; _lastUndo=null; }, 12000);
+}
+function delDoc(coll,id){ if(confirm(lang==='ar'?'يتنقل لسلة المحذوفات؟ (هيتمسح تلقائي بعد 30 يوم، وتقدر ترجّعه قبلها)':'Move to Recycle Bin? (auto-deleted after 30 days — you can restore it before then)')){ var _rec=null; try{ var _arr=COLL_REG()[coll]; if(_arr){ var _c=_arr.find(function(x){return x.id===id;}); if(_c)_rec=JSON.parse(JSON.stringify(_c)); } }catch(e){} toTrash(coll,id).then(function(){ logAudit('delete',coll,id,''); try{ if(ACC_SRC[coll]){ autoUnpost(coll+':'+id); if(coll==='bills')autoUnpost('billpay:'+id); } }catch(e){} try{ if(_rec){ var _d=Object.assign({},_rec); delete _d.id; recordUndo((lang==='ar'?'اتمسح: ':'Deleted: ')+trashName(_rec,id), function(){ return apiCall('PUT','/'+coll+'/'+id+'.json',_d); }); } }catch(_u){} synced(); }).catch(function(e){ alert('Delete error: '+(e.message||e)); }); } }
 function trashRestore(tid){ var t=(trash||[]).find(function(x){return x.id===tid;}); if(!t){ alert('Not found'); return; }
   if(!(isMgr()||me.dept==='Management'||isAdmin()||nameEq(t.by,(me&&me.name)))){ alert(lang==='ar'?'الاسترجاع للمدير أو صاحب الحذف فقط.':'Restore is limited to a manager or the person who deleted it.'); return; }
   var d=Object.assign({},t.data); delete d.id;
