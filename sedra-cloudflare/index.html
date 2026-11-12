@@ -2683,6 +2683,51 @@ function mktContent(){
     <td style="white-space:nowrap"><button class="btn gh sm" onclick="editPost('${p.id}')">Edit</button> ${isAdmin()||me.role==='Manager'?`<button class="btn dn sm" onclick="delDoc('posts','${p.id}')">✕</button>`:''}</td></tr>`}).join('')+`</tbody></table>`;
   return h;
 }
+/* ===== Universal table filter — a quick-search above EVERY data table in the system =====
+   Lets Hesham filter any list (leads, projects, invoices, HR, inventory…) by typing any word
+   (name, campaign, status, branch…). Skips tables that already have their own rich search
+   (tableView wrappers) and tables that already carry a search box right above them, and ignores
+   tiny info/KPI tables (fewer than 4 rows). Runs after every render. */
+function autoTableFilters(){
+  try{
+    var host=document.getElementById('view'); if(!host) return;
+    var ar=(typeof lang!=='undefined'&&lang==='ar');
+    var tables=host.querySelectorAll('table');
+    Array.prototype.forEach.call(tables,function(tb){
+      try{
+        if(tb.getAttribute('data-qf')) return;
+        if(tb.closest && tb.closest('.tvwrap')) return;              /* tableView — already has search+filters */
+        var tbody=tb.tBodies&&tb.tBodies[0]; if(!tbody) return;
+        /* count real data rows (ignore our own expansion rows) */
+        var dataRows=0; for(var i=0;i<tbody.rows.length;i++){ var c=tbody.rows[i].className||''; if(c.indexOf('projActRow')<0) dataRows++; }
+        if(dataRows<4) return;                                       /* skip tiny info/KPI tables */
+        /* skip if a search box already sits right above this table (custom views like Projects) */
+        var sib=tb.previousElementSibling, near=false, hops=0;
+        while(sib && hops<2){ if(sib.querySelector && (sib.querySelector('input.tvq')||sib.querySelector('input[type=search]'))){ near=true; break; } if((sib.tagName||'').toLowerCase()==='table') break; sib=sib.previousElementSibling; hops++; }
+        if(near) return;
+        tb.setAttribute('data-qf','1');
+        var box=document.createElement('div'); box.style.cssText='margin:8px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+        var inp=document.createElement('input'); inp.type='search'; inp.className='tvq qf-input';
+        inp.placeholder='🔍 '+(ar?'فلترة الجدول… (اكتب أي كلمة)':'Filter this table… (type any word)');
+        inp.style.cssText='max-width:300px;padding:7px 10px;border:1px solid var(--mist);border-radius:8px;font-size:13px';
+        var cnt=document.createElement('span'); cnt.className='mini'; cnt.style.color='var(--muted)';
+        box.appendChild(inp); box.appendChild(cnt);
+        tb.parentNode.insertBefore(box,tb);
+        inp.addEventListener('input',function(){
+          var q=(inp.value||'').trim().toLowerCase(); var shown=0,total=0;
+          var rws=tbody.rows;
+          for(var r=0;r<rws.length;r++){ var tr=rws[r];
+            if((tr.className||'').indexOf('projActRow')>=0){ tr.style.display=q?'none':''; continue; }
+            total++;
+            var ok=!q||((tr.textContent||'').toLowerCase().indexOf(q)>=0);
+            tr.style.display=ok?'':'none'; if(ok)shown++;
+          }
+          cnt.textContent=q?(shown+' / '+total):'';
+        });
+      }catch(_e){}
+    });
+  }catch(e){}
+}
 function render(keepScroll){
   if(!me)return;
   var _sy=0; try{ if(keepScroll) _sy=window.scrollY||window.pageYOffset||0; }catch(_e){}
@@ -2697,6 +2742,7 @@ function render(keepScroll){
   g('view').innerHTML = fn?fn():'';
   if(curView==='sales' && window._afterSales)window._afterSales();
   if(curView==='chat' && window._afterChat)window._afterChat();
+  try{ autoTableFilters(); }catch(e){}
   try{ translateDOM(g('app')); }catch(e){}
   try{ if(keepScroll && _sy) window.scrollTo(0,_sy); }catch(_e){}
 }
@@ -3216,13 +3262,17 @@ function bwBuild(){
 /* Which campaign a lead came from — shown in the leads dashboard instead of branch/value.
    campaignId links to the marketing `campaigns` collection (or an ad campaign); imported leads may
    carry a plain-text `campaign`. Falls back to a dash. */
-function leadCampaignCell(r){
+function leadCampaignName(r){
+  if(!r) return '';
   var c=(typeof campaigns!=='undefined'?campaigns:[]).find(function(x){return x.id===r.campaignId;});
-  if(c) return '<b>'+esc(c.name)+'</b>';
+  if(c) return c.name||'';
   var ac=(typeof adcampaigns!=='undefined'?adcampaigns:[]).find(function(x){return x.id===r.campaignId;});
-  if(ac) return '<b>'+esc(ac.name)+'</b>';
-  if(r.campaign) return esc(r.campaign);
-  return '<span class="mini" style="color:var(--muted)">—</span>';
+  if(ac) return ac.name||'';
+  return r.campaign||'';
+}
+function leadCampaignCell(r){
+  var n=leadCampaignName(r);
+  return n?('<b>'+esc(n)+'</b>'):'<span class="mini" style="color:var(--muted)">—</span>';
 }
 function vSales(){
   if(openLeadId){ const _l=leads.find(x=>x.id===openLeadId); if(_l)return vLeadDetail(); openLeadId=''; }
@@ -3248,7 +3298,7 @@ function vSales(){
     <td style="white-space:nowrap"><button class="btn cy sm" onclick="openLeadId='${r.id}';render()">Open</button> <button class="btn gh sm" title="WhatsApp" onclick="waLead('${r.id}')">💬</button> ${r.stage!=='Lost'&&!r.quoteId?`<button class="btn gh sm" onclick="leadToQuote('${r.id}')">→ Quote</button> `:''}<button class="btn gh sm" onclick="editLead('${r.id}')">Edit</button>${canDelLead(r)?`  <button class="btn dn sm" title="Delete" onclick="delDoc('leads','${r.id}')">✕</button>`:''}</td></tr>`},
     {empty:'No leads yet. Click “Add lead”.', placeholder:'🔍 Search leads…',
      search:r=>[r.company,r.name,r.phone,r.owner,r.source,r.service,r.branch].join(' '),
-     filters:[{label:'Stage',opts:STAGES,match:(r,v)=>(r.stage||'New')===v},{label:(lang==='ar'?'العمر':'Age'),opts:[(lang==='ar'?'⏳ راكد New (+30ي)':'⏳ Stale New (>30d)')],match:(r,v)=>isStaleNew(r)},{label:(lang==='ar'?'المصدر':'Source'),opts:[...new Set(rows.map(function(x){return x.source;}).filter(Boolean))].sort(),match:function(x,v){return (x.source||'')===v;}}].concat(curBranch==='All'?[{label:'Branch',opts:BRANCHES,match:(r,v)=>r.branch===v}]:[]),
+     filters:[{label:'Stage',opts:STAGES,match:(r,v)=>(r.stage||'New')===v},{label:(lang==='ar'?'العمر':'Age'),opts:[(lang==='ar'?'⏳ راكد New (+30ي)':'⏳ Stale New (>30d)')],match:(r,v)=>isStaleNew(r)},{label:(lang==='ar'?'المصدر':'Source'),opts:[...new Set(rows.map(function(x){return x.source;}).filter(Boolean))].sort(),match:function(x,v){return (x.source||'')===v;}},{label:(lang==='ar'?'الحملة':'Campaign'),opts:[...new Set(rows.map(function(x){return leadCampaignName(x);}).filter(Boolean))].sort(),match:function(x,v){return leadCampaignName(x)===v;}}].concat(curBranch==='All'?[{label:'Branch',opts:BRANCHES,match:(r,v)=>r.branch===v}]:[]),
      sorts:[
        {label:(lang==='ar'?'الأحدث أولاً':'Newest first'),fn:(a,b)=>(''+(b.created||b.date||'')).localeCompare(''+(a.created||a.date||''))},
        {label:(lang==='ar'?'الأقدم أولاً':'Oldest first'),fn:(a,b)=>(''+(a.created||a.date||'')).localeCompare(''+(b.created||b.date||''))},
