@@ -4223,11 +4223,24 @@ function addMilestone(pid){
 }
 function toggleMilestone(pid,i){ const p=projects.find(x=>x.id===pid); if(!p)return; const mil=(p.milestones||[]).map((m,j)=>j===i?Object.assign({},m,{done:!m.done}):m); apiMerge('projects',pid,{milestones:mil}).then(synced); }
 function delMilestone(pid,i){ const p=projects.find(x=>x.id===pid); if(!p)return; const mil=(p.milestones||[]).filter((m,j)=>j!==i); apiMerge('projects',pid,{milestones:mil}).then(synced); }
+function projQuotePick(){
+  var sel=g('p_quote'); if(!sel)return; var q=(quotes||[]).find(function(x){return x.id===sel.value;}); var note=g('p_quoteNote');
+  if(!q){ if(note)note.textContent=''; return; }
+  var t=(typeof quoteTotal==='function')?quoteTotal(q):{total:0};
+  if(g('p_name')&&!g('p_name').value) g('p_name').value=(q.client||'Project')+' — '+(q.number||'');
+  if(g('p_client')&&!g('p_client').value) g('p_client').value=q.client||'';
+  if(g('p_value')&&!num(g('p_value').value)) g('p_value').value=Math.round(t.total||0);
+  var n=((typeof quoteChecklist==='function')?quoteChecklist(q):[]).length;
+  if(note)note.innerHTML='✅ '+(lang==='ar'?('هينزّل '+n+' بند من الكوتيشن تلقائي كقائمة مواد للمشروع'):(n+' items will be imported as the project materials list'));
+}
 function editProject(id){
   if(!canApproveMat()){ alert(lang==='ar'?'🚫 تعديل تفاصيل المشاريع للمدير أو Team Leader فقط.':'🚫 Editing project details is restricted to a manager / team leader.'); return; }
+  if(!id && typeof loadHeavy==='function' && !window._projQuotesTried && !(typeof quotes!=='undefined' && quotes && quotes.length)){ window._projQuotesTried=true; try{ loadHeavy('quotes').then(function(){ editProject(id); }).catch(function(){ editProject(id); }); return; }catch(e){} }
   const r=id?projects.find(x=>x.id===id):{branch:defBranch(),status:'Planning',progress:0,dept:(me.dept==='Management'?'Operations':me.dept),owner:me.name};
   var _gpsLocked=!!(id&&r&&r.gps&&!isAdmin()); /* location set once: locked for everyone except Super Admin; others request a change */
+  var _quoteOpts = (!id) ? ('<div class="fld"><label>'+(lang==='ar'?'📄 استورد بنود من كوتيشن (اختياري) — ينزّل كل المنتجات مرة واحدة':'📄 Import items from a quotation (optional) — loads all products at once')+'</label><select id="p_quote" onchange="projQuotePick()"><option value="">'+(lang==='ar'?'— بدون / مشروع فاضي —':'— none / blank project —')+'</option>'+(quotes||[]).filter(function(q){ return (!q.isRFQ||q.rfqDone) && !q.projectId && !(projects||[]).some(function(pp){return pp.fromQuote===q.id;}); }).slice().sort(function(a,b){return (''+(b.date||'')).localeCompare(''+(a.date||''));}).map(function(q){ return '<option value="'+q.id+'">'+esc((q.number||q.id.slice(-5))+' · '+(q.client||'')+(q.date?(' · '+q.date):''))+'</option>'; }).join('')+'</select><div id="p_quoteNote" class="mini" style="margin-top:4px;color:var(--ok)"></div></div>') : '';
   openModal(id?'Edit project':'Add project',
+    _quoteOpts+
     fEl('Project name','p_name',r.name)+fEl('Client','p_client',r.client)+
     `<div class="row2">${selEl('Branch','p_branch',branchOpts(),r.branch)}${selEl('Department','p_dept',['Operations','Technical'],r.dept||'Operations')}</div>`+
     `<div class="row2">${selEl('Status','p_status',PSTAT,r.status||'Planning')}${fEl('Progress %','p_progress',r.progress,'number')}</div>`+
@@ -4242,7 +4255,10 @@ function editProject(id){
     ()=>{ var _gps=_gpsLocked?(r.gps||''):val('p_gps');
       if(_gps && typeof scLatLng==='function' && !scLatLng(_gps)){ alert(lang==='ar'?'⚠️ الموقع اللي دخلته مش بإحداثيات مقروءة. استخدم زرار «📍 استخدم موقعي الحالي» وانت في الموقع، أو الصق إحداثيات زي 30.0512, 31.2405. (اللينكات المختصرة maps.app.goo.gl مش بتشتغل مع تحديد الحضور.)':'⚠️ Location has no readable coordinates. Use "📍 Use my current location" on-site, or paste coordinates like 30.0512, 31.2405. (Shortened maps.app.goo.gl links do not work for check-in.)'); return false; }
       const d={name:val('p_name'),client:val('p_client'),branch:val('p_branch'),dept:val('p_dept'),status:val('p_status'),progress:num(val('p_progress')),start:val('p_start'),end:val('p_end'),owner:val('p_owner'),value:num(val('p_value')),gps:_gps,address:val('p_address'),collected:num(val('p_collected')),assignedTo:(val('p_assigned')||'').split(',').map(function(s){return s.trim().toLowerCase();}).filter(Boolean),drawingApproved:val('p_draw')==='Yes',cost:num(val('p_cost')),notes:val('p_notes'),file:fileVal('p_file')};
-      if(!d.name){alert('Name required');return false;} if(!dupGuard('projects',d,id))return false; if(!id)d.created=new Date().toISOString(); d.ownerEmail=ownerEmailFor(d.owner); saveDoc('projects',d,id); try{ notifyLeaders(d,(lang==='ar'?(id?'✏️ تعديل مشروع — ':'➕ مشروع جديد — '):(id?'✏️ Project edited — ':'➕ New project — '))+d.name,((me&&me.name)||'')+(lang==='ar'?(id?' عدّل بيانات المشروع':' أضاف مشروع'):(id?' edited the project':' added a project'))); }catch(_n){} });
+      if(!d.name){alert('Name required');return false;} if(!dupGuard('projects',d,id))return false; if(!id)d.created=new Date().toISOString();
+      /* NEW project from a quotation: load ALL the quote's items as the materials checklist in one shot */
+      if(!id){ var _qid=(g('p_quote')&&g('p_quote').value)||''; if(_qid){ var _q=(quotes||[]).find(function(x){return x.id===_qid;}); if(_q){ d.fromQuote=_qid; d.checklist=quoteChecklist(_q); if(!num(d.value)){ try{ d.value=quoteTotal(_q).total; }catch(e){} } try{ apiMerge('quotes',_qid,{status:'Approved'}); }catch(e){} } } }
+      d.ownerEmail=ownerEmailFor(d.owner); saveDoc('projects',d,id); try{ notifyLeaders(d,(lang==='ar'?(id?'✏️ تعديل مشروع — ':'➕ مشروع جديد — '):(id?'✏️ Project edited — ':'➕ New project — '))+d.name,((me&&me.name)||'')+(lang==='ar'?(id?' عدّل بيانات المشروع':' أضاف مشروع'):(id?' edited the project':' added a project'))); }catch(_n){} });
 }
 
 /* Fill the project GPS field from the manager's/TL's current device location (editProject is already gated to canApproveMat) */
