@@ -4157,6 +4157,7 @@ function editTask(id,projectId){
     tkMediaBody(ar,!!(t.hasPhoto),!!(t.hasAudio),id||''),
     ()=>{ const pid=val('t_project'); const pn=(projects.find(x=>x.id===pid)||{}).name||''; const br=(projects.find(x=>x.id===pid)||{}).branch||defBranch();
       const d={title:val('t_title'),project:pid,projectName:pn,branch:br,assignee:val('t_assignee'),due:val('t_due'),status:val('t_status'),notes:val('t_notes')};
+      var _asgEmp=(employees||[]).find(function(x){return (x.name||'')===d.assignee;}); d.assigneeEmail=((_asgEmp&&_asgEmp.email)||'').toLowerCase();
       if(!d.title){alert(ar?'لازم عنوان للتاسك':'Title required');return false;} if(!id)d.created=new Date().toISOString();
       if(_tkPhoto)d.hasPhoto=true; if(_tkAudio)d.hasAudio=true;
       var _asgChanged=(d.assignee && d.assignee!==(t.assignee||'')); var _mediaNew=!!(_tkPhoto||_tkAudio);
@@ -8320,7 +8321,7 @@ function getNotifications(){
   expclaims.forEach(function(c){ if((c.email||'').toLowerCase()===myEmail&&(c.status==='Approved'||c.status==='Rejected'||c.status==='Paid')&&num(c.decidedTs)>_seen) list.unshift({ico:c.status==='Rejected'?'⛔':'🧾',key:'claim:'+c.id,title:'Expense claim '+c.status,sub:(c.category||'')+' · '+nfmt(c.amount),count:1,ts:num(c.decidedTs),act:function(){curView='claims';markNotifSeen();closeBell();render();}}); });
   approvals.forEach(function(a){ if((a.email||'').toLowerCase()===myEmail&&(a.status==='Approved'||a.status==='Rejected')&&num(a.decidedTs)>_seen) list.unshift({ico:a.status==='Approved'?'✅':'⛔',key:'appr:'+a.id,title:'Request '+a.status,sub:(a.title||''),count:1,ts:num(a.decidedTs),act:function(){curView='approvals';markNotifSeen();closeBell();render();}}); });
   // ---- personal: a NEW task was assigned to me (shows in the bell; a phone push is also sent on assignment) ----
-  try{ var _nt=(tasks||[]).filter(function(tk){ if((tk.assignee||'')!==myName) return false; if((tk.status||'')==='Done') return false; var ts=num(tk.assignedTs)||(tk.created?new Date(tk.created).getTime():0); return ts && ts>_seen && (Date.now()-ts)<30*86400000; });
+  try{ var _nt=(tasks||[]).filter(function(tk){ var mine=((tk.assigneeEmail||'').toLowerCase()===myEmail && myEmail)||((tk.assignee||'')===myName); if(!mine) return false; if((tk.status||'')==='Done') return false; var ts=num(tk.assignedTs)||(tk.created?new Date(tk.created).getTime():0); return ts && ts>_seen && (Date.now()-ts)<30*86400000; });
     _nt.forEach(function(tk){ list.unshift({ico:'🗂️',key:'task:'+tk.id,title:(lang==='ar'?'تاسك جديد ليك':'New task assigned'),sub:(tk.title||'')+(tk.projectName?(' · '+tk.projectName):'')+(tk.due?(' · '+(lang==='ar'?'تسليم ':'due ')+tk.due):''),count:1,ts:(num(tk.assignedTs)||(tk.created?new Date(tk.created).getTime():0)),act:function(){curView='operations';opsScope='mine';markNotifSeen();closeBell();render();}}); });
   }catch(e){}
   // ---- Quote Requests: notify every stakeholder (managers, team leader, tech manager, assignee, requester) ----
