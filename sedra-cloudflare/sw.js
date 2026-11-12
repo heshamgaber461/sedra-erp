@@ -1,6 +1,5 @@
 /* Sedra ERP service worker — network-first so updates always show; cache only as offline fallback. */
-const CACHE = 'sedra-v105';
-const SHELL = ['/', '/index.html', '/logo.png', '/manifest.json'];
+const CACHE = 'sedra-v106';const SHELL = ['/', '/index.html', '/logo.png', '/manifest.json'];
 
 self.addEventListener('install', function(e){
   self.skipWaiting();
