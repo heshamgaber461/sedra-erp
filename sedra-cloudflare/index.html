@@ -4562,10 +4562,10 @@ function projExtraDetail(p){
     h+='</tbody></table></div>';
   }
   h+='<div class="sect"><h2>📦 '+(ar?'قائمة المواد (مخزن المشروع)':'Materials checklist (project store)')+' <span class="tag">'+cl.length+'</span></h2><div class="sp"></div>';
-  if(canApproveMat(p)){ h+='<button class="btn cy sm" onclick="addProjMaterial(\''+p.id+'\')">➕ '+(ar?'إضافة مادة':'Add material')+'</button> '; }
+  if(canApproveMat(p)){ h+='<button class="btn cy sm" onclick="projImportFromQuote(\''+p.id+'\')">📄 '+(ar?'استورد من كوتيشن جاهز':'Import from a quotation')+'</button> <button class="btn gh sm" onclick="addProjMaterial(\''+p.id+'\')">➕ '+(ar?'إضافة مادة يدوي':'Add material')+'</button> '; }
   if(cl.length&&(isMgr()||isAdmin())){ h+='<button class="btn gh sm" onclick="projMatExport(\''+p.id+'\')">⬇ CSV</button>'; }
   h+='</div>';
-  if(!cl.length){ h+='<div class="card empty">'+(ar?'مفيش بنود. اعمل Import من الكوتيشن.':'No items. Import from the quotation.')+'</div>'; return h; }
+  if(!cl.length){ h+='<div class="card empty">'+(ar?'مفيش بنود لسه. دوس «📄 استورد من كوتيشن جاهز» فوق عشان تنزّل كل البنود مرة واحدة — من غير إدخال يدوي.':'No items yet. Tap “📄 Import from a quotation” above to load all items at once.')+'</div>'; return h; }
   h+='<div style="overflow-x:auto"><table><thead><tr><th>'+(ar?'الصنف':'Item')+'</th><th>'+(ar?'المطلوب':'Required')+'</th><th>'+(ar?'المنصرف':'Issued')+'</th><th>'+(ar?'المتبقّي':'Remaining')+'</th><th></th></tr></thead><tbody>';
   cl.forEach(function(it,i){ var rem=clRemaining(it); var done=rem<=0;
     h+='<tr><td><b>'+esc(it.item)+'</b>'+(it.code?'<div class="mini">'+esc(it.code)+'</div>':'')+'</td>'
@@ -4581,6 +4581,26 @@ function projMatExport(pid){ var p=projects.find(function(x){return x.id===pid;}
   var a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv); a.download=(p.name||'project')+'-materials.csv'; document.body.appendChild(a); a.click(); a.remove();
 }
 /* Manually ADD a material line to a project's checklist (manager / Team Leader only) */
+/* Import ALL items of a READY quotation into an EXISTING project's materials checklist — one shot, no manual entry. */
+function projImportFromQuote(pid){
+  var p=projects.find(function(x){return x.id===pid;}); if(!p)return; var ar=(lang==='ar');
+  if(!canApproveMat(p)){ alert(ar?'الاستيراد للمدير أو Team Leader فقط.':'Import is for a manager / team leader only.'); return; }
+  var go=function(){
+    var qs=(quotes||[]).filter(function(q){ return (!q.isRFQ||q.rfqDone); }).slice().sort(function(a,b){return (''+(b.date||'')).localeCompare(''+(a.date||''));});
+    if(!qs.length){ alert(ar?'مفيش كوتيشنات جاهزة. اعمل كوتيشن الأول من شاشة Quotations.':'No quotations yet. Create one first from Quotations.'); return; }
+    var body='<div class="card mini" style="margin-bottom:8px">'+(ar?'اختر كوتيشن جاهز — هينزّل كل بنوده كقائمة مواد للمشروع. لو المشروع فيه بنود، هتتضاف فوقهم.':'Pick a ready quotation — all its items load into the project store. Existing items are kept.')+'</div>'+
+      qs.map(function(q){ var n=((typeof quoteChecklist==='function')?quoteChecklist(q):[]).length; return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--mist)"><div><b>'+esc(q.number||q.id.slice(-5))+'</b><div class="mini">'+esc(q.client||'')+(q.date?(' · '+q.date):'')+' · '+n+' '+(ar?'بند':'items')+'</div></div><button class="btn cy sm" onclick="projDoImportQuote(\''+pid+'\',\''+q.id+'\')">📥 '+(ar?'استورد':'Import')+'</button></div>'; }).join('');
+    openModal((ar?'📄 استورد مواد من كوتيشن — ':'📄 Import materials from a quotation — ')+esc(p.name), body, null);
+    var sb=g('mSave'); if(sb)sb.classList.add('hide');
+  };
+  if(typeof loadHeavy==='function' && !(typeof quotes!=='undefined'&&quotes&&quotes.length)){ loadHeavy('quotes').then(go).catch(go); } else go();
+}
+function projDoImportQuote(pid,qid){
+  var p=projects.find(function(x){return x.id===pid;}); if(!p)return; var q=(quotes||[]).find(function(x){return x.id===qid;}); if(!q)return; var ar=(lang==='ar');
+  var add=(typeof quoteChecklist==='function')?quoteChecklist(q):[]; if(!add.length){ alert(ar?'الكوتيشن ملوش بنود.':'This quotation has no items.'); return; }
+  var cur=(p.checklist||[]).slice(); var merged=cur.concat(add);
+  apiMerge('projects',pid,{checklist:merged,fromQuote:(p.fromQuote||q.id)}).then(function(){ try{ apiMerge('quotes',qid,{status:'Approved'}); }catch(e){} try{logAudit('import','projects',pid,'checklist from quote '+(q.number||''));}catch(e){} try{ recordUndo((ar?('استوردت '+add.length+' بند من كوتيشن'):('Imported '+add.length+' items')), function(){ return apiMerge('projects',pid,{checklist:cur}); }); }catch(_u){} closeModal(); synced(); alert(ar?('✔ اتنزّل '+add.length+' بند لقائمة مواد المشروع'):('✔ '+add.length+' items imported to the project store')); }).catch(function(e){ alert('Error: '+(e.message||e)); });
+}
 function addProjMaterial(pid){
   var p=projects.find(function(x){return x.id===pid;}); if(!p)return;
   if(!canApproveMat(p)){ alert(lang==='ar'?'🚫 إضافة المواد للمدير أو Team Leader فقط.':'🚫 Adding materials is restricted to a manager / team leader.'); return; }
