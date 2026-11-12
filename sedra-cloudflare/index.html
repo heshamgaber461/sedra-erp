@@ -2733,8 +2733,18 @@ function autoTableFilters(){
     });
   }catch(e){}
 }
+/* Open the exact item a notification points to (works for the in-app bell AND a tapped push via ?n=ref). */
+function openNotifRef(ref){ if(!ref)return; try{ var parts=String(ref).split(':'); var t=parts[0], id=parts.slice(1).join(':')||'';
+  if(t==='task'){ curView='operations'; opsScope='mine'; try{closeBell&&closeBell();}catch(e){} render(); setTimeout(function(){ try{editTask(id);}catch(e){} },350); return; }
+  if(t==='matreq'){ curView='field'; try{closeBell&&closeBell();}catch(e){} render(); return; }
+  if(t==='lead'){ curView='sales'; salesTab='leads'; openLeadId=id; try{closeBell&&closeBell();}catch(e){} render(); return; }
+  if(t==='project'){ curView='projects'; openProjectId=id; try{closeBell&&closeBell();}catch(e){} render(); return; }
+  if(t==='field'||t==='operations'||t==='sales'||t==='projects'){ curView=t; try{closeBell&&closeBell();}catch(e){} render(); return; }
+}catch(e){} }
+var _notifRefDone=false;
 function render(keepScroll){
   if(!me)return;
+  if(!_notifRefDone){ _notifRefDone=true; try{ var _np=new URLSearchParams(location.search).get('n'); if(_np){ setTimeout(function(){ try{openNotifRef(decodeURIComponent(_np));}catch(e){} try{history.replaceState(null,'',location.pathname);}catch(e){} },500); } }catch(e){} }
   var _sy=0; try{ if(keepScroll) _sy=window.scrollY||window.pageYOffset||0; }catch(_e){}
   try{ if(curView==='projects'){ if(openProjectId) localStorage.setItem('sedra_openproj',openProjectId); else localStorage.removeItem('sedra_openproj'); } }catch(_e){}
   ensureHeavyFor(curView);
@@ -3859,8 +3869,10 @@ function mktPerf(){
 }
 
 /* ===================== PROJECTS ===================== */
-var PSTAT_DEF=['Planning','In Progress','On Hold','Completed','Cancelled']; var PSTAT=PSTAT_DEF.slice();
-const PSTAT_COL={Planning:'#5A6B7B','In Progress':'#2C77B0','On Hold':'#e0a93b',Completed:'#1a7a4f',Cancelled:'#c0392b'};
+var PSTAT_DEF=['المتابعات','تحت التركيب','جاري التسليم','تم التسليم','Hold','تم الإلغاء']; var PSTAT=PSTAT_DEF.slice();
+const PSTAT_COL={'المتابعات':'#2C77B0','تحت التركيب':'#37c0dc','جاري التسليم':'#e0a93b','تم التسليم':'#1a7a4f','Hold':'#8a5a00','تم الإلغاء':'#c0392b',
+  /* legacy statuses kept so older projects still show a colour */
+  Planning:'#5A6B7B','In Progress':'#2C77B0','On Hold':'#e0a93b',Completed:'#1a7a4f',Cancelled:'#c0392b'};
 let openProjectId=null;
 function projProgress(p){ const ts=tasks.filter(t=>t.project===p.id); if(ts.length){ return Math.round(ts.filter(t=>t.status==='Done').length/ts.length*100); } return num(p.progress); }
 let projTab='list';
@@ -3925,9 +3937,9 @@ function vProjects(){
   h+=projectsPanel(rows);
   h+=`<div class="sect"><h2>Projects</h2><div class="sp"></div>${isAdmin()?`<button class="btn gh sm" onclick="sedraImportProjects()" title="Import projects from /projects-seed.json">⬆ Import</button> <button class="btn dn sm" onclick="sedraDeleteAllProjects()" title="Move all projects to Recycle Bin">🗑 Clear all</button> `:''}${canApproveMat()?`<button class="btn cy" onclick="editProject()">+ Add project</button>`:''}</div>`;
   if(!rows.length)return h+`<div class="card empty">No projects yet.</div>`;
-  h+=`<div class="sect" style="margin-top:4px"><input class="tvq" type="search" style="max-width:280px" placeholder="🔍 ${lang==='ar'?'ابحث عن مشروع…':'Search projects…'}" value="${esc(projQ)}" oninput="projQ=this.value;render()"><div class="sp"></div><span class="mini">${lang==='ar'?'دوس على السهم ▾ لإجراءات سريعة (حضور / انصراف / طلب ماتريل)':'Tap the ▾ arrow for quick actions (check-in / out / request material)'}</span></div>`;
+  h+=`<div class="sect" style="margin-top:4px"><input class="tvq" type="search" style="max-width:240px" placeholder="🔍 ${lang==='ar'?'ابحث عن مشروع…':'Search projects…'}" value="${esc(projQ)}" oninput="setProjQ(this.value)"> <select class="tvf" onchange="setProjStatusF(this.value)"><option value="">${lang==='ar'?'كل الحالات':'All statuses'}</option>${PSTAT.map(function(s){return '<option value="'+esc(s)+'" '+(s===projStatusF?'selected':'')+'>'+esc(s)+'</option>';}).join('')}</select><div class="sp"></div><span class="mini">${lang==='ar'?'دوس على السهم ▾ لإجراءات سريعة (حضور / انصراف / طلب ماتريل)':'Tap the ▾ arrow for quick actions'}</span></div>`;
   var pq=(projQ||'').trim().toLowerCase();
-  var frows=pq?rows.filter(function(p){return [p.name,p.client,p.owner,p.branch,p.status,p.dept].join(' ').toLowerCase().indexOf(pq)>=0;}):rows;
+  var frows=rows.filter(function(p){ if(projStatusF && (p.status||'')!==projStatusF) return false; if(pq && [p.name,p.client,p.owner,p.branch,p.status,p.dept].join(' ').toLowerCase().indexOf(pq)<0) return false; return true; });
   if(!frows.length)return h+`<div class="card empty">${lang==='ar'?'مفيش مشاريع مطابقة للبحث.':'No projects match your search.'}</div>`;
   h+=`<table><thead><tr><th></th><th>Project</th><th>Client</th><th>Branch</th><th>Dept</th><th>Status</th><th>Progress</th><th>Tasks</th>${canSeeMoney()?'<th>Value</th>':''}<th></th></tr></thead><tbody>`+frows.map(p=>{const pr=projProgress(p),ts=tasks.filter(t=>t.project===p.id),done=ts.filter(t=>t.status==='Done').length;const _op=(projOpenRow===p.id);return `<tr>
     <td style="text-align:center"><button class="btn gh sm" title="${lang==='ar'?'إجراءات سريعة':'Quick actions'}" onclick="projToggleRow('${p.id}')" style="font-size:13px;min-width:30px;padding:3px 7px">${_op?'▾':'▸'}</button></td>
@@ -3943,7 +3955,11 @@ function vProjects(){
 /* ===== Projects list quick actions (the ▾ arrow on each project row) =====
    Lets a technician/manager check-in, check-out or request materials for a project straight from the
    list without opening it. */
-var projOpenRow='', projQ='';
+var projOpenRow='';
+var projQ=(function(){try{return localStorage.getItem('sedra_projq')||'';}catch(e){return '';}})();
+var projStatusF=(function(){try{return localStorage.getItem('sedra_projsf')||'';}catch(e){return '';}})();
+function setProjQ(v){ projQ=v; try{localStorage.setItem('sedra_projq',v);}catch(e){} render(); }
+function setProjStatusF(v){ projStatusF=v; try{localStorage.setItem('sedra_projsf',v);}catch(e){} render(); }
 function projToggleRow(id){ projOpenRow=(projOpenRow===id?'':id); render(); }
 function projQuickCheckIn(pid){
   var p=projects.find(function(x){return x.id===pid;}); if(!p)return; var ar=(lang==='ar');
@@ -4197,7 +4213,7 @@ function editTask(id,projectId){
               var _ttl=_asgChanged?(ar?'تاسك جديد ليك':'New task assigned'):(ar?'تحديث على تاسك ليك':'Task updated');
               var _sub=(d.title||'')+(pn?(' — '+pn):'')+(_att?(' · '+_att):'');
               try{ apiAdd('notifications',{ ts:Date.now(), toEmail:_ae, ico:'🗂️', title:_ttl, sub:_sub, type:'task', taskId:(id||newId||''), projectId:pid||'', branch:br||'', actor:(me&&me.name)||'', actorEmail:_meE }); }catch(_an){}
-              try{ sendPushToStaff([_ae],'🗂️ '+_ttl+' — Sedra',_sub+(d.due?(' · '+(ar?'تسليم ':'due ')+d.due):''),'/'); }catch(_ps){}
+              try{ sendPushToStaff([_ae],'🗂️ '+_ttl+' — Sedra',_sub+(d.due?(' · '+(ar?'تسليم ':'due ')+d.due):''),'/?n=task:'+(id||newId||'')); }catch(_ps){}
               try{ var _NL=String.fromCharCode(10);
                 var _body=(_asgChanged?(ar?'اتكلّفت بتاسك جديد:':'A new task has been assigned to you:'):(ar?'في تحديث على تاسك مطلوب منك:':'A task assigned to you was updated:'))+_NL+_NL
                   +(ar?'التاسك: ':'Task: ')+(d.title||'-')+_NL
@@ -4236,7 +4252,7 @@ function projQuotePick(){
 function editProject(id){
   if(!canApproveMat()){ alert(lang==='ar'?'🚫 تعديل تفاصيل المشاريع للمدير أو Team Leader فقط.':'🚫 Editing project details is restricted to a manager / team leader.'); return; }
   if(!id && typeof loadHeavy==='function' && !window._projQuotesTried && !(typeof quotes!=='undefined' && quotes && quotes.length)){ window._projQuotesTried=true; try{ loadHeavy('quotes').then(function(){ editProject(id); }).catch(function(){ editProject(id); }); return; }catch(e){} }
-  const r=id?projects.find(x=>x.id===id):{branch:defBranch(),status:'Planning',progress:0,dept:(me.dept==='Management'?'Operations':me.dept),owner:me.name};
+  const r=id?projects.find(x=>x.id===id):{branch:defBranch(),status:'المتابعات',progress:0,dept:(me.dept==='Management'?'Operations':me.dept),owner:me.name};
   var _gpsLocked=!!(id&&r&&r.gps&&!isAdmin()); /* location set once: locked for everyone except Super Admin; others request a change */
   var _quoteOpts = (!id) ? ('<div class="fld"><label>'+(lang==='ar'?'📄 استورد بنود من كوتيشن (اختياري) — ينزّل كل المنتجات مرة واحدة':'📄 Import items from a quotation (optional) — loads all products at once')+'</label><select id="p_quote" onchange="projQuotePick()"><option value="">'+(lang==='ar'?'— بدون / مشروع فاضي —':'— none / blank project —')+'</option>'+(quotes||[]).filter(function(q){ return (!q.isRFQ||q.rfqDone) && !q.projectId && !(projects||[]).some(function(pp){return pp.fromQuote===q.id;}); }).slice().sort(function(a,b){return (''+(b.date||'')).localeCompare(''+(a.date||''));}).map(function(q){ return '<option value="'+q.id+'">'+esc((q.number||q.id.slice(-5))+' · '+(q.client||'')+(q.date?(' · '+q.date):''))+'</option>'; }).join('')+'</select><div id="p_quoteNote" class="mini" style="margin-top:4px;color:var(--ok)"></div></div>') : '';
   openModal(id?'Edit project':'Add project',
@@ -4478,7 +4494,7 @@ function notifyMatRequester(r,p,decision,approvedQty,partial){
     else { title=(ar?'طلب ماتريل اتوافق ✅':'Material request approved ✅'); sub=num(approvedQty)+' × '+(r.item||'')+(p?(' — '+p.name):''); }
   } else { title=(ar?'طلب ماتريل اترفض ⛔':'Material request rejected ⛔'); sub=num(r.qty)+' × '+(r.item||'')+(p?(' — '+p.name):''); }
   try{ apiAdd('notifications',{ts:Date.now(), toEmail:to, ico:(decision==='Approved'?'✅':'⛔'), title:title, sub:sub, type:'matreq', matreqId:r.id, projectId:(p&&p.id)||'', branch:(p&&p.branch)||'', actor:(me&&me.name)||'', actorEmail:meE}); }catch(_a){}
-  try{ sendPushToStaff([to], title+' — Sedra', sub, '/'); }catch(_p){}
+  try{ sendPushToStaff([to], title+' — Sedra', sub, '/?n=matreq:'+((r&&r.id)||'')); }catch(_p){}
   try{ var emp=(employees||[]).find(function(x){return (x.email||'').toLowerCase()===to;}); if(emp){ var NL=String.fromCharCode(10); sendEmailAuto(to, '🧰 '+title, (ar?'بخصوص طلب الماتريل بتاعك:':'Regarding your material request:')+NL+NL+sub+NL+NL+(ar?'ادخل نظام Sedra من «شغل الموقع ← طلباتي» للتفاصيل.':'Open Sedra (Field work → My requests) for details.')); } }catch(_e){}
 }
 /* Technician returns unused material back to the PROJECT STORE.
@@ -5739,7 +5755,7 @@ function createProjectFromQuote(id){
   const q=quotes.find(x=>x.id===id); if(!q)return; const t=quoteTotal(q);
   const name=(q.client||'Project')+' — '+(q.number||'');
   if(!confirm((lang==='ar'?'إنشاء مشروع من هذا العرض؟':'Create a project from this quotation?')+String.fromCharCode(10)+name+' · '+money2(docCur(q),t.total)))return;
-  apiAdd('projects',{name:name,client:q.client,branch:q.branch,dept:q.dept||'Operations',status:'Planning',progress:0,owner:(me&&me.name)||'',ownerEmail:(me&&me.email||'').toLowerCase(),value:t.total,currency:docCur(q),fxRate:(quoteRate(q)>0?(1/quoteRate(q)):1),start:today(),end:q.date,fromQuote:q.id,checklist:quoteChecklist(q),created:new Date().toISOString()})
+  apiAdd('projects',{name:name,client:q.client,branch:q.branch,dept:q.dept||'Operations',status:'المتابعات',progress:0,owner:(me&&me.name)||'',ownerEmail:(me&&me.email||'').toLowerCase(),value:t.total,currency:docCur(q),fxRate:(quoteRate(q)>0?(1/quoteRate(q)):1),start:today(),end:q.date,fromQuote:q.id,checklist:quoteChecklist(q),created:new Date().toISOString()})
     .then(pid=>{ apiMerge('quotes',id,{status:'Approved',projectId:pid||''}); logAudit('create','projects',pid||'','from quote '+(q.number||'')); synced(); alert(lang==='ar'?'تم إنشاء المشروع ✔ — شوفه في Projects':'Project created ✔ — see Projects.'); })
     .catch(e=>alert('Error: '+(e.message||e)));
 }
@@ -8406,7 +8422,7 @@ function getNotifications(){
   approvals.forEach(function(a){ if((a.email||'').toLowerCase()===myEmail&&(a.status==='Approved'||a.status==='Rejected')&&num(a.decidedTs)>_seen) list.unshift({ico:a.status==='Approved'?'✅':'⛔',key:'appr:'+a.id,title:'Request '+a.status,sub:(a.title||''),count:1,ts:num(a.decidedTs),act:function(){curView='approvals';markNotifSeen();closeBell();render();}}); });
   // ---- personal: a NEW task was assigned to me (shows in the bell; a phone push is also sent on assignment) ----
   try{ var _nt=(tasks||[]).filter(function(tk){ var mine=((tk.assigneeEmail||'').toLowerCase()===myEmail && myEmail)||((tk.assignee||'')===myName); if(!mine) return false; if((tk.status||'')==='Done') return false; var ts=num(tk.assignedTs)||(tk.created?new Date(tk.created).getTime():0); return ts && ts>_seen && (Date.now()-ts)<30*86400000; });
-    _nt.forEach(function(tk){ list.unshift({ico:'🗂️',key:'task:'+tk.id,title:(lang==='ar'?'تاسك جديد ليك':'New task assigned'),sub:(tk.title||'')+(tk.projectName?(' · '+tk.projectName):'')+(tk.due?(' · '+(lang==='ar'?'تسليم ':'due ')+tk.due):''),count:1,ts:(num(tk.assignedTs)||(tk.created?new Date(tk.created).getTime():0)),act:function(){curView='operations';opsScope='mine';markNotifSeen();closeBell();render();}}); });
+    _nt.forEach(function(tk){ list.unshift({ico:'🗂️',key:'task:'+tk.id,title:(lang==='ar'?'تاسك جديد ليك':'New task assigned'),sub:(tk.title||'')+(tk.projectName?(' · '+tk.projectName):'')+(tk.due?(' · '+(lang==='ar'?'تسليم ':'due ')+tk.due):''),count:1,ts:(num(tk.assignedTs)||(tk.created?new Date(tk.created).getTime():0)),act:(function(tid){return function(){markNotifSeen();closeBell();openNotifRef('task:'+tid);};})(tk.id)}); });
   }catch(e){}
   // ---- personal: my MATERIAL REQUEST was approved / modified / rejected ----
   try{ (matreqs||[]).forEach(function(mr){ if(((mr.byEmail||'').toLowerCase())!==myEmail) return; var st=mr.status||'Pending'; if(st==='Pending') return; var ts=num(mr.decidedTs)||Date.parse(mr.decidedAt||'')||0; if(!ts||ts<=_seen||(Date.now()-ts)>30*86400000) return; var ap=num(mr.approvedQty); var partial=(st==='Approved'&&ap&&ap<num(mr.qty)); var isApp=(st==='Approved'); list.unshift({ico:isApp?'✅':'⛔',key:'matreq:'+mr.id+':'+st,title:isApp?(partial?(lang==='ar'?'طلب ماتريل اتعدّل واتوافق':'Material request modified'):(lang==='ar'?'طلب ماتريل اتوافق ✅':'Material request approved')):(lang==='ar'?'طلب ماتريل اترفض ⛔':'Material request rejected'),sub:(partial?(num(mr.qty)+'→'+ap+' × '):'')+(mr.item||''),count:1,ts:ts,act:function(){curView='field';markNotifSeen();closeBell();render();}}); }); }catch(e){}
