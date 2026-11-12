@@ -3984,6 +3984,11 @@ function projActionsRow(p){
   btns+='<button class="btn gh sm" onclick="openProjectId=\''+p.id+'\';render()">📂 '+(ar?'افتح المشروع':'Open project')+'</button>';
   return '<tr class="projActRow" style="background:#f6f9fc"><td colspan="12" style="padding:10px 12px"><div class="mini" style="margin-bottom:6px;color:var(--muted)">⚡ '+(ar?'إجراءات سريعة':'Quick actions')+(openV?(' · <span style="color:#1a7a4f;font-weight:700">'+(ar?'إنت مسجّل حضور هنا':'You are checked in here')+'</span>'):'')+'</div>'+btns+'</td></tr>';
 }
+function matReqBadge(mr){ var ar=(lang==='ar'); var st=(mr&&mr.status)||'Pending';
+  if(st==='Approved'){ var partial=num(mr.approvedQty)&&num(mr.approvedQty)<num(mr.qty); return '<span class="tag" style="background:#1a7a4f22;color:#1a7a4f">'+(partial?(ar?'✅ اتعدّل واتوافق':'✅ Modified & approved'):(ar?'✅ اتوافق':'✅ Approved'))+'</span>'; }
+  if(st==='Rejected') return '<span class="tag" style="background:#c0392b22;color:#c0392b">⛔ '+(ar?'مرفوض':'Rejected')+'</span>';
+  return '<span class="tag" style="background:#e0a93b22;color:#a9781a">🕓 '+(ar?'مستني الموافقة':'Pending')+'</span>';
+}
 function projQuickReturn(pid){
   var p=projects.find(function(x){return x.id===pid;}); if(!p)return; var ar=(lang==='ar');
   var myE=((me&&me.email)||'').toLowerCase();
@@ -4026,6 +4031,17 @@ function vField(){
         +'<button class="btn cy" style="flex:1;padding:12px;font-size:15px" onclick="advanceTask(\''+t.id+'\')">'+tStepLabel(st)+'</button>'
         +'<button class="btn gh" style="padding:12px" onclick="editTask(\''+t.id+'\')">'+(ar?'تفاصيل':'Details')+'</button>'
       +'</div></div>';
+  }).join(''); }
+  var myReqs=(matreqs||[]).filter(function(mr){ return ((mr.byEmail||'').toLowerCase()===myE); }).sort(function(a,b){return (''+(b.date||'')).localeCompare(''+(a.date||''));});
+  h+='<div class="sect" style="margin-top:10px"><h2 style="font-size:16px">🧰 '+(ar?'طلباتي للماتريال':'My material requests')+(myReqs.length?' ('+myReqs.length+')':'')+'</h2></div>';
+  if(!myReqs.length){ h+='<div class="card mini">'+(ar?'لسه مطلبتش ماتريل. اطلب من أي مشروع تحت — وهتتابع هنا الموافقة والرفض والتعديل.':'No requests yet. Request from a project below — approvals, rejections and changes show here.')+'</div>'; }
+  else { h+=myReqs.slice(0,20).map(function(mr){ var ap=num(mr.approvedQty); var partial=(mr.status==='Approved'&&ap&&ap<num(mr.qty)); var ret=num(mr.returnedQty);
+    return '<div class="card" style="margin-bottom:8px;padding:12px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="font-weight:800;font-size:15px">'+esc(mr.item)+(mr.hasTakePhoto?' <a href="#" title="'+(ar?'صورتك':'your photo')+'" onclick="matPhoto(\''+mr.id+'\',\'take\');return false">📷</a>':'')+'</div>'+matReqBadge(mr)+'</div>'
+      +'<div class="mini">'+(mr.project?'🏗️ '+esc(mr.project)+' · ':'')+(ar?'طلبت':'requested')+': <b>'+num(mr.qty)+'</b>'+(partial?(' · '+(ar?'اتصرفلك':'approved')+': <b style="color:var(--ok)">'+ap+'</b>'):'')+(ret?(' · '+(ar?'مرتجع':'returned')+': '+ret):'')+' · '+esc((mr.date||'').slice(0,10))+'</div>'
+      +(mr.decidedBy?'<div class="mini">'+(ar?'القرار من':'decided by')+': '+esc(mr.decidedBy)+'</div>':'')
+      +((mr.status==='Approved'&&ret<num(ap||mr.qty))?'<div style="margin-top:6px"><button class="btn gh sm" onclick="returnMat(\''+mr.id+'\')">↩ '+(ar?'رجّع ماتريل':'Return material')+'</button></div>':'')
+      +'</div>';
   }).join(''); }
   h+='<div class="sect" style="margin-top:10px"><h2 style="font-size:16px">🏗️ '+(ar?'مشاريعي':'My projects')+'</h2></div>';
   if(!list.length){ h+='<div class="card mini">'+(ar?'مفيش مشاريع متاحة ليك دلوقتي.':'No projects available to you.')+'</div>'; return h; }
@@ -4399,24 +4415,55 @@ function requestMaterial(pid,idx){
     });
   mpStartCam();
 }
-function decideMatReq(reqId,approve){
+/* Approve: opens a modal so the manager can APPROVE A MODIFIED QUANTITY (e.g. requested 3, approve 2). */
+function approveMatReq(reqId){
   var r=(typeof matreqs!=='undefined'?matreqs:[]).find(function(x){return x.id===reqId;}); if(!r)return;
   var p=projects.find(function(x){return x.id===r.projectId;}); if(!p){ alert('Project not found'); return; }
   if(!canApproveMat(p)){ alert(lang==='ar'?'الموافقة لمدير Operations أو Team Leader فقط.':'Only an Operations Manager or Team Leader can approve.'); return; }
-  if(r.status && r.status!=='Pending'){ return; }                 /* already decided / in-flight — blocks a double-click re-counting */
-  r.status = approve ? 'Approved' : 'Rejected';                   /* optimistic lock, set synchronously before any await */
-  if(approve){
-    var cl=(p.checklist||[]).map(function(x){ return Object.assign({},x); });   /* deep copy — never mutate the live global before the save lands */
-    var it=cl[r.itemIdx];
-    if(it){ var rem=Math.max(0,num(it.qtyPlanned)-num(it.qtyUsed)); if(num(r.qty)>rem && !confirm(lang==='ar'?('الكمية أكبر من المتبقّي ('+rem+'). توافق برضه؟'):('Qty exceeds remaining ('+rem+'). Approve anyway?'))){ r.status='Pending'; return; }
-      it.qtyUsed=num(it.qtyUsed)+num(r.qty);
-      apiMerge('projects',r.projectId,{checklist:cl}).catch(function(){});
-      apiAdd('stockMoves',{item:r.item,project:p.name,projectId:r.projectId,branch:p.branch,type:'out',qty:num(r.qty),by:r.by,note:'Approved material request (by '+((me&&me.name)||'')+')',date:new Date().toISOString().slice(0,16).replace('T',' ')});
-    }
-    apiMerge('matreqs',reqId,{status:'Approved',decidedBy:(me&&me.name)||'',decidedAt:new Date().toISOString()}).then(function(){ try{logAudit('approve','matreqs',reqId,p.name);}catch(e){} synced(); }).catch(function(e){ r.status='Pending'; alert('Error: '+(e.message||e)); });
-  } else {
-    apiMerge('matreqs',reqId,{status:'Rejected',decidedBy:(me&&me.name)||'',decidedAt:new Date().toISOString()}).then(function(){ synced(); }).catch(function(e){ r.status='Pending'; alert('Error: '+(e.message||e)); });
+  if(r.status && r.status!=='Pending'){ return; }
+  var ar=(lang==='ar'); var it=(p.checklist||[])[r.itemIdx]; var rem=it?Math.max(0,num(it.qtyPlanned)-num(it.qtyUsed)):num(r.qty);
+  openModal((ar?'موافقة على طلب — ':'Approve request — ')+esc(r.item),
+    '<div class="card mini" style="margin-bottom:8px">'+(ar?'الطالب':'By')+': <b>'+esc(r.by||'')+'</b> · '+(ar?'طلب':'requested')+': <b>'+num(r.qty)+'</b>'+(it?(' · '+(ar?'متبقّي في المخزن':'remaining')+': <b>'+rem+'</b>'):'')+(r.hasTakePhoto?' · <a href="#" onclick="matPhoto(\''+r.id+'\',\'take\');return false">📷 '+(ar?'صورته':'photo')+'</a>':'')+'</div>'+
+    '<div class="card mini" style="margin-bottom:8px;background:#eef7fb">'+(ar?'تقدر توافق على كمية أقل لو حابب — اكتب الكمية اللي هتصرفها فعلاً.':'You can approve a smaller quantity — enter what you actually issue.')+'</div>'+
+    fEl(ar?'الكمية المعتمدة':'Approved quantity','amq',num(r.qty),'number'),
+    function(){ var q=num(val('amq')); if(q<=0){alert(ar?'اكتب كمية':'Enter quantity');return false;} if(q>num(r.qty) && !confirm(ar?('الكمية أكبر من المطلوب ('+num(r.qty)+'). تمام؟'):('More than requested ('+num(r.qty)+'). OK?')))return false; _applyMatApproval(reqId,q); });
+  var sb=g('mSave'); if(sb)sb.textContent=(ar?'✓ وافق':'✓ Approve');
+}
+function _applyMatApproval(reqId,approvedQty){
+  var r=(typeof matreqs!=='undefined'?matreqs:[]).find(function(x){return x.id===reqId;}); if(!r)return;
+  var p=projects.find(function(x){return x.id===r.projectId;}); if(!p)return;
+  if(r.status && r.status!=='Pending'){ return; }
+  r.status='Approved';
+  var cl=(p.checklist||[]).map(function(x){ return Object.assign({},x); });
+  var it=cl[r.itemIdx];
+  if(it){ it.qtyUsed=num(it.qtyUsed)+num(approvedQty);
+    apiMerge('projects',r.projectId,{checklist:cl}).catch(function(){});
+    apiAdd('stockMoves',{item:r.item,project:p.name,projectId:r.projectId,branch:p.branch,type:'out',qty:num(approvedQty),by:r.by,note:'Approved material request (by '+((me&&me.name)||'')+')',date:new Date().toISOString().slice(0,16).replace('T',' ')});
   }
+  var partial=(num(approvedQty)<num(r.qty));
+  apiMerge('matreqs',reqId,{status:'Approved',approvedQty:num(approvedQty),decidedBy:(me&&me.name)||'',decidedAt:new Date().toISOString(),decidedTs:Date.now()}).then(function(){ try{logAudit('approve','matreqs',reqId,p.name);}catch(e){} try{ notifyMatRequester(r,p,'Approved',num(approvedQty),partial); }catch(_n){} synced(); }).catch(function(e){ r.status='Pending'; alert('Error: '+(e.message||e)); });
+}
+function decideMatReq(reqId,approve){
+  var r=(typeof matreqs!=='undefined'?matreqs:[]).find(function(x){return x.id===reqId;}); if(!r)return;
+  var p=projects.find(function(x){return x.id===r.projectId;}); if(!p){ alert('Project not found'); return; }
+  if(!canApproveMat(p)){ alert(lang==='ar'?'القرار لمدير Operations أو Team Leader فقط.':'Only an Operations Manager or Team Leader can decide.'); return; }
+  if(r.status && r.status!=='Pending'){ return; }
+  if(approve){ approveMatReq(reqId); return; }                    /* approve goes through the modal (modifiable qty) */
+  r.status='Rejected';
+  apiMerge('matreqs',reqId,{status:'Rejected',decidedBy:(me&&me.name)||'',decidedAt:new Date().toISOString(),decidedTs:Date.now()}).then(function(){ try{logAudit('reject','matreqs',reqId,p.name);}catch(e){} try{ notifyMatRequester(r,p,'Rejected',0,false); }catch(_n){} synced(); }).catch(function(e){ r.status='Pending'; alert('Error: '+(e.message||e)); });
+}
+/* Notify the technician who made the request when it is approved / modified / rejected (bell + push + email). */
+function notifyMatRequester(r,p,decision,approvedQty,partial){
+  var ar=(lang==='ar'); var to=((r&&r.byEmail)||'').toLowerCase(); var meE=((me&&me.email)||'').toLowerCase();
+  if(!to || to===meE) return;
+  var title, sub;
+  if(decision==='Approved'){
+    if(partial){ title=(ar?'طلب ماتريل اتعدّل واتوافق':'Material request modified & approved'); sub=(ar?'طلبت ':'requested ')+num(r.qty)+(ar?' · اتوافق على ':' · approved ')+num(approvedQty)+' × '+(r.item||'')+(p?(' — '+p.name):''); }
+    else { title=(ar?'طلب ماتريل اتوافق ✅':'Material request approved ✅'); sub=num(approvedQty)+' × '+(r.item||'')+(p?(' — '+p.name):''); }
+  } else { title=(ar?'طلب ماتريل اترفض ⛔':'Material request rejected ⛔'); sub=num(r.qty)+' × '+(r.item||'')+(p?(' — '+p.name):''); }
+  try{ apiAdd('notifications',{ts:Date.now(), toEmail:to, ico:(decision==='Approved'?'✅':'⛔'), title:title, sub:sub, type:'matreq', matreqId:r.id, projectId:(p&&p.id)||'', branch:(p&&p.branch)||'', actor:(me&&me.name)||'', actorEmail:meE}); }catch(_a){}
+  try{ sendPushToStaff([to], title+' — Sedra', sub, '/'); }catch(_p){}
+  try{ var emp=(employees||[]).find(function(x){return (x.email||'').toLowerCase()===to;}); if(emp){ var NL=String.fromCharCode(10); sendEmailAuto(to, '🧰 '+title, (ar?'بخصوص طلب الماتريل بتاعك:':'Regarding your material request:')+NL+NL+sub+NL+NL+(ar?'ادخل نظام Sedra من «شغل الموقع ← طلباتي» للتفاصيل.':'Open Sedra (Field work → My requests) for details.')); } }catch(_e){}
 }
 /* Technician returns unused material back to the PROJECT STORE.
    Effect: reduces the checklist item's qtyUsed (so Remaining goes back up), logs an IN stock move,
@@ -4428,10 +4475,10 @@ function returnMat(reqId){
   var isReq=((r.byEmail||'')===((me&&me.email||'').toLowerCase()));
   if(!isReq && !canApproveMat(p)){ alert(ar?'المرتجع للفني صاحب الطلب أو المدير / Team Leader فقط.':'Only the requester or a manager can return.'); return; }
   if(r.status!=='Approved'){ alert(ar?'المرتجع للطلبات المعتمدة فقط.':'Returns are only for approved requests.'); return; }
-  var already=num(r.returnedQty); var maxRet=num(r.qty)-already; if(maxRet<=0){ alert(ar?'الطلب ده اترجّع بالكامل.':'Already fully returned.'); return; }
+  var taken=num(r.approvedQty)||num(r.qty); var already=num(r.returnedQty); var maxRet=taken-already; if(maxRet<=0){ alert(ar?'الطلب ده اترجّع بالكامل.':'Already fully returned.'); return; }
   mpReset();
   openModal((ar?'↩ مرتجع من الفني — ':'↩ Return material — ')+esc(r.item),
-    '<div class="card mini" style="margin-bottom:8px">'+(ar?'المأخوذ':'Taken')+': <b>'+num(r.qty)+'</b>'+(already?(' · '+(ar?'مرتجع سابقًا':'returned before')+': '+already):'')+' · '+(ar?'أقصى كمية مرتجعة':'max return')+': <b>'+maxRet+'</b></div>'+
+    '<div class="card mini" style="margin-bottom:8px">'+(ar?'المأخوذ':'Taken')+': <b>'+taken+'</b>'+(already?(' · '+(ar?'مرتجع سابقًا':'returned before')+': '+already):'')+' · '+(ar?'أقصى كمية مرتجعة':'max return')+': <b>'+maxRet+'</b></div>'+
     fEl(ar?'الكمية المرتجعة لمخزن المشروع':'Quantity returned to project store','mrt_qty',maxRet,'number')+fTa(ar?'ملاحظة (اختياري)':'Note (optional)','mrt_note','')+
     mpCamBody(ar,(ar?'📷 صورة حيّة للماتريل اللي بترجّعه (إجبارية)':'📷 Live photo of the material you are returning (required)')),
     function(){ var q=num(val('mrt_qty')); if(q<=0){alert(ar?'اكتب كمية':'Enter quantity');return false;} if(q>maxRet){alert((ar?'أكبر من المسموح ':'Exceeds max ')+'('+maxRet+')');return false;}
@@ -4474,10 +4521,10 @@ function projExtraDetail(p){
   else { h+='<div style="overflow-x:auto"><table><thead><tr><th>'+(ar?'الصنف':'Item')+'</th><th>'+(ar?'كمية':'Qty')+'</th><th>'+(ar?'الطالب':'By')+'</th><th>'+(ar?'الحالة':'Status')+'</th><th></th></tr></thead><tbody>';
     reqs.slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');}).forEach(function(r){
       var col=r.status==='Approved'?'var(--ok)':(r.status==='Rejected'?'var(--bad)':'#e0a93b');
-      var ret=num(r.returnedQty); var net=num(r.qty)-ret; var isReq=((r.byEmail||'')===((me&&me.email||'').toLowerCase())); var canRet=(r.status==='Approved'&&ret<num(r.qty)&&(isReq||canAp));
+      var _taken=num(r.approvedQty)||num(r.qty); var _partial=(r.status==='Approved'&&num(r.approvedQty)&&num(r.approvedQty)<num(r.qty)); var ret=num(r.returnedQty); var net=_taken-ret; var isReq=((r.byEmail||'')===((me&&me.email||'').toLowerCase())); var canRet=(r.status==='Approved'&&ret<_taken&&(isReq||canAp));
       var _mph=(r.hasTakePhoto?' <a href="#" onclick="matPhoto(\''+r.id+'\',\'take\');return false" title="'+(ar?'صورة الاستلام':'pickup photo')+'">📷</a>':'')+(r.hasReturnPhoto?' <a href="#" onclick="matPhoto(\''+r.id+'\',\'ret\');return false" title="'+(ar?'صورة المرتجع':'return photo')+'">📷↩</a>':'');
-      h+='<tr><td><b>'+esc(r.item)+'</b>'+_mph+(r.note?'<div class="mini">'+esc(r.note)+'</div>':'')+'</td><td>'+num(r.qty)+(ret?'<div class="mini" style="color:var(--ok)">↩ '+(ar?'مرتجع ':'returned ')+ret+' · '+(ar?'صافي ':'net ')+net+'</div>':'')+'</td><td>'+esc(r.by||'')+'<div class="mini">'+esc((r.date||'').slice(0,10))+'</div></td>'
-        +'<td><span class="tag" style="background:'+col+'22;color:'+col+'">'+esc(r.status||'')+'</span>'+(r.decidedBy?'<div class="mini">'+esc(r.decidedBy)+'</div>':'')+(ret>=num(r.qty)?'<div class="mini" style="color:var(--ok)">'+(ar?'↩ اترجّع بالكامل':'fully returned')+'</div>':'')+'</td>'
+      h+='<tr><td><b>'+esc(r.item)+'</b>'+_mph+(r.note?'<div class="mini">'+esc(r.note)+'</div>':'')+'</td><td>'+num(r.qty)+(_partial?'<div class="mini" style="color:var(--ok)">✅ '+(ar?'اتصرف ':'issued ')+num(r.approvedQty)+'</div>':'')+(ret?'<div class="mini" style="color:var(--ok)">↩ '+(ar?'مرتجع ':'returned ')+ret+' · '+(ar?'صافي ':'net ')+net+'</div>':'')+'</td><td>'+esc(r.by||'')+'<div class="mini">'+esc((r.date||'').slice(0,10))+'</div></td>'
+        +'<td><span class="tag" style="background:'+col+'22;color:'+col+'">'+esc(r.status||'')+'</span>'+(r.decidedBy?'<div class="mini">'+esc(r.decidedBy)+'</div>':'')+(ret>=_taken?'<div class="mini" style="color:var(--ok)">'+(ar?'↩ اترجّع بالكامل':'fully returned')+'</div>':'')+'</td>'
         +'<td style="white-space:nowrap">'+((canAp&&r.status==='Pending')?'<button class="btn cy sm" onclick="decideMatReq(\''+r.id+'\',true)">'+(ar?'موافقة':'Approve')+'</button> <button class="btn dn sm" onclick="decideMatReq(\''+r.id+'\',false)">'+(ar?'رفض':'Reject')+'</button> ':'')+(canRet?'<button class="btn gh sm" onclick="returnMat(\''+r.id+'\')" title="'+(ar?'مرتجع من الفني لمخزن المشروع':'Return to project store')+'">↩ '+(ar?'مرتجع':'Return')+'</button>':'')+'</td></tr>';
     });
     h+='</tbody></table></div>';
@@ -8345,6 +8392,8 @@ function getNotifications(){
   try{ var _nt=(tasks||[]).filter(function(tk){ var mine=((tk.assigneeEmail||'').toLowerCase()===myEmail && myEmail)||((tk.assignee||'')===myName); if(!mine) return false; if((tk.status||'')==='Done') return false; var ts=num(tk.assignedTs)||(tk.created?new Date(tk.created).getTime():0); return ts && ts>_seen && (Date.now()-ts)<30*86400000; });
     _nt.forEach(function(tk){ list.unshift({ico:'🗂️',key:'task:'+tk.id,title:(lang==='ar'?'تاسك جديد ليك':'New task assigned'),sub:(tk.title||'')+(tk.projectName?(' · '+tk.projectName):'')+(tk.due?(' · '+(lang==='ar'?'تسليم ':'due ')+tk.due):''),count:1,ts:(num(tk.assignedTs)||(tk.created?new Date(tk.created).getTime():0)),act:function(){curView='operations';opsScope='mine';markNotifSeen();closeBell();render();}}); });
   }catch(e){}
+  // ---- personal: my MATERIAL REQUEST was approved / modified / rejected ----
+  try{ (matreqs||[]).forEach(function(mr){ if(((mr.byEmail||'').toLowerCase())!==myEmail) return; var st=mr.status||'Pending'; if(st==='Pending') return; var ts=num(mr.decidedTs)||Date.parse(mr.decidedAt||'')||0; if(!ts||ts<=_seen||(Date.now()-ts)>30*86400000) return; var ap=num(mr.approvedQty); var partial=(st==='Approved'&&ap&&ap<num(mr.qty)); var isApp=(st==='Approved'); list.unshift({ico:isApp?'✅':'⛔',key:'matreq:'+mr.id+':'+st,title:isApp?(partial?(lang==='ar'?'طلب ماتريل اتعدّل واتوافق':'Material request modified'):(lang==='ar'?'طلب ماتريل اتوافق ✅':'Material request approved')):(lang==='ar'?'طلب ماتريل اترفض ⛔':'Material request rejected'),sub:(partial?(num(mr.qty)+'→'+ap+' × '):'')+(mr.item||''),count:1,ts:ts,act:function(){curView='field';markNotifSeen();closeBell();render();}}); }); }catch(e){}
   // ---- Quote Requests: notify every stakeholder (managers, team leader, tech manager, assignee, requester) ----
   try{
     var _mineRFQ=(typeof rfqPending==='function')?rfqPending():[];
