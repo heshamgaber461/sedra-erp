@@ -4591,7 +4591,7 @@ function projImportFromQuote(pid){
   if(!canApproveMat(p)){ alert(ar?'الاستيراد للمدير أو Team Leader فقط.':'Import is for a manager / team leader only.'); return; }
   var go=function(){
     var qs=(quotes||[]).filter(function(q){ return (!q.isRFQ||q.rfqDone); }).slice().sort(function(a,b){return (''+(b.date||'')).localeCompare(''+(a.date||''));});
-    var fileBtn='<button class="btn" style="width:100%;margin-bottom:10px" onclick="closeModal();quoteImportFileOpen(\''+pid+'\')">📥 '+(ar?'استورد كوتيشن من ملف على جهازك (Excel / CSV)':'Import a quotation from a file on your device (Excel / CSV)')+'</button>';
+    var fileBtn='<button class="btn" style="width:100%;margin-bottom:10px" onclick="closeModal();quoteImportFileOpen(\''+pid+'\')">📥 '+(ar?'استورد كوتيشن من ملف على جهازك (PDF / Excel / CSV)':'Import a quotation from a file on your device (PDF / Excel / CSV)')+'</button>';
     var body='<div class="card mini" style="margin-bottom:8px">'+(ar?'اختر كوتيشن جاهز من كوتيشنات الشركة — هينزّل كل بنوده كقائمة مواد للمشروع. لو المشروع فيه بنود، هتتضاف فوقهم. أو استورد كوتيشن جديد من ملف على جهازك.':'Pick a ready company quotation — all its items load into the project store (existing items kept). Or import a new one from a file on your device.')+'</div>'+
       fileBtn+
       (qs.length?qs.map(function(q){ var n=((typeof quoteChecklist==='function')?quoteChecklist(q):[]).length; return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--mist)"><div><b>'+esc(q.number||q.id.slice(-5))+'</b><div class="mini">'+esc(q.client||'')+(q.date?(' · '+q.date):'')+' · '+n+' '+(ar?'بند':'items')+'</div></div><button class="btn cy sm" onclick="projDoImportQuote(\''+pid+'\',\''+q.id+'\')">📥 '+(ar?'استورد':'Import')+'</button></div>'; }).join(''):'<div class="mini" style="color:var(--muted);padding:6px 0">'+(ar?'مفيش كوتيشنات متسجّلة لسه — استخدم زرار الاستيراد من ملف فوق.':'No saved quotations yet — use the file import button above.')+'</div>');
@@ -5317,6 +5317,67 @@ function genQuoteNo(k){
 /* ===== Import a ready quotation FROM A FILE on the user's device (Excel / CSV) and
    register it in the company quotations. Optional pid → also attach it to that project. ===== */
 var _qfItems=[]; var _qfPid=null;
+/* ---- PDF reading (text layer) — load pdf.js on demand, extract rows, map columns by x ---- */
+function ensurePDFJS(cb){ if(window.pdfjsLib){ return cb(true); } var s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'; s.onload=function(){ try{ if(window.pdfjsLib){ window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; } }catch(e){} cb(!!window.pdfjsLib); }; s.onerror=function(){cb(false);}; document.head.appendChild(s); }
+function pdfExtractRows(buf){
+  return pdfjsLib.getDocument({data:buf}).promise.then(function(pdf){
+    var rows=[]; var chain=Promise.resolve();
+    for(var pg=1; pg<=pdf.numPages; pg++){ (function(pg){ chain=chain.then(function(){ return pdf.getPage(pg).then(function(page){ return page.getTextContent().then(function(tc){
+      var lines=[];
+      tc.items.forEach(function(it){ var s=(it.str||''); if(!s.trim())return; var x=it.transform[4], y=it.transform[5];
+        var ln=null; for(var i=0;i<lines.length;i++){ if(Math.abs(lines[i].y - y)<=3){ ln=lines[i]; break; } } if(!ln){ ln={y:y,cells:[]}; lines.push(ln); } ln.cells.push({x:x,s:s}); });
+      lines.sort(function(a,b){return b.y-a.y;});
+      lines.forEach(function(ln){ ln.cells.sort(function(a,b){return a.x-b.x;}); rows.push(ln); });
+    }); }); }); })(pg); }
+    return chain.then(function(){ return rows; });
+  });
+}
+function qfIsNum(s){ var cl=(s==null?'':''+s).replace(/[,\s]/g,''); return /^[-+]?\d+(\.\d+)?%?$/.test(cl); }
+function qfRowsToItems(rows){ /* rows: array of arrays of strings */
+  var items=[];
+  (rows||[]).forEach(function(cells,idx){ var textParts=[],nums=[];
+    (cells||[]).forEach(function(c){ var s=(c==null?'':''+c).trim(); if(!s)return; if(qfIsNum(s)) nums.push(num(s.replace(/[,\s]/g,''))); else textParts.push(s); });
+    var item=textParts.join(' ').trim(); if(!item)return;
+    var low=item.toLowerCase();
+    if(/^(total|sub ?total|subtotal|vat|grand|اجمالي|إجمالي|الاجمالي|الإجمالي|الضريبة|ضريبة|discount|خصم|terms|شروط|notes|ملاحظات|page|صفحة)/.test(low)) return;
+    var joined=(cells||[]).join(' ').toLowerCase();
+    if(idx<3 && nums.length<2 && /item|desc|product|qty|price|code|unit|بند|وصف|كمية|سعر|عدد|كود/.test(joined)) return;
+    if(nums.length<1) return;
+    var qty=1,price=0; if(nums.length>=2){ qty=nums[nums.length-2]; price=nums[nums.length-1]; } else { price=nums[0]; }
+    items.push({item:item,code:'',qty:qty||1,price:price||0,brand:''});
+  });
+  return items;
+}
+function qfPdfParse(rows){
+  /* rows: [{y, cells:[{x,s}]}] — try header+column-by-x; fallback to text-merge positional */
+  var hdr=null,hi=-1;
+  for(var i=0;i<Math.min(rows.length,20);i++){ var txt=rows[i].cells.map(function(c){return c.s;}).join(' ').toLowerCase();
+    if(/(desc|item|product|بند|وصف|الصنف)/.test(txt) && /(qty|quantity|كمية|عدد|price|سعر|unit|rate)/.test(txt)){ hdr=rows[i]; hi=i; break; } }
+  if(hdr){
+    var cols={};
+    hdr.cells.forEach(function(c){ var n=(c.s||'').toLowerCase();
+      if(cols.qty===undefined && /qty|quantity|كمية|عدد/.test(n)) cols.qty=c.x;
+      else if(cols.price===undefined && /unit|price|سعر|rate/.test(n)) cols.price=c.x;
+      else if(cols.code===undefined && /code|part|sku|model|كود|موديل/.test(n)) cols.code=c.x;
+      else if(cols.total===undefined && /total|اجمالي|إجمالي/.test(n)) cols.total=c.x;
+      else if(cols.desc===undefined && /desc|item|product|بند|وصف|الصنف/.test(n)) cols.desc=c.x;
+    });
+    if(cols.desc!==undefined && (cols.qty!==undefined || cols.price!==undefined)){
+      var items=[];
+      rows.slice(hi+1).forEach(function(r){ var b={desc:[],code:[],qty:[],price:[],total:[]};
+        r.cells.forEach(function(c){ var best=null,bd=1e9; for(var k in cols){ var d=Math.abs(c.x-cols[k]); if(d<bd){bd=d;best=k;} } if(best==='total')return; (b[best]||b.desc).push(c.s); });
+        var desc=(b.desc.join(' ')).trim(); var code=(b.code.join(' ')).trim();
+        var qty=num((b.qty.join('')||'').replace(/[,\s]/g,'')); var price=num((b.price.join('')||'').replace(/[,\s]/g,''));
+        if(!desc)return; var low=desc.toLowerCase();
+        if(/^(total|sub ?total|subtotal|vat|grand|اجمالي|إجمالي|الاجمالي|الإجمالي|الضريبة|ضريبة|discount|خصم|terms|شروط|notes|ملاحظات|page|صفحة)/.test(low)) return;
+        if(!qty && !price && !/\d/.test(r.cells.map(function(c){return c.s;}).join(''))) return;
+        items.push({item:desc,code:code,qty:qty||1,price:price||0,brand:''});
+      });
+      if(items.length) return items;
+    }
+  }
+  return qfRowsToItems(rows.map(function(r){return r.cells.map(function(c){return c.s;});}));
+}
 function qfParse(objs, arrFallback){ var items=qfByHeader(objs||[]); if(items.length) return items; var arr=(arrFallback&&arrFallback.length)?arrFallback:(objs||[]).map(function(r){return Object.keys(r||{}).map(function(k){return r[k];});}); return qfByPosition(arr); }
 function qfByHeader(rows){
   if(!rows||!rows.length)return [];
@@ -5348,15 +5409,19 @@ function quoteImportFileOpen(pid){
   if(typeof canCreateQuote==='function' && !canCreateQuote()){ alert(ar?'إنشاء الكوتيشن متاح لفريق المبيعات / المدير فقط.':'Creating quotations is limited to Sales / manager.'); return; }
   _qfItems=[]; _qfPid=pid||null;
   var body=''+
-   '<div class="mini" style="margin-bottom:8px">'+(ar?'ارفع ملف الكوتيشن من جهازك (Excel أو CSV). الأعمدة المتوقّعة: <b>البند/الوصف</b> · كود (اختياري) · الكمية · سعر الوحدة. هتشوف معاينة قبل الحفظ، والكوتيشن هيتسجّل في كوتيشنات الشركة.':'Upload a quotation file from your device (Excel or CSV). Expected columns: <b>Item/Description</b> · Code (optional) · Qty · Unit price. You will preview before saving; it will be registered in the company quotations.')+'</div>'+
+   '<div class="mini" style="margin-bottom:8px">'+(ar?'ارفع ملف الكوتيشن من جهازك (PDF أو Excel أو CSV). الأعمدة المتوقّعة: <b>البند/الوصف</b> · كود (اختياري) · الكمية · سعر الوحدة. هتشوف معاينة قبل الحفظ، والكوتيشن هيتسجّل في كوتيشنات الشركة.':'Upload a quotation file from your device (PDF, Excel or CSV). Expected columns: <b>Item/Description</b> · Code (optional) · Qty · Unit price. You will preview before saving; it will be registered in the company quotations.')+'</div>'+
    '<div class="row2">'+fEl(ar?'اسم العميل':'Client name','qf_client','')+selEl(ar?'الفرع':'Branch','qf_branch',BRANCHES,defBranch())+'</div>'+
    '<div class="row2">'+fEl(ar?'عنوان / اسم الكوتيشن (اختياري)':'Title (optional)','qf_subject','')+selEl(ar?'المجال':'Service','qf_service',QSERVICES,'Home Automation')+'</div>'+
-   '<div class="fld"><label>'+(ar?'📄 ملف الكوتيشن (Excel / CSV)':'📄 Quotation file (Excel / CSV)')+'</label><input id="qf_file" type="file" accept=".xlsx,.xls,.csv" onchange="quoteImportFileLoad()"></div>'+
+   '<div class="fld"><label>'+(ar?'📄 ملف الكوتيشن (PDF / Excel / CSV)':'📄 Quotation file (PDF / Excel / CSV)')+'</label><input id="qf_file" type="file" accept=".xlsx,.xls,.csv,.pdf" onchange="quoteImportFileLoad()"></div>'+
    '<details style="margin:6px 0"><summary class="mini" style="cursor:pointer">'+(ar?'أو الصق البنود من Excel':'Or paste rows from Excel')+'</summary><textarea id="qf_paste" rows="5" style="width:100%" placeholder="'+(ar?'الصق الصفوف هنا (نسخ من Excel)…':'Paste rows here (copy from Excel)…')+'"></textarea><button class="btn gh sm" style="margin-top:6px" onclick="quoteImportPaste()">'+(ar?'حلّل اللصق':'Parse paste')+'</button></details>'+
    '<div id="qf_prev" class="mini" style="margin-top:8px"></div>';
   openModal((ar?'📥 استورد كوتيشن من ملف':'📥 Import quotation from file'), body, function(){ return quoteImportSave(); }, {wide:true});
 }
 function quoteImportFileLoad(){ var el=g('qf_file'); var f=el&&el.files[0]; if(!f)return; var nm=(f.name||'').toLowerCase();
+  if(/\.pdf$/.test(nm)){ var prev=g('qf_prev'); if(prev)prev.innerHTML='<div class="mini">'+(lang==='ar'?'⏳ بقرا الـ PDF…':'⏳ Reading PDF…')+'</div>';
+    ensurePDFJS(function(ok){ if(!ok){ alert(lang==='ar'?'تعذّر تحميل قارئ PDF — اتأكد من النت وجرّب تاني':'Could not load the PDF reader — check your connection'); return; }
+      var rd=new FileReader(); rd.onload=function(e){ try{ pdfExtractRows(new Uint8Array(e.target.result)).then(function(rows){ if(!rows.length){ _qfItems=[]; var pp=g('qf_prev'); if(pp)pp.innerHTML='<div class="mini" style="color:var(--bad)">'+(lang==='ar'?'الـ PDF ده مفهوش نص قابل للقراءة (غالبًا صورة/سكان). صدّره Excel أو استخدم اللصق.':'This PDF has no readable text (likely a scan). Export to Excel or use paste.')+'</div>'; return; } _qfItems=qfPdfParse(rows); quoteImportPrev(); }).catch(function(err){ alert('PDF read error: '+(err.message||err)); }); }catch(err){ alert('PDF read error: '+(err.message||err)); } }; rd.readAsArrayBuffer(f); });
+    return; }
   if(/\.xlsx?$/.test(nm)){ ensureXLSX(function(ok){ if(!ok){alert(lang==='ar'?'تعذّر تحميل قارئ Excel — جرّب CSV':'Could not load Excel reader — try CSV'); return;} var rd=new FileReader(); rd.onload=function(e){ try{ var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'}); var ws=wb.Sheets[wb.SheetNames[0]]; var objs=XLSX.utils.sheet_to_json(ws,{defval:''}); var arr=XLSX.utils.sheet_to_json(ws,{header:1,defval:''}); _qfItems=qfParse(objs,arr); quoteImportPrev(); }catch(err){ alert('Excel read error: '+(err.message||err)); } }; rd.readAsArrayBuffer(f); }); return; }
   readTextSmart(f,function(txt){ try{ _qfItems=qfParse(parseCSV(txt),null); quoteImportPrev(); }catch(e){ alert('Could not read file: '+(e.message||e)); } });
 }
@@ -5392,7 +5457,7 @@ function quoteImportSave(){ var ar=(lang==='ar'); var client=((g('qf_client')&&g
   }).catch(function(e){ alert('Save error: '+(e.message||e)); });
   closeModal();
 }
-function newQuoteChoice(){ if(!canRequestQuote()){ alert(lang==='ar'?'الصلاحية دي لفريق المبيعات فقط.':'This is limited to the Sales team.'); return; } if(!canCreateQuote()){ quoteToTech(); return; } var ar=(lang==='ar'); openModal(ar?'كوتيشن جديد':'New quotation','<div class="mini" style="margin-bottom:12px">'+(ar?'عايز تعمل الكوتيشن إزاي؟':'How do you want to create this quotation?')+'</div>'+'<button class="btn cy" style="width:100%;margin-bottom:10px" onclick="closeModal();editQuote()">\uD83D\uDEE0\uFE0F '+(ar?'ابنيه بنفسي (اختار المنتجات والأسعار)':'Build it myself (choose products & prices)')+'</button>'+'<button class="btn" style="width:100%;margin-bottom:10px" onclick="closeModal();quoteImportFileOpen()">\uD83D\uDCE5 '+(ar?'استورد من ملف جاهز (Excel / CSV)':'Import from a ready file (Excel / CSV)')+'</button>'+'<button class="btn" style="width:100%" onclick="closeModal();quoteToTech()">\uD83D\uDCE8 '+(ar?'ابعت طلب للمكتب الفني':'Send a request to the Technical Office')+'</button>', null); }
+function newQuoteChoice(){ if(!canRequestQuote()){ alert(lang==='ar'?'الصلاحية دي لفريق المبيعات فقط.':'This is limited to the Sales team.'); return; } if(!canCreateQuote()){ quoteToTech(); return; } var ar=(lang==='ar'); openModal(ar?'كوتيشن جديد':'New quotation','<div class="mini" style="margin-bottom:12px">'+(ar?'عايز تعمل الكوتيشن إزاي؟':'How do you want to create this quotation?')+'</div>'+'<button class="btn cy" style="width:100%;margin-bottom:10px" onclick="closeModal();editQuote()">\uD83D\uDEE0\uFE0F '+(ar?'ابنيه بنفسي (اختار المنتجات والأسعار)':'Build it myself (choose products & prices)')+'</button>'+'<button class="btn" style="width:100%;margin-bottom:10px" onclick="closeModal();quoteImportFileOpen()">\uD83D\uDCE5 '+(ar?'استورد من ملف جاهز (PDF / Excel / CSV)':'Import from a ready file (PDF / Excel / CSV)')+'</button>'+'<button class="btn" style="width:100%" onclick="closeModal();quoteToTech()">\uD83D\uDCE8 '+(ar?'ابعت طلب للمكتب الفني':'Send a request to the Technical Office')+'</button>', null); }
 const RFQ_PTYPES=['Apartment','Villa','Duplex','Penthouse','Twin house','Townhouse','Administrative','Commercial','Clinic','Retail','Other'];
 const RFQ_DESIGN=['Plan','Qty by sales'];
 const RFQ_CATS=['Low budget','Mid-range','High-end','Premium'];
