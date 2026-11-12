@@ -4114,13 +4114,16 @@ function tkRecToggle(){ var ar=(lang==='ar'); var btn=g('tkRecBtn'),st=g('tkRecS
   }).catch(function(){ alert(ar?'اسمح للميكروفون بالوصول':'Allow microphone access'); });
 }
 function tkAudioDrop(){ _tkAudio=null; var au=g('tkAudio'); if(au){au.style.display='none';au.src='';} var st=g('tkRecStatus'); if(st)st.textContent=''; var btn=g('tkRecBtn'); if(btn)btn.textContent='🎙️ '+(lang==='ar'?'سجّل صوت':'Record voice'); var dr=g('tkAudDrop'); if(dr)dr.style.display='none'; }
-function tkMediaBody(ar,hasP,hasA){
-  return '<div class="fld"><label>'+(ar?'📎 مرفقات الملاحظة (اختياري)':'📎 Note attachments (optional)')+'</label>'
+function tkShowSaved(taskId,which){ var ar=(lang==='ar'); var box=g('tkSavedBox'); if(box)box.innerHTML='<span class="mini">'+(ar?'⏳ بحمّل…':'⏳ loading…')+'</span>';
+  apiCall('GET','/taskmedia/'+taskId+'.json').then(function(rec){ var d=rec&&rec[which]; var b=g('tkSavedBox'); if(!b)return; if(!d){ b.innerHTML='<span class="mini" style="color:var(--bad)">'+(ar?'المرفق مش موجود':'Attachment not found')+'</span>'; return; } if(which==='photo'){ b.innerHTML='<img src="'+d+'" alt="" style="width:100%;max-height:280px;object-fit:contain;border-radius:8px;background:#000">'; } else { b.innerHTML='<audio controls autoplay src="'+d+'" style="width:100%"></audio>'; } }).catch(function(e){ var b=g('tkSavedBox'); if(b)b.innerHTML='<span class="mini" style="color:var(--bad)">Error: '+(e&&e.message||e)+'</span>'; });
+}
+function tkMediaBody(ar,hasP,hasA,taskId){
+  return '<div class="fld"><label>'+(ar?'📎 مرفقات الملاحظة (صورة / صوت)':'📎 Note attachments (photo / voice)')+'</label>'
+   +((hasP||hasA)&&taskId?('<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">'+(hasP?'<button type="button" class="btn cy sm" onclick="tkShowSaved(\''+taskId+'\',\'photo\')">👁 '+(ar?'شوف الصورة المحفوظة':'View saved photo')+'</button>':'')+(hasA?'<button type="button" class="btn cy sm" onclick="tkShowSaved(\''+taskId+'\',\'audio\')">▶ '+(ar?'اسمع الصوت المحفوظ':'Play saved voice')+'</button>':'')+'</div><div id="tkSavedBox" style="margin-bottom:6px"></div>'):'')
+   +'<div class="mini" style="margin-bottom:4px">'+(ar?'تقدر تضيف/تستبدل:':'Add / replace:')+'</div>'
    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
      +'<button type="button" class="btn gh sm" onclick="tkCamOpen()">📷 '+(ar?'صورة':'Photo')+'</button>'
      +'<button type="button" id="tkRecBtn" class="btn gh sm" onclick="tkRecToggle()">🎙️ '+(ar?'سجّل صوت':'Record voice')+'</button>'
-     +(hasP?'<span class="mini" style="color:var(--ok)">📷 '+(ar?'في صورة محفوظة':'photo on file')+'</span>':'')
-     +(hasA?'<span class="mini" style="color:var(--ok)">🎙️ '+(ar?'في صوت محفوظ':'voice on file')+'</span>':'')
    +'</div>'
    +'<div id="tkCamWrap" style="display:none;margin-bottom:6px">'
      +'<video id="tkVid" playsinline autoplay muted style="display:none;width:100%;max-height:220px;border-radius:8px;background:#000;object-fit:cover"></video>'
@@ -4151,7 +4154,7 @@ function editTask(id,projectId){
     `<div class="row2">${assigneeSel}${fEl('Due date','t_due',t.due,'date')}</div>`+
     selEl('Status','t_status',TSTAT,t.status||'To Do')+
     fTa(ar?'ملاحظات (نص)':'Notes (text)','t_notes',t.notes)+
-    tkMediaBody(ar,!!(t.hasPhoto),!!(t.hasAudio)),
+    tkMediaBody(ar,!!(t.hasPhoto),!!(t.hasAudio),id||''),
     ()=>{ const pid=val('t_project'); const pn=(projects.find(x=>x.id===pid)||{}).name||''; const br=(projects.find(x=>x.id===pid)||{}).branch||defBranch();
       const d={title:val('t_title'),project:pid,projectName:pn,branch:br,assignee:val('t_assignee'),due:val('t_due'),status:val('t_status'),notes:val('t_notes')};
       if(!d.title){alert(ar?'لازم عنوان للتاسك':'Title required');return false;} if(!id)d.created=new Date().toISOString();
